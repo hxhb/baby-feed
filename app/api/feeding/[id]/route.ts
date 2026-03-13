@@ -8,7 +8,7 @@ export async function PUT(
 ) {
   try {
     const { id } = await params
-    const session = await auth()
+    const session = await auth(request)
     if (!session?.user) {
       return NextResponse.json({ error: '未授权' }, { status: 401 })
     }
@@ -18,6 +18,7 @@ export async function PUT(
       type,
       leftBreastDuration,
       rightBreastDuration,
+      breastMilkAmount,
       formulaAmount,
       adGiven,
       startTime,
@@ -42,6 +43,7 @@ export async function PUT(
         type,
         leftBreastDuration,
         rightBreastDuration,
+        breastMilkAmount,
         formulaAmount,
         adGiven,
         startTime: startTime ? new Date(startTime) : undefined,
@@ -64,7 +66,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    const session = await auth()
+    const session = await auth(request)
     if (!session?.user) {
       return NextResponse.json({ error: '未授权' }, { status: 401 })
     }

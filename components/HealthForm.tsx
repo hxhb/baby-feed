@@ -12,12 +12,12 @@ import {
   Clock,
   Ruler,
   Syringe,
-  Baby,
+  Baby as BabyIcon,
   Droplets,
   Milk
 } from 'lucide-react'
 
-interface Baby {
+interface BabyInfo {
   id: string
   name: string
 }
@@ -30,7 +30,7 @@ interface Props {
 
 export default function HealthForm({ initialType }: Props) {
   const router = useRouter()
-  const [babies, setBabies] = useState<Baby[]>([])
+  const [babies, setBabies] = useState<BabyInfo[]>([])
   const [loading, setLoading] = useState(false)
   
   const [babyId, setBabyId] = useState('')
@@ -137,7 +137,7 @@ export default function HealthForm({ initialType }: Props) {
     { value: 'AD_VITAMIN', label: 'AD', icon: Pill, color: 'orange' },
     { value: 'MEDICATION', label: '服药', icon: Pill, color: 'purple' },
     { value: 'VACCINE', label: '疫苗', icon: Syringe, color: 'teal' },
-    { value: 'DIAPER', label: '大小便', icon: Baby, color: 'amber' },
+    { value: 'DIAPER', label: '大小便', icon: BabyIcon, color: 'amber' },
   ]
 
   const getColorClasses = (color: string, isSelected: boolean) => {
