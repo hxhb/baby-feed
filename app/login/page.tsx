@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { signIn } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 export default function LoginPage() {
@@ -9,6 +10,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -19,19 +21,28 @@ export default function LoginPage() {
       const result = await signIn('credentials', {
         email,
         password,
-        redirect: false
+        redirect: false,
+        callbackUrl: '/',
       })
 
       console.log('signIn result:', result)
 
       if (result?.error) {
-        setError('邮箱或密码错误')
+        if (result.error === 'CredentialsSignin') {
+          setError('邮箱或密码错误')
+        } else {
+          setError(`登录失败: ${result.error}`)
+        }
       } else if (result?.ok) {
-        window.location.href = '/'
+        // 使用 Next.js router 跳转，比 window.location.href 更可靠
+        router.push('/')
+        router.refresh()
+      } else {
+        setError('登录异常，请重试')
       }
     } catch (err) {
       console.error('login error:', err)
-      setError('登录失败，请重试')
+      setError(`登录失败: ${err instanceof Error ? err.message : '请重试'}`)
     } finally {
       setLoading(false)
     }

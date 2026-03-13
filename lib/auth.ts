@@ -23,6 +23,13 @@ declare module 'next-auth/jwt' {
   }
 }
 
+// 判断是否通过 HTTPS 访问（影响 cookie 的 Secure 标志和名称前缀）
+// 注意：去掉 NEXTAUTH_URL 末尾的斜杠，避免 NextAuth 拼接回调 URL 时出现双斜杠
+const nextAuthUrl = process.env.NEXTAUTH_URL?.replace(/\/+$/, '')
+const useSecureCookies = nextAuthUrl?.startsWith('https://') ?? false
+// HTTPS 时 NextAuth 默认用 __Secure- 前缀，HTTP 时不带前缀
+const cookiePrefix = useSecureCookies ? '__Secure-' : ''
+
 export const authOptions: AuthOptions = {
   providers: [
     CredentialsProvider({
@@ -68,14 +75,35 @@ export const authOptions: AuthOptions = {
   pages: {
     signIn: '/login'
   },
+  // useSecureCookies 必须和 cookie 配置中的 secure 标志保持一致
+  // 这告诉 NextAuth 内部在读取/写入 cookie 时使用正确的名称前缀
+  useSecureCookies,
   cookies: {
     sessionToken: {
-      name: `next-auth.session-token`,
+      name: `${cookiePrefix}next-auth.session-token`,
       options: {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
-        secure: process.env.NODE_ENV === 'production',
+        secure: useSecureCookies,
+      },
+    },
+    callbackUrl: {
+      name: `${cookiePrefix}next-auth.callback-url`,
+      options: {
+        sameSite: 'lax',
+        path: '/',
+        secure: useSecureCookies,
+      },
+    },
+    csrfToken: {
+      // CSRF token 始终不使用 __Secure- 前缀（NextAuth 约定）
+      name: 'next-auth.csrf-token',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: useSecureCookies,
       },
     },
   },
@@ -93,14 +121,19 @@ export const authOptions: AuthOptions = {
       return session
     }
   },
-  debug: process.env.NODE_ENV === 'development',
+  // 生产环境开启 debug 以便排查问题，确认正常后可关闭
+  debug: process.env.NEXTAUTH_DEBUG === 'true',
 }
 
-export async function auth(request?: NextRequest): Promise<Session | null> {
+export async function auth(request: NextRequest): Promise<Session | null> {
   try {
     const token = await getToken({ 
-      req: request as NextRequest,
-      secret: process.env.NEXTAUTH_SECRET 
+      req: request,
+      secret: process.env.NEXTAUTH_SECRET,
+      // 显式指定 cookie 名，与 authOptions.cookies.sessionToken.name 保持一致
+      cookieName: `${cookiePrefix}next-auth.session-token`,
+      // 在反向代理场景下 secureCookie 必须与 useSecureCookies 一致
+      secureCookie: useSecureCookies,
     })
     
     if (!token) {
