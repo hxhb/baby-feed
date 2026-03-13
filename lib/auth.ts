@@ -1,8 +1,9 @@
-import { AuthOptions, Session, getServerSession } from 'next-auth'
-import { JWT } from 'next-auth/jwt'
+import { AuthOptions, Session } from 'next-auth'
+import { JWT, getToken } from 'next-auth/jwt'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import { prisma } from './prisma'
+import { NextRequest } from 'next/server'
 
 interface SessionUser {
   id: string
@@ -78,7 +79,7 @@ export const authOptions: AuthOptions = {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
-        secure: false,
+        secure: process.env.NODE_ENV === 'production',
       },
     },
   },
@@ -98,13 +99,29 @@ export const authOptions: AuthOptions = {
       return session
     }
   },
-  debug: true,
+  debug: process.env.NODE_ENV === 'development',
 }
 
-export async function auth(): Promise<Session | null> {
+export async function auth(request?: NextRequest): Promise<Session | null> {
   try {
-    const session = await getServerSession(authOptions)
-    return session
+    const token = await getToken({ 
+      req: request as NextRequest,
+      secret: process.env.NEXTAUTH_SECRET 
+    })
+    
+    if (!token) {
+      console.log('auth: no token found')
+      return null
+    }
+    
+    return {
+      user: {
+        id: token.id as string,
+        email: token.email as string,
+        name: token.name as string
+      },
+      expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+    }
   } catch (error) {
     console.error('Auth error:', error)
     return null
