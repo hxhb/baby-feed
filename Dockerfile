@@ -54,7 +54,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# 复制必要文件（public 目录可能不存在）
+# 复制必要文件
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
@@ -63,10 +63,8 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/app/generated/prisma ./app/generated/prisma
 
-# 复制 Prisma 运行时依赖
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder /app/node_modules/@libsql ./node_modules/@libsql
-COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
+# 复制完整的 node_modules（Prisma 7 需要完整依赖）
+COPY --from=builder /app/node_modules ./node_modules
 
 # 复制启动脚本
 COPY --from=builder /app/start.sh ./start.sh
