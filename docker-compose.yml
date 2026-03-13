@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  baby-feed:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: baby-feed
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=file:/app/data/baby-feed.db
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-your-secret-key-change-me}
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
+    volumes:
+      - baby-feed-data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  baby-feed-data:
+    driver: local

@@ -1,0 +1,74 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  babies    Baby[]
+  feedingRecords FeedingRecord[]
+  healthRecords HealthRecord[]
+}
+
+model Baby {
+  id        String   @id @default(cuid())
+  name      String
+  birthDate DateTime
+  gender    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String
+  user      User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  feedingRecords FeedingRecord[]
+  healthRecords HealthRecord[]
+}
+
+model FeedingRecord {
+  id                  String    @id @default(cuid())
+  babyId              String
+  type                String
+  leftBreastDuration  Int?
+  rightBreastDuration Int?
+  breastMilkAmount    Float?
+  formulaAmount       Float?
+  adGiven             Boolean?
+  startTime           DateTime
+  endTime             DateTime?
+  notes               String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  createdBy           String
+  baby                Baby      @relation(fields: [babyId], references: [id], onDelete: Cascade)
+  user                User      @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+}
+
+model HealthRecord {
+  id              String    @id @default(cuid())
+  babyId          String
+  type            String
+  weight          Float?
+  height          Float?
+  temperature     Float?
+  medicationName  String?
+  medicationDose  String?
+  vaccineName     String?
+  diaperType      String?
+  diaperStatus    String?
+  adGiven         Boolean?
+  recordedAt      DateTime
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  createdBy       String
+  baby            Baby      @relation(fields: [babyId], references: [id], onDelete: Cascade)
+  user            User      @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+}
