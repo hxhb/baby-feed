@@ -35,8 +35,8 @@ COPY . .
 RUN npx prisma generate
 
 # 设置环境变量
-ENV NEXT_TELEMETRY_DISABLED 1
-ENV NODE_ENV production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
 
 # 构建 Next.js 应用
 RUN npm run build
@@ -47,15 +47,14 @@ RUN npm run build
 FROM base AS runner
 WORKDIR /app
 
-ENV NODE_ENV production
-ENV NEXT_TELEMETRY_DISABLED 1
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
 
 # 创建非 root 用户
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
 # 复制必要文件
-COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
@@ -64,10 +63,8 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/app/generated/prisma ./app/generated/prisma
 
-# 复制 Prisma 运行时依赖
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder /app/node_modules/@libsql ./node_modules/@libsql
-COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
+# 复制完整的 node_modules（Prisma 7 需要完整依赖）
+COPY --from=builder /app/node_modules ./node_modules
 
 # 复制启动脚本
 COPY --from=builder /app/start.sh ./start.sh
@@ -84,8 +81,8 @@ USER nextjs
 EXPOSE 3000
 
 # 设置环境变量
-ENV PORT 3000
-ENV HOSTNAME "0.0.0.0"
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
 
 # 启动应用
 CMD ["sh", "start.sh"]
