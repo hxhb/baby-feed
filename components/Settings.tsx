@@ -756,7 +756,7 @@ export default function SettingsComponent({ userName, userEmail }: Props) {
                   onChange={(e) => setDeleteConfirmText(e.target.value)}
                   required
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
-                  placeholder="请输入"确认注销""
+                  placeholder={'请输入"确认注销"'}
                 />
               </div>
 
