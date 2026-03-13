@@ -1,6 +1,9 @@
 import { withAuth } from 'next-auth/middleware'
 import { NextResponse } from 'next/server'
 
+const useSecureCookies = process.env.NEXTAUTH_URL?.startsWith('https://') ?? false
+const cookiePrefix = useSecureCookies ? '__Secure-' : ''
+
 export default withAuth(
   function middleware(req) {
     return NextResponse.next()
@@ -10,8 +13,8 @@ export default withAuth(
       authorized: ({ token, req }) => {
         const { pathname } = req.nextUrl
         
-        // 允许访问登录页面和注册页面
-        if (pathname === '/login' || pathname === '/register') {
+        // 允许访问登录页面、注册页面和离线页面
+        if (pathname === '/login' || pathname === '/register' || pathname === '/offline') {
           return true
         }
         
@@ -20,11 +23,14 @@ export default withAuth(
           return true
         }
         
-        // 允许访问静态文件
+        // 允许访问 PWA 资源和静态文件（精确匹配常见静态资源后缀）
         if (
           pathname.startsWith('/_next') ||
           pathname.startsWith('/favicon') ||
-          pathname.includes('.')
+          pathname.startsWith('/icons/') ||
+          pathname === '/manifest.json' ||
+          pathname === '/sw.js' ||
+          /\.(ico|png|jpg|jpeg|gif|svg|webp|css|js|woff|woff2|ttf|eot|map)$/i.test(pathname)
         ) {
           return true
         }
@@ -35,6 +41,12 @@ export default withAuth(
     },
     pages: {
       signIn: '/login',
+    },
+    // middleware 的 cookies 类型是 Omit<CookieOption, "options">，只接受 name 字段
+    cookies: {
+      sessionToken: {
+        name: `${cookiePrefix}next-auth.session-token`,
+      },
     },
   }
 )
