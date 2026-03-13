@@ -1,7 +1,7 @@
 'use client'
 
 import { useSession } from 'next-auth/react'
-import { redirect } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { Layout } from '@/components/Providers'
 import Dashboard from '@/components/Dashboard'
@@ -9,12 +9,13 @@ import Dashboard from '@/components/Dashboard'
 export default function Home() {
   const { data: session, status } = useSession()
   const [selectedBabyId, setSelectedBabyId] = useState<string | null>(null)
+  const router = useRouter()
 
   useEffect(() => {
     if (status === 'unauthenticated') {
-      redirect('/login')
+      router.push('/login')
     }
-  }, [status])
+  }, [status, router])
 
   if (status === 'loading') {
     return (

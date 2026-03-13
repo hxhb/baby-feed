@@ -15,7 +15,7 @@ import {
   Trash2,
   Ruler,
   Syringe,
-  Baby
+  Baby as BabyIcon
 } from 'lucide-react'
 
 interface Baby {
@@ -56,7 +56,7 @@ interface HealthRecord {
   recordType: 'health'
 }
 
-type Record = FeedingRecord | HealthRecord
+type TimelineRecord = FeedingRecord | HealthRecord
 
 interface Props {
   selectedBabyId: string | null
@@ -180,12 +180,12 @@ export default function TimelineComponent({ selectedBabyId, onSelectBaby }: Prop
       case 'TEMPERATURE': return <Thermometer size={20} className="text-red-500" />
       case 'MEDICATION': return <Pill size={20} className="text-purple-500" />
       case 'VACCINE': return <Syringe size={20} className="text-teal-500" />
-      case 'DIAPER': return <Baby size={20} className="text-amber-500" />
+      case 'DIAPER': return <BabyIcon size={20} className="text-amber-500" />
       default: return null
     }
   }
 
-  const getRecordTitle = (record: Record) => {
+  const getRecordTitle = (record: TimelineRecord) => {
     switch (record.type) {
       case 'BREAST_MILK': {
         const feeding = record as FeedingRecord

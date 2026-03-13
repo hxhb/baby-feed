@@ -1,7 +1,7 @@
 'use client'
 
 import { useSession } from 'next-auth/react'
-import { redirect, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, Suspense } from 'react'
 import { Layout } from '@/components/Providers'
 import FeedingForm from '@/components/FeedingForm'
@@ -11,12 +11,13 @@ function AddContent() {
   const { data: session, status } = useSession()
   const searchParams = useSearchParams()
   const type = searchParams.get('type')
+  const router = useRouter()
 
   useEffect(() => {
     if (status === 'unauthenticated') {
-      redirect('/login')
+      router.push('/login')
     }
-  }, [status])
+  }, [status, router])
 
   if (status === 'loading' || !session) {
     return (

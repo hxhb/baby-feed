@@ -8,7 +8,7 @@ export async function PUT(
 ) {
   try {
     const { id } = await params
-    const session = await auth()
+    const session = await auth(request)
     if (!session?.user) {
       return NextResponse.json({ error: '未授权' }, { status: 401 })
     }
@@ -17,9 +17,14 @@ export async function PUT(
     const {
       type,
       weight,
+      height,
       temperature,
       medicationName,
       medicationDose,
+      vaccineName,
+      diaperType,
+      diaperStatus,
+      adGiven,
       recordedAt,
       notes
     } = body
@@ -40,9 +45,14 @@ export async function PUT(
       data: {
         type,
         weight,
+        height,
         temperature,
         medicationName,
         medicationDose,
+        vaccineName,
+        diaperType,
+        diaperStatus,
+        adGiven,
         recordedAt: recordedAt ? new Date(recordedAt) : undefined,
         notes
       },
@@ -62,7 +72,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    const session = await auth()
+    const session = await auth(request)
     if (!session?.user) {
       return NextResponse.json({ error: '未授权' }, { status: 401 })
     }

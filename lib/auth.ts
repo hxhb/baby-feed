@@ -32,7 +32,6 @@ export const authOptions: AuthOptions = {
         password: { label: 'Password', type: 'password' }
       },
       async authorize(credentials) {
-        console.log('authorize credentials:', credentials?.email)
         if (!credentials?.email || !credentials?.password) {
           return null
         }
@@ -42,7 +41,6 @@ export const authOptions: AuthOptions = {
         })
 
         if (!user) {
-          console.log('user not found')
           return null
         }
 
@@ -52,11 +50,9 @@ export const authOptions: AuthOptions = {
         )
 
         if (!isPasswordValid) {
-          console.log('invalid password')
           return null
         }
 
-        console.log('authorize success, user:', user.id)
         return {
           id: user.id,
           email: user.email,
@@ -85,14 +81,12 @@ export const authOptions: AuthOptions = {
   },
   callbacks: {
     async jwt({ token, user }) {
-      console.log('jwt callback, user:', user?.id, 'token id:', token.id)
       if (user) {
         token.id = user.id
       }
       return token
     },
     async session({ session, token }: { session: Session; token: JWT }) {
-      console.log('session callback, token id:', token.id)
       if (session.user) {
         session.user.id = token.id as string
       }
@@ -110,7 +104,6 @@ export async function auth(request?: NextRequest): Promise<Session | null> {
     })
     
     if (!token) {
-      console.log('auth: no token found')
       return null
     }
     

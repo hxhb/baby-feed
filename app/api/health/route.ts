@@ -5,7 +5,7 @@ import { startOfDay, endOfDay } from 'date-fns'
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth()
+    const session = await auth(request)
     if (!session?.user) {
       return NextResponse.json({ error: '未授权' }, { status: 401 })
     }
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth()
+    const session = await auth(request)
     if (!session?.user) {
       return NextResponse.json({ error: '未授权' }, { status: 401 })
     }

@@ -5,7 +5,7 @@ import { format } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
 import Link from 'next/link'
 import { 
-  Baby, 
+  Baby as BabyIcon, 
   PlusCircle, 
   Droplets, 
   Milk, 
@@ -185,7 +185,7 @@ export default function Dashboard({ selectedBabyId, onSelectBaby }: Props) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="text-center py-16">
-          <Baby size={64} className="mx-auto text-gray-300 mb-4" />
+          <BabyIcon size={64} className="mx-auto text-gray-300 mb-4" />
           <h2 className="text-2xl font-bold text-gray-900 mb-2">还没有添加宝宝</h2>
           <p className="text-gray-600 mb-6">请先添加宝宝信息开始记录</p>
           <Link
@@ -229,7 +229,7 @@ export default function Dashboard({ selectedBabyId, onSelectBaby }: Props) {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <div className="w-16 h-16 bg-gradient-to-br from-pink-100 to-blue-100 rounded-full flex items-center justify-center">
-                <Baby size={32} className="text-blue-600" />
+                <BabyIcon size={32} className="text-blue-600" />
               </div>
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">{selectedBaby.name}</h2>
@@ -285,7 +285,7 @@ export default function Dashboard({ selectedBabyId, onSelectBaby }: Props) {
 
         <div className="bg-white rounded-xl p-4 shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <Baby size={20} className="text-amber-500" />
+            <BabyIcon size={20} className="text-amber-500" />
             <span className="text-xs text-gray-500">大小便</span>
           </div>
           <p className="text-2xl font-bold text-gray-900">
@@ -401,7 +401,7 @@ export default function Dashboard({ selectedBabyId, onSelectBaby }: Props) {
                         {record.type === 'TEMPERATURE' && <Thermometer size={20} className="text-red-500" />}
                         {record.type === 'MEDICATION' && <Pill size={20} className="text-purple-500" />}
                         {record.type === 'VACCINE' && <Syringe size={20} className="text-teal-500" />}
-                        {record.type === 'DIAPER' && <Baby size={20} className="text-amber-500" />}
+                        {record.type === 'DIAPER' && <BabyIcon size={20} className="text-amber-500" />}
                         
                         <div>
                           <p className="font-medium text-gray-900">
