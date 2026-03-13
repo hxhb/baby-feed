@@ -26,7 +26,7 @@ export default function SettingsPage() {
 
   return (
     <Layout>
-      <Settings userName={session.user?.name || ''} />
+      <Settings userName={session.user?.name || ''} userEmail={session.user?.email || ''} />
     </Layout>
   )
 }
