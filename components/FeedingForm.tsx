@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { format } from 'date-fns'
+import { getBeijingNow, toBeijingISO } from '@/lib/time'
 import { 
   Droplets, 
   Milk, 
@@ -38,7 +38,7 @@ export default function FeedingForm({ initialType }: Props) {
   const [rightBreastDuration, setRightBreastDuration] = useState('')
   const [breastMilkAmount, setBreastMilkAmount] = useState('')
   const [formulaAmount, setFormulaAmount] = useState('')
-  const [startTime, setStartTime] = useState(format(new Date(), "yyyy-MM-dd'T'HH:mm"))
+  const [startTime, setStartTime] = useState(getBeijingNow())
   const [notes, setNotes] = useState('')
 
   useEffect(() => {
@@ -76,7 +76,7 @@ export default function FeedingForm({ initialType }: Props) {
       const data: Record<string, unknown> = {
         babyId,
         type,
-        startTime: new Date(startTime).toISOString(),
+        startTime: `${startTime}:00+08:00`,
         notes: notes || null
       }
 

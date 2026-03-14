@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { format } from 'date-fns'
-import { zhCN } from 'date-fns/locale'
+import { formatBeijingTime, getBeijingToday } from '@/lib/time'
 import Link from 'next/link'
 import { 
   Baby as BabyIcon, 
@@ -107,7 +107,7 @@ export default function Dashboard({ selectedBabyId, onSelectBaby }: Props) {
     if (!selectedBabyId) return
     
     try {
-      const today = format(new Date(), 'yyyy-MM-dd')
+      const today = getBeijingToday()
       
       const feedingResponse = await fetch(
         `/api/feeding?babyId=${selectedBabyId}&date=${today}`
@@ -158,19 +158,29 @@ export default function Dashboard({ selectedBabyId, onSelectBaby }: Props) {
   }, [fetchTodayData])
 
   const calculateAge = (birthDate: string) => {
-    const birth = new Date(birthDate)
-    const today = new Date()
-    const diffTime = today.getTime() - birth.getTime()
+    // 按北京时间解析出生日期（避免纯日期字符串被解析为UTC）
+    const birth = new Date(`${birthDate}T00:00:00+08:00`)
+    const now = new Date()
+    const diffTime = now.getTime() - birth.getTime()
     const totalDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
     
-    const months = (today.getFullYear() - birth.getFullYear()) * 12 + 
-                   (today.getMonth() - birth.getMonth())
-    const days = today.getDate() - birth.getDate()
+    // 计算月数和天数
+    let months = (now.getFullYear() - birth.getFullYear()) * 12 + 
+                 (now.getMonth() - birth.getMonth())
+    let days = now.getDate() - birth.getDate()
     
-    if (months === 0) {
-      return `第${totalDays + 1}天`
+    // 如果天数为负，说明本月还没到出生日，月份减1
+    if (days < 0) {
+      months -= 1
+      // 取上个月的总天数来计算剩余天
+      const prevMonth = new Date(now.getFullYear(), now.getMonth(), 0)
+      days += prevMonth.getDate()
     }
-    return `${months}个月${days > 0 ? days + '天' : ''} (第${totalDays + 1}天)`
+    
+    if (months <= 0) {
+      return `${totalDays + 1}天`
+    }
+    return `${months}月${days}天·第${totalDays + 1}天`
   }
 
   if (loading) {
@@ -226,23 +236,20 @@ export default function Dashboard({ selectedBabyId, onSelectBaby }: Props) {
       {/* 宝宝信息卡片 */}
       {selectedBaby && (
         <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-pink-100 to-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                <BabyIcon size={24} className="text-blue-600 sm:hidden" />
-                <BabyIcon size={32} className="text-blue-600 hidden sm:block" />
-              </div>
-              <div className="min-w-0">
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">{selectedBaby.name}</h2>
-                <p className="text-sm text-gray-600">
-                  {selectedBaby.gender === 'MALE' ? '👦 男宝' : '👧 女宝'} · {calculateAge(selectedBaby.birthDate)}
-                </p>
-              </div>
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-pink-100 to-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <BabyIcon size={24} className="text-blue-600 sm:hidden" />
+              <BabyIcon size={28} className="text-blue-600 hidden sm:block" />
             </div>
-            <div className="text-right text-xs sm:text-sm text-gray-500 flex-shrink-0 ml-2">
-              <p>出生日期</p>
-              <p className="font-medium text-gray-900">
-                {format(new Date(selectedBaby.birthDate), 'yyyy年MM月dd日', { locale: zhCN })}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-baseline gap-1.5">
+                <h2 className="text-lg sm:text-xl font-bold text-gray-900 truncate">{selectedBaby.name}</h2>
+                <span className="text-xs text-gray-400 flex-shrink-0">
+                  {selectedBaby.gender === 'MALE' ? '👦' : '👧'}
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm text-gray-500 whitespace-nowrap overflow-hidden text-ellipsis">
+                {calculateAge(selectedBaby.birthDate)} · {format(new Date(`${selectedBaby.birthDate}T00:00:00+08:00`), 'yyyy.MM.dd')}出生
               </p>
             </div>
           </div>
@@ -415,7 +422,7 @@ export default function Dashboard({ selectedBabyId, onSelectBaby }: Props) {
                             {record.type === 'DIAPER' && `${healthRecord?.diaperType === 'PEE' ? '小便' : healthRecord?.diaperType === 'POOP' ? '大便' : '大小便'}`}
                           </p>
                           <p className="text-xs text-gray-500">
-                            {format(new Date(time), 'HH:mm')}
+                            {formatBeijingTime(time)}
                           </p>
                         </div>
                       </div>

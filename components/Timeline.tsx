@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { format, isToday, isYesterday } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
+import { formatBeijingTime } from '@/lib/time'
 import Link from 'next/link'
 import { 
   Droplets, 
@@ -365,7 +366,7 @@ export default function TimelineComponent({ selectedBabyId, onSelectBaby }: Prop
                     <div className="min-w-0">
                       <p className="font-medium text-gray-900 text-sm truncate">{getRecordTitle(record)}</p>
                       <p className="text-xs text-gray-500">
-                        {format(new Date(time), 'HH:mm')}
+                        {formatBeijingTime(time)}
                         {record.notes && ` · ${record.notes}`}
                       </p>
                     </div>

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { format } from 'date-fns'
+import { getBeijingNow, toBeijingISO } from '@/lib/time'
 import { 
   Scale, 
   Thermometer, 
@@ -44,7 +44,7 @@ export default function HealthForm({ initialType }: Props) {
   const [diaperType, setDiaperType] = useState<'PEE' | 'POOP' | 'BOTH'>('PEE')
   const [diaperStatus, setDiaperStatus] = useState('')
   const [adGiven, setAdGiven] = useState(true)
-  const [recordedAt, setRecordedAt] = useState(format(new Date(), "yyyy-MM-dd'T'HH:mm"))
+  const [recordedAt, setRecordedAt] = useState(getBeijingNow())
   const [notes, setNotes] = useState('')
 
   useEffect(() => {
@@ -88,7 +88,7 @@ export default function HealthForm({ initialType }: Props) {
       const data: Record<string, unknown> = {
         babyId,
         type,
-        recordedAt: new Date(recordedAt).toISOString(),
+        recordedAt: `${recordedAt}:00+08:00`,
         notes: notes || null
       }
 
