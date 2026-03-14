@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { format } from 'date-fns'
-import { zhCN } from 'date-fns/locale'
+import { formatBeijingTime, getBeijingToday, extractDateStr, parseDateAsBeijing } from '@/lib/time'
 import Link from 'next/link'
 import { 
   Baby as BabyIcon, 
@@ -33,6 +32,7 @@ interface FeedingRecord {
   breastMilkAmount?: number
   formulaAmount?: number
   adGiven?: boolean
+  notes?: string
   recordType: 'feeding'
 }
 
@@ -48,6 +48,7 @@ interface HealthRecord {
   diaperType?: string
   diaperStatus?: string
   adGiven?: boolean
+  notes?: string
   recordType: 'health'
 }
 
@@ -107,7 +108,7 @@ export default function Dashboard({ selectedBabyId, onSelectBaby }: Props) {
     if (!selectedBabyId) return
     
     try {
-      const today = format(new Date(), 'yyyy-MM-dd')
+      const today = getBeijingToday()
       
       const feedingResponse = await fetch(
         `/api/feeding?babyId=${selectedBabyId}&date=${today}`
@@ -158,19 +159,29 @@ export default function Dashboard({ selectedBabyId, onSelectBaby }: Props) {
   }, [fetchTodayData])
 
   const calculateAge = (birthDate: string) => {
-    const birth = new Date(birthDate)
-    const today = new Date()
-    const diffTime = today.getTime() - birth.getTime()
+    // 安全地按北京时间解析出生日期（无论 birthDate 是 ISO 字符串还是纯日期）
+    const birth = parseDateAsBeijing(birthDate)
+    const now = new Date()
+    const diffTime = now.getTime() - birth.getTime()
     const totalDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
     
-    const months = (today.getFullYear() - birth.getFullYear()) * 12 + 
-                   (today.getMonth() - birth.getMonth())
-    const days = today.getDate() - birth.getDate()
+    // 计算月数和天数
+    let months = (now.getFullYear() - birth.getFullYear()) * 12 + 
+                 (now.getMonth() - birth.getMonth())
+    let days = now.getDate() - birth.getDate()
     
-    if (months === 0) {
-      return `第${totalDays + 1}天`
+    // 如果天数为负，说明本月还没到出生日，月份减1
+    if (days < 0) {
+      months -= 1
+      // 取上个月的总天数来计算剩余天
+      const prevMonth = new Date(now.getFullYear(), now.getMonth(), 0)
+      days += prevMonth.getDate()
     }
-    return `${months}个月${days > 0 ? days + '天' : ''} (第${totalDays + 1}天)`
+    
+    if (months <= 0) {
+      return `${totalDays + 1}天`
+    }
+    return `${months}月${days}天·第${totalDays + 1}天`
   }
 
   if (loading) {
@@ -203,15 +214,15 @@ export default function Dashboard({ selectedBabyId, onSelectBaby }: Props) {
   const selectedBaby = babies.find(b => b.id === selectedBabyId)
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+    <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 space-y-4">
       {/* 宝宝选择器 */}
       {babies.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto pb-2">
+        <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
           {babies.map(baby => (
             <button
               key={baby.id}
               onClick={() => onSelectBaby(baby.id)}
-              className={`px-4 py-2 rounded-full whitespace-nowrap transition ${
+              className={`px-4 py-2 rounded-full whitespace-nowrap transition text-sm ${
                 baby.id === selectedBabyId
                   ? 'bg-blue-600 text-white'
                   : 'bg-white text-gray-700 hover:bg-gray-50'
@@ -225,23 +236,16 @@ export default function Dashboard({ selectedBabyId, onSelectBaby }: Props) {
 
       {/* 宝宝信息卡片 */}
       {selectedBaby && (
-        <div className="bg-white rounded-2xl p-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="w-16 h-16 bg-gradient-to-br from-pink-100 to-blue-100 rounded-full flex items-center justify-center">
-                <BabyIcon size={32} className="text-blue-600" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">{selectedBaby.name}</h2>
-                <p className="text-gray-600">
-                  {selectedBaby.gender === 'MALE' ? '👦 男宝' : '👧 女宝'} · {calculateAge(selectedBaby.birthDate)}
-                </p>
-              </div>
+        <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-pink-100 to-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <BabyIcon size={24} className="text-blue-600 sm:hidden" />
+              <BabyIcon size={28} className="text-blue-600 hidden sm:block" />
             </div>
-            <div className="text-right text-sm text-gray-500">
-              <p>出生日期</p>
-              <p className="font-medium text-gray-900">
-                {format(new Date(selectedBaby.birthDate), 'yyyy年MM月dd日', { locale: zhCN })}
+            <div className="flex-1 min-w-0">
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900 truncate">{selectedBaby.name}</h2>
+              <p className="text-xs sm:text-sm text-gray-500 whitespace-nowrap overflow-hidden text-ellipsis">
+                {calculateAge(selectedBaby.birthDate)} · {extractDateStr(selectedBaby.birthDate).replace(/-/g, '.')}出生
               </p>
             </div>
           </div>
@@ -249,32 +253,37 @@ export default function Dashboard({ selectedBabyId, onSelectBaby }: Props) {
       )}
 
       {/* 今日概览 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <Droplets size={20} className="text-pink-500" />
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-white rounded-xl p-3 shadow-sm">
+          <div className="flex items-center justify-between mb-1.5">
+            <Droplets size={18} className="text-pink-500" />
             <span className="text-xs text-gray-500">母乳</span>
           </div>
           <p className="text-2xl font-bold text-gray-900">
             {(stats?.breastFeedingCount || 0) + (stats?.breastBottleCount || 0)}
           </p>
           <p className="text-xs text-gray-500">
-            {stats?.totalBreastDuration || 0}分钟 · {stats?.totalBreastMilkAmount || 0}ml
+            亲喂{stats?.breastFeedingCount || 0}次 · {stats?.totalBreastDuration || 0}分钟
           </p>
+          {(stats?.breastBottleCount || 0) > 0 && (
+            <p className="text-xs text-gray-500">
+              瓶喂{stats?.breastBottleCount || 0}次（{stats?.totalBreastMilkAmount || 0}ml）
+            </p>
+          )}
         </div>
 
-        <div className="bg-white rounded-xl p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <Milk size={20} className="text-blue-500" />
+        <div className="bg-white rounded-xl p-3 shadow-sm">
+          <div className="flex items-center justify-between mb-1.5">
+            <Milk size={18} className="text-blue-500" />
             <span className="text-xs text-gray-500">奶粉</span>
           </div>
           <p className="text-2xl font-bold text-gray-900">{stats?.formulaCount || 0}</p>
           <p className="text-xs text-gray-500">次 · {stats?.totalFormulaAmount || 0}ml</p>
         </div>
 
-        <div className="bg-white rounded-xl p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <Pill size={20} className="text-orange-500" />
+        <div className="bg-white rounded-xl p-3 shadow-sm">
+          <div className="flex items-center justify-between mb-1.5">
+            <Pill size={18} className="text-orange-500" />
             <span className="text-xs text-gray-500">AD</span>
           </div>
           <p className="text-2xl font-bold text-gray-900">
@@ -283,9 +292,9 @@ export default function Dashboard({ selectedBabyId, onSelectBaby }: Props) {
           <p className="text-xs text-gray-500">{stats?.adGiven ? '已服用' : '未服用'}</p>
         </div>
 
-        <div className="bg-white rounded-xl p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <BabyIcon size={20} className="text-amber-500" />
+        <div className="bg-white rounded-xl p-3 shadow-sm">
+          <div className="flex items-center justify-between mb-1.5">
+            <BabyIcon size={18} className="text-amber-500" />
             <span className="text-xs text-gray-500">大小便</span>
           </div>
           <p className="text-2xl font-bold text-gray-900">
@@ -297,28 +306,25 @@ export default function Dashboard({ selectedBabyId, onSelectBaby }: Props) {
 
       {/* 今日健康数据 */}
       {stats && (stats.temperature || stats.weight || stats.height) && (
-        <div className="bg-white rounded-2xl p-4 shadow-sm">
-          <h3 className="text-sm font-medium text-gray-500 mb-3">今日健康数据</h3>
-          <div className="flex flex-wrap gap-4">
+        <div className="bg-white rounded-2xl p-3 shadow-sm">
+          <h3 className="text-xs font-medium text-gray-500 mb-2">今日健康数据</h3>
+          <div className="flex flex-wrap gap-2">
             {stats.temperature && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-red-50 rounded-lg">
-                <Thermometer size={18} className="text-red-500" />
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 rounded-lg">
+                <Thermometer size={16} className="text-red-500" />
                 <span className="text-sm font-medium text-gray-900">{stats.temperature}°C</span>
-                <span className="text-xs text-gray-500">体温</span>
               </div>
             )}
             {stats.weight && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-green-50 rounded-lg">
-                <Scale size={18} className="text-green-500" />
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 rounded-lg">
+                <Scale size={16} className="text-green-500" />
                 <span className="text-sm font-medium text-gray-900">{stats.weight}kg</span>
-                <span className="text-xs text-gray-500">体重</span>
               </div>
             )}
             {stats.height && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg">
-                <Ruler size={18} className="text-blue-500" />
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 rounded-lg">
+                <Ruler size={16} className="text-blue-500" />
                 <span className="text-sm font-medium text-gray-900">{stats.height}cm</span>
-                <span className="text-xs text-gray-500">身高</span>
               </div>
             )}
           </div>
@@ -326,49 +332,49 @@ export default function Dashboard({ selectedBabyId, onSelectBaby }: Props) {
       )}
 
       {/* 快捷操作 */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm">
-        <h3 className="text-lg font-bold text-gray-900 mb-4">快捷记录</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="bg-white rounded-2xl p-4 shadow-sm">
+        <h3 className="text-base font-bold text-gray-900 mb-3">快捷记录</h3>
+        <div className="grid grid-cols-4 gap-2">
           <Link
             href="/add?type=breast"
-            className="flex flex-col items-center p-4 bg-pink-50 rounded-xl hover:bg-pink-100 transition"
+            className="flex flex-col items-center py-3 bg-pink-50 rounded-xl hover:bg-pink-100 transition"
           >
-            <Droplets size={24} className="text-pink-500 mb-2" />
-            <span className="text-sm font-medium text-gray-700">母乳</span>
+            <Droplets size={22} className="text-pink-500 mb-1" />
+            <span className="text-xs font-medium text-gray-700">母乳</span>
           </Link>
           <Link
             href="/add?type=formula"
-            className="flex flex-col items-center p-4 bg-blue-50 rounded-xl hover:bg-blue-100 transition"
+            className="flex flex-col items-center py-3 bg-blue-50 rounded-xl hover:bg-blue-100 transition"
           >
-            <Milk size={24} className="text-blue-500 mb-2" />
-            <span className="text-sm font-medium text-gray-700">奶粉喂养</span>
+            <Milk size={22} className="text-blue-500 mb-1" />
+            <span className="text-xs font-medium text-gray-700">奶粉</span>
           </Link>
           <Link
             href="/add?type=ad"
-            className="flex flex-col items-center p-4 bg-orange-50 rounded-xl hover:bg-orange-100 transition"
+            className="flex flex-col items-center py-3 bg-orange-50 rounded-xl hover:bg-orange-100 transition"
           >
-            <Pill size={24} className="text-orange-500 mb-2" />
-            <span className="text-sm font-medium text-gray-700">AD滴剂</span>
+            <Pill size={22} className="text-orange-500 mb-1" />
+            <span className="text-xs font-medium text-gray-700">AD滴剂</span>
           </Link>
           <Link
             href="/add?type=health"
-            className="flex flex-col items-center p-4 bg-green-50 rounded-xl hover:bg-green-100 transition"
+            className="flex flex-col items-center py-3 bg-green-50 rounded-xl hover:bg-green-100 transition"
           >
-            <Scale size={24} className="text-green-500 mb-2" />
-            <span className="text-sm font-medium text-gray-700">健康记录</span>
+            <Scale size={22} className="text-green-500 mb-1" />
+            <span className="text-xs font-medium text-gray-700">健康</span>
           </Link>
         </div>
       </div>
 
       {/* 今日记录列表 */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold text-gray-900">今日记录</h3>
+      <div className="bg-white rounded-2xl p-4 shadow-sm">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-base font-bold text-gray-900">今日记录</h3>
           <Link
             href="/timeline"
             className="text-sm text-blue-600 hover:text-blue-700 flex items-center"
           >
-            查看全部 <ChevronRight size={16} />
+            全部 <ChevronRight size={16} />
           </Link>
         </div>
 
@@ -415,9 +421,10 @@ export default function Dashboard({ selectedBabyId, onSelectBaby }: Props) {
                             {record.type === 'MEDICATION' && `服药 ${healthRecord?.medicationName}`}
                             {record.type === 'VACCINE' && `疫苗 ${healthRecord?.vaccineName}`}
                             {record.type === 'DIAPER' && `${healthRecord?.diaperType === 'PEE' ? '小便' : healthRecord?.diaperType === 'POOP' ? '大便' : '大小便'}`}
+                            {record.notes && <span className="ml-1 text-gray-400">（{record.notes}）</span>}
                           </p>
                           <p className="text-xs text-gray-500">
-                            {format(new Date(time), 'HH:mm')}
+                            {formatBeijingTime(time)}
                           </p>
                         </div>
                       </div>

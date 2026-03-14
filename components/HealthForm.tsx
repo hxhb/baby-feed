@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { format } from 'date-fns'
+import { getBeijingNow, toBeijingISO } from '@/lib/time'
 import { 
   Scale, 
   Thermometer, 
@@ -44,7 +44,7 @@ export default function HealthForm({ initialType }: Props) {
   const [diaperType, setDiaperType] = useState<'PEE' | 'POOP' | 'BOTH'>('PEE')
   const [diaperStatus, setDiaperStatus] = useState('')
   const [adGiven, setAdGiven] = useState(true)
-  const [recordedAt, setRecordedAt] = useState(format(new Date(), "yyyy-MM-dd'T'HH:mm"))
+  const [recordedAt, setRecordedAt] = useState(getBeijingNow())
   const [notes, setNotes] = useState('')
 
   useEffect(() => {
@@ -88,7 +88,7 @@ export default function HealthForm({ initialType }: Props) {
       const data: Record<string, unknown> = {
         babyId,
         type,
-        recordedAt: new Date(recordedAt).toISOString(),
+        recordedAt: toBeijingISO(recordedAt),
         notes: notes || null
       }
 
@@ -155,19 +155,19 @@ export default function HealthForm({ initialType }: Props) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <button
         onClick={() => router.back()}
         className="flex items-center text-gray-600 hover:text-gray-900 transition"
       >
-        <ArrowLeft size={20} className="mr-2" />
-        返回
+        <ArrowLeft size={20} className="mr-1" />
+        <span className="text-sm">返回</span>
       </button>
 
-      <div className="bg-white rounded-2xl p-6 shadow-sm">
-        <h2 className="text-xl font-bold text-gray-900 mb-6">添加健康记录</h2>
+      <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm">
+        <h2 className="text-lg font-bold text-gray-900 mb-4">添加健康记录</h2>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               选择宝宝
@@ -191,48 +191,26 @@ export default function HealthForm({ initialType }: Props) {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               记录类型
             </label>
-            <div className="grid grid-cols-4 gap-3">
+            {/* 喂养快捷入口 */}
+            <div className="grid grid-cols-2 gap-2 mb-3">
               <Link
                 href="/add?type=breast"
-                className="flex flex-col items-center p-4 rounded-xl border-2 border-gray-200 hover:border-gray-300 transition"
+                className="flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-gray-200 hover:border-gray-300 transition"
               >
-                <Droplets size={24} className="text-gray-400" />
-                <span className="mt-2 text-sm font-medium text-gray-600">
-                  母乳
-                </span>
+                <Droplets size={20} className="text-pink-400" />
+                <span className="text-sm font-medium text-gray-600">母乳</span>
               </Link>
               <Link
                 href="/add?type=formula"
-                className="flex flex-col items-center p-4 rounded-xl border-2 border-gray-200 hover:border-gray-300 transition"
+                className="flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-gray-200 hover:border-gray-300 transition"
               >
-                <Milk size={24} className="text-gray-400" />
-                <span className="mt-2 text-sm font-medium text-gray-600">
-                  奶粉
-                </span>
+                <Milk size={20} className="text-blue-400" />
+                <span className="text-sm font-medium text-gray-600">奶粉</span>
               </Link>
-              {typeOptions.slice(0, 2).map(option => {
-                const isSelected = type === option.value
-                const colorClasses = getColorClasses(option.color, isSelected)
-                const Icon = option.icon
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setType(option.value as HealthType)}
-                    className={`flex flex-col items-center p-4 rounded-xl border-2 transition ${
-                      isSelected ? colorClasses.border : 'border-gray-200 hover:border-gray-300'
-                    } ${isSelected ? colorClasses.bg : ''}`}
-                  >
-                    <Icon size={24} className={colorClasses.icon} />
-                    <span className={`mt-2 text-sm font-medium ${colorClasses.text}`}>
-                      {option.label}
-                    </span>
-                  </button>
-                )
-              })}
             </div>
-            <div className="grid grid-cols-5 gap-3 mt-3">
-              {typeOptions.slice(2).map(option => {
+            {/* 健康类型选择：每行3个，自动换行 */}
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+              {typeOptions.map(option => {
                 const isSelected = type === option.value
                 const colorClasses = getColorClasses(option.color, isSelected)
                 const Icon = option.icon
@@ -241,12 +219,12 @@ export default function HealthForm({ initialType }: Props) {
                     key={option.value}
                     type="button"
                     onClick={() => setType(option.value as HealthType)}
-                    className={`flex flex-col items-center p-4 rounded-xl border-2 transition ${
+                    className={`flex flex-col items-center py-3 px-2 rounded-xl border-2 transition ${
                       isSelected ? colorClasses.border : 'border-gray-200 hover:border-gray-300'
                     } ${isSelected ? colorClasses.bg : ''}`}
                   >
-                    <Icon size={24} className={colorClasses.icon} />
-                    <span className={`mt-2 text-sm font-medium ${colorClasses.text}`}>
+                    <Icon size={22} className={colorClasses.icon} />
+                    <span className={`mt-1.5 text-xs font-medium ${colorClasses.text}`}>
                       {option.label}
                     </span>
                   </button>

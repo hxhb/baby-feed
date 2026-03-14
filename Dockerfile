@@ -36,10 +36,13 @@ RUN npm run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 
-RUN apk add --no-cache libc6-compat su-exec
+RUN apk add --no-cache libc6-compat su-exec tzdata && \
+    cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
+    echo "Asia/Shanghai" > /etc/timezone
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV TZ=Asia/Shanghai
 
 # 创建非 root 用户
 RUN addgroup --system --gid 1001 nodejs && \

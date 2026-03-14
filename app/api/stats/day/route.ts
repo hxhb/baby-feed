@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { startOfDay, endOfDay, parseISO } from 'date-fns'
+
+// 获取北京时间（UTC+8）的一天起止
+function getBeijingDayRange(dateStr: string) {
+  const start = new Date(`${dateStr}T00:00:00+08:00`)
+  const end = new Date(`${dateStr}T23:59:59.999+08:00`)
+  return { start, end }
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,9 +35,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: '婴儿不存在' }, { status: 404 })
     }
 
-    const date = parseISO(dateStr)
-    const dayStart = startOfDay(date)
-    const dayEnd = endOfDay(date)
+    const { start: dayStart, end: dayEnd } = getBeijingDayRange(dateStr)
 
     const feedingRecords = await prisma.feedingRecord.findMany({
       where: {

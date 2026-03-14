@@ -5,6 +5,7 @@ import { signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
+import { extractDateStr, parseDateAsBeijing } from '@/lib/time'
 import { 
   Baby, 
   PlusCircle, 
@@ -162,7 +163,7 @@ export default function SettingsComponent({ userName, userEmail }: Props) {
   const openEditBabyModal = (baby: BabyInfo) => {
     setEditingBaby(baby)
     setBabyName(baby.name)
-    setBirthDate(format(new Date(baby.birthDate), 'yyyy-MM-dd'))
+    setBirthDate(extractDateStr(baby.birthDate))
     setGender(baby.gender as 'MALE' | 'FEMALE')
     setActiveModal('editBaby')
   }
@@ -336,7 +337,7 @@ export default function SettingsComponent({ userName, userEmail }: Props) {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+    <div className="max-w-2xl mx-auto px-3 sm:px-4 py-4 space-y-4">
       {/* 用户信息卡片 */}
       <div className="bg-white rounded-2xl p-6 shadow-sm">
         <h2 className="text-lg font-bold text-gray-900 mb-4">账户信息</h2>
@@ -427,7 +428,7 @@ export default function SettingsComponent({ userName, userEmail }: Props) {
                     <p className="font-medium text-gray-900">{baby.name}</p>
                     <p className="text-sm text-gray-500">
                       {baby.gender === 'MALE' ? '👦 男宝' : '👧 女宝'} · 
-                      {format(new Date(baby.birthDate), 'yyyy年MM月dd日出生', { locale: zhCN })}
+                      {format(parseDateAsBeijing(baby.birthDate), 'yyyy年MM月dd日出生', { locale: zhCN })}
                     </p>
                   </div>
                 </div>

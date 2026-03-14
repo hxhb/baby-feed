@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { format } from 'date-fns'
+import { getBeijingNow, toBeijingISO } from '@/lib/time'
 import { 
   Droplets, 
   Milk, 
@@ -38,7 +38,7 @@ export default function FeedingForm({ initialType }: Props) {
   const [rightBreastDuration, setRightBreastDuration] = useState('')
   const [breastMilkAmount, setBreastMilkAmount] = useState('')
   const [formulaAmount, setFormulaAmount] = useState('')
-  const [startTime, setStartTime] = useState(format(new Date(), "yyyy-MM-dd'T'HH:mm"))
+  const [startTime, setStartTime] = useState(getBeijingNow())
   const [notes, setNotes] = useState('')
 
   useEffect(() => {
@@ -76,7 +76,7 @@ export default function FeedingForm({ initialType }: Props) {
       const data: Record<string, unknown> = {
         babyId,
         type,
-        startTime: new Date(startTime).toISOString(),
+        startTime: toBeijingISO(startTime),
         notes: notes || null
       }
 
@@ -110,20 +110,20 @@ export default function FeedingForm({ initialType }: Props) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* 返回按钮 */}
       <button
         onClick={() => router.back()}
         className="flex items-center text-gray-600 hover:text-gray-900 transition"
       >
-        <ArrowLeft size={20} className="mr-2" />
-        返回
+        <ArrowLeft size={20} className="mr-1" />
+        <span className="text-sm">返回</span>
       </button>
 
-      <div className="bg-white rounded-2xl p-6 shadow-sm">
-        <h2 className="text-xl font-bold text-gray-900 mb-6">添加喂养记录</h2>
+      <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm">
+        <h2 className="text-lg font-bold text-gray-900 mb-4">添加喂养记录</h2>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-5">
           {/* 选择宝宝 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">

@@ -46,8 +46,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN">
+    <html lang="zh-CN" style={{ colorScheme: 'light' }}>
       <head>
+        <meta name="color-scheme" content="light" />
         <link rel="apple-touch-icon" href="/icons/icon-192x192.svg" />
       </head>
       <body
