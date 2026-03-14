@@ -376,7 +376,7 @@ export default function StatsComponent({ selectedBabyId, onSelectBaby }: Props) 
                     fill="#16a34a" 
                     fontSize={11} 
                     fontWeight={600}
-                    formatter={(v: string | number) => `${v}kg`}
+                    formatter={(v) => `${v}kg`}
                   />
                 </Line>
               </LineChart>
