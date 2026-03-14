@@ -68,3 +68,24 @@ export function getBeijingNow(): string {
 export function toBeijingISO(localValue: string): string {
   return `${localValue}:00+08:00`
 }
+
+/**
+ * 从可能是完整 ISO 字符串或纯日期字符串中提取纯日期部分 yyyy-MM-dd
+ * @param dateValue 如 "2026-01-01T00:00:00.000Z" 或 "2026-01-01"
+ * @returns "2026-01-01"
+ */
+export function extractDateStr(dateValue: string): string {
+  if (!dateValue) return ''
+  // 如果包含 T，取 T 前面的部分
+  return dateValue.includes('T') ? dateValue.split('T')[0] : dateValue
+}
+
+/**
+ * 将日期值安全地解析为北京时间 Date（无论输入是 ISO 字符串还是纯日期）
+ * @param dateValue 如 "2026-01-01T00:00:00.000Z" 或 "2026-01-01"
+ * @returns Date 对象
+ */
+export function parseDateAsBeijing(dateValue: string): Date {
+  const dateStr = extractDateStr(dateValue)
+  return new Date(`${dateStr}T00:00:00+08:00`)
+}

@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { format } from 'date-fns'
-import { formatBeijingTime, getBeijingToday } from '@/lib/time'
+import { formatBeijingTime, getBeijingToday, extractDateStr, parseDateAsBeijing } from '@/lib/time'
 import Link from 'next/link'
 import { 
   Baby as BabyIcon, 
@@ -158,8 +157,8 @@ export default function Dashboard({ selectedBabyId, onSelectBaby }: Props) {
   }, [fetchTodayData])
 
   const calculateAge = (birthDate: string) => {
-    // 按北京时间解析出生日期（避免纯日期字符串被解析为UTC）
-    const birth = new Date(`${birthDate}T00:00:00+08:00`)
+    // 安全地按北京时间解析出生日期（无论 birthDate 是 ISO 字符串还是纯日期）
+    const birth = parseDateAsBeijing(birthDate)
     const now = new Date()
     const diffTime = now.getTime() - birth.getTime()
     const totalDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
@@ -249,7 +248,7 @@ export default function Dashboard({ selectedBabyId, onSelectBaby }: Props) {
                 </span>
               </div>
               <p className="text-xs sm:text-sm text-gray-500 whitespace-nowrap overflow-hidden text-ellipsis">
-                {calculateAge(selectedBaby.birthDate)} · {format(new Date(`${selectedBaby.birthDate}T00:00:00+08:00`), 'yyyy.MM.dd')}出生
+                {calculateAge(selectedBaby.birthDate)} · {extractDateStr(selectedBaby.birthDate).replace(/-/g, '.')}出生
               </p>
             </div>
           </div>
