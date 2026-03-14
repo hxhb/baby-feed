@@ -243,12 +243,7 @@ export default function Dashboard({ selectedBabyId, onSelectBaby }: Props) {
               <BabyIcon size={28} className="text-blue-600 hidden sm:block" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-baseline gap-1.5">
-                <h2 className="text-lg sm:text-xl font-bold text-gray-900 truncate">{selectedBaby.name}</h2>
-                <span className="text-xs text-gray-400 flex-shrink-0">
-                  {selectedBaby.gender === 'MALE' ? '👦' : '👧'}
-                </span>
-              </div>
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900 truncate">{selectedBaby.name}</h2>
               <p className="text-xs sm:text-sm text-gray-500 whitespace-nowrap overflow-hidden text-ellipsis">
                 {calculateAge(selectedBaby.birthDate)} · {extractDateStr(selectedBaby.birthDate).replace(/-/g, '.')}出生
               </p>
@@ -421,10 +416,10 @@ export default function Dashboard({ selectedBabyId, onSelectBaby }: Props) {
                             {record.type === 'MEDICATION' && `服药 ${healthRecord?.medicationName}`}
                             {record.type === 'VACCINE' && `疫苗 ${healthRecord?.vaccineName}`}
                             {record.type === 'DIAPER' && `${healthRecord?.diaperType === 'PEE' ? '小便' : healthRecord?.diaperType === 'POOP' ? '大便' : '大小便'}`}
+                            {record.notes && <span className="ml-1 text-gray-400">（{record.notes}）</span>}
                           </p>
                           <p className="text-xs text-gray-500">
                             {formatBeijingTime(time)}
-                            {record.notes && <span className="ml-1 text-gray-400">· {record.notes}</span>}
                           </p>
                         </div>
                       </div>

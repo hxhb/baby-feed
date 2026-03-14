@@ -860,8 +860,8 @@ export default function TimelineComponent({ selectedBabyId, onSelectBaby }: Prop
           </div>
         ) : (
           <div>
-            {renderRecordSection('上午', morning)}
             {renderRecordSection('下午', afternoon)}
+            {renderRecordSection('上午', morning)}
           </div>
         )}
       </div>
