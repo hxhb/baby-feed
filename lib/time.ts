@@ -89,3 +89,28 @@ export function parseDateAsBeijing(dateValue: string): Date {
   const dateStr = extractDateStr(dateValue)
   return new Date(`${dateStr}T00:00:00+08:00`)
 }
+
+/**
+ * 获取北京时间的小时数 (0-23)
+ * @param isoString ISO 时间字符串
+ * @returns 北京时间小时数
+ */
+export function getBeijingHour(isoString: string): number {
+  const bj = toBeijingDate(new Date(isoString))
+  return bj.getUTCHours()
+}
+
+/**
+ * 将 ISO 时间字符串转换为 datetime-local 格式的北京时间字符串
+ * @param isoString ISO 时间字符串（如 "2026-03-13T19:54:00.000Z"）
+ * @returns "2026-03-14T03:54" 格式的字符串
+ */
+export function toBeijingDatetimeLocal(isoString: string): string {
+  const bj = toBeijingDate(new Date(isoString))
+  const y = bj.getUTCFullYear()
+  const mo = String(bj.getUTCMonth() + 1).padStart(2, '0')
+  const d = String(bj.getUTCDate()).padStart(2, '0')
+  const h = String(bj.getUTCHours()).padStart(2, '0')
+  const mi = String(bj.getUTCMinutes()).padStart(2, '0')
+  return `${y}-${mo}-${d}T${h}:${mi}`
+}

@@ -75,6 +75,23 @@ input[type="datetime-local"]::-webkit-date-and-time-value {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* 去除 Recharts 图表点击时的黑色边框/焦点框 */
+.recharts-wrapper,
+.recharts-wrapper svg,
+.recharts-surface,
+.recharts-responsive-container,
+.recharts-wrapper *:focus,
+.recharts-wrapper *:active {
+  outline: none !important;
+  box-shadow: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+.recharts-wrapper svg:focus,
+.recharts-wrapper svg:active {
+  outline: none !important;
+}
+
 /* 优化安全区域（刘海屏等） */
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 0px);

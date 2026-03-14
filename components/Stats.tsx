@@ -296,9 +296,9 @@ export default function StatsComponent({ selectedBabyId, onSelectBaby }: Props) 
       {stats && (
         <div className="bg-white rounded-2xl p-4 shadow-sm">
           <h3 className="text-base font-bold text-gray-900 mb-3">母乳喂养趋势</h3>
-          <div className="h-56 sm:h-72 -ml-2">
+          <div className="h-56 sm:h-72 -ml-2" style={{ outline: 'none' }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 25, right: 5, left: -10, bottom: 0 }}>
+              <BarChart data={chartData} margin={{ top: 25, right: 5, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} />
@@ -325,9 +325,9 @@ export default function StatsComponent({ selectedBabyId, onSelectBaby }: Props) 
       {stats && (
         <div className="bg-white rounded-2xl p-4 shadow-sm">
           <h3 className="text-base font-bold text-gray-900 mb-3">奶粉喂养趋势</h3>
-          <div className="h-56 sm:h-72 -ml-2">
+          <div className="h-56 sm:h-72 -ml-2" style={{ outline: 'none' }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 25, right: 5, left: -10, bottom: 0 }}>
+              <BarChart data={chartData} margin={{ top: 25, right: 5, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} />
@@ -349,9 +349,9 @@ export default function StatsComponent({ selectedBabyId, onSelectBaby }: Props) 
           <h3 className="text-base font-bold text-gray-900">体重趋势</h3>
         </div>
         {weightData.length > 0 ? (
-          <div className="h-56 sm:h-64 -ml-2">
+          <div className="h-56 sm:h-64 -ml-2" style={{ outline: 'none' }}>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={weightData} margin={{ top: 10, right: 15, left: -10, bottom: 0 }}>
+              <LineChart data={weightData} margin={{ top: 10, right: 15, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                 <YAxis 
@@ -395,9 +395,9 @@ export default function StatsComponent({ selectedBabyId, onSelectBaby }: Props) 
       {tempData.length > 0 && (
         <div className="bg-white rounded-2xl p-4 shadow-sm">
           <h3 className="text-base font-bold text-gray-900 mb-3">体温趋势</h3>
-          <div className="h-56 sm:h-64 -ml-2">
+          <div className="h-56 sm:h-64 -ml-2" style={{ outline: 'none' }}>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={tempData} margin={{ top: 10, right: 15, left: -10, bottom: 0 }}>
+              <LineChart data={tempData} margin={{ top: 10, right: 15, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                 <YAxis domain={[36, 38]} tick={{ fontSize: 11 }} />

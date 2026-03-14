@@ -32,6 +32,7 @@ interface FeedingRecord {
   breastMilkAmount?: number
   formulaAmount?: number
   adGiven?: boolean
+  notes?: string
   recordType: 'feeding'
 }
 
@@ -47,6 +48,7 @@ interface HealthRecord {
   diaperType?: string
   diaperStatus?: string
   adGiven?: boolean
+  notes?: string
   recordType: 'health'
 }
 
@@ -422,6 +424,7 @@ export default function Dashboard({ selectedBabyId, onSelectBaby }: Props) {
                           </p>
                           <p className="text-xs text-gray-500">
                             {formatBeijingTime(time)}
+                            {record.notes && <span className="ml-1 text-gray-400">· {record.notes}</span>}
                           </p>
                         </div>
                       </div>
