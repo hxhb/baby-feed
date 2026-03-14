@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { format, parseISO } from 'date-fns'
-import { zhCN } from 'date-fns/locale'
 import { 
   BarChart, 
   Bar, 
@@ -361,7 +360,7 @@ export default function StatsComponent({ selectedBabyId, onSelectBaby }: Props) 
                   tickFormatter={(v) => `${v}kg`}
                 />
                 <Tooltip 
-                  formatter={(value: number) => [`${value} kg`, '体重']}
+                  formatter={(value) => [`${value} kg`, '体重']}
                 />
                 <Line 
                   type="monotone" 
