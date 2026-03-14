@@ -376,7 +376,7 @@ export default function StatsComponent({ selectedBabyId, onSelectBaby }: Props) 
                     fill="#16a34a" 
                     fontSize={11} 
                     fontWeight={600}
-                    formatter={(v: number) => `${v}kg`}
+                    formatter={(v: string | number) => `${v}kg`}
                   />
                 </Line>
               </LineChart>
@@ -401,7 +401,7 @@ export default function StatsComponent({ selectedBabyId, onSelectBaby }: Props) 
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                 <YAxis domain={[36, 38]} tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(value: number) => [`${value}°C`, '体温']} />
+                <Tooltip formatter={(value) => [`${value}°C`, '体温']} />
                 <Line 
                   type="monotone" 
                   dataKey="体温" 
