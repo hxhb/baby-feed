@@ -259,15 +259,15 @@ export default function TimelineComponent({ selectedBabyId, onSelectBaby }: Prop
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+    <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 space-y-4">
       {/* 宝宝选择器 */}
       {babies.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto pb-2">
+        <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
           {babies.map(baby => (
             <button
               key={baby.id}
               onClick={() => onSelectBaby(baby.id)}
-              className={`px-4 py-2 rounded-full whitespace-nowrap transition ${
+              className={`px-4 py-2 rounded-full whitespace-nowrap transition text-sm ${
                 baby.id === selectedBabyId
                   ? 'bg-blue-600 text-white'
                   : 'bg-white text-gray-700 hover:bg-gray-50'
@@ -280,17 +280,17 @@ export default function TimelineComponent({ selectedBabyId, onSelectBaby }: Prop
       )}
 
       {/* 日期导航 */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm">
+      <div className="bg-white rounded-2xl p-3 shadow-sm">
         <div className="flex items-center justify-between">
           <button
             onClick={goToPreviousDay}
             className="p-2 hover:bg-gray-100 rounded-lg transition"
           >
-            <ChevronLeft size={24} />
+            <ChevronLeft size={22} />
           </button>
           <div className="text-center">
-            <h2 className="text-lg font-bold text-gray-900">{formatDateLabel(currentDate)}</h2>
-            <p className="text-sm text-gray-500">{format(currentDate, 'yyyy年MM月dd日')}</p>
+            <h2 className="text-base font-bold text-gray-900">{formatDateLabel(currentDate)}</h2>
+            <p className="text-xs text-gray-500">{format(currentDate, 'yyyy年MM月dd日')}</p>
           </div>
           <button
             onClick={goToNextDay}
@@ -301,23 +301,23 @@ export default function TimelineComponent({ selectedBabyId, onSelectBaby }: Prop
                 : 'hover:bg-gray-100'
             }`}
           >
-            <ChevronRight size={24} />
+            <ChevronRight size={22} />
           </button>
         </div>
       </div>
 
       {/* 日统计 */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm">
-        <h3 className="font-bold text-gray-900 mb-3">今日统计</h3>
-        <div className="grid grid-cols-4 gap-4 text-center">
+      <div className="bg-white rounded-2xl p-3 shadow-sm">
+        <h3 className="font-bold text-gray-900 mb-2 text-sm">当日统计</h3>
+        <div className="grid grid-cols-4 gap-2 text-center">
           <div>
-            <p className="text-2xl font-bold text-pink-600">
+            <p className="text-xl font-bold text-pink-600">
               {records.filter((r) => r.type === 'BREAST_MILK' || r.type === 'BREAST_MILK_BOTTLE').length}
             </p>
             <p className="text-xs text-gray-500">母乳</p>
           </div>
           <div>
-            <p className="text-2xl font-bold text-blue-600">
+            <p className="text-xl font-bold text-blue-600">
               {records
                 .filter((r): r is FeedingRecord => r.type === 'FORMULA')
                 .reduce((sum, r) => sum + (r.formulaAmount || 0), 0)}
@@ -325,7 +325,7 @@ export default function TimelineComponent({ selectedBabyId, onSelectBaby }: Prop
             <p className="text-xs text-gray-500">奶粉(ml)</p>
           </div>
           <div>
-            <p className="text-2xl font-bold text-amber-600">
+            <p className="text-xl font-bold text-amber-600">
               {records.filter((r) => r.type === 'DIAPER' && ['PEE', 'BOTH'].includes((r as HealthRecord).diaperType || '')).length}
               {'/'}
               {records.filter((r) => r.type === 'DIAPER' && ['POOP', 'BOTH'].includes((r as HealthRecord).diaperType || '')).length}
@@ -333,7 +333,7 @@ export default function TimelineComponent({ selectedBabyId, onSelectBaby }: Prop
             <p className="text-xs text-gray-500">小便/大便</p>
           </div>
           <div>
-            <p className="text-2xl font-bold text-orange-600">
+            <p className="text-xl font-bold text-orange-600">
               {records.some((r) => r.type === 'AD_VITAMIN' && (r as HealthRecord).adGiven) ? '✓' : '○'}
             </p>
             <p className="text-xs text-gray-500">AD</p>
@@ -344,7 +344,7 @@ export default function TimelineComponent({ selectedBabyId, onSelectBaby }: Prop
       {/* 记录列表 */}
       <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
         {records.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
+          <div className="text-center py-10 text-gray-500">
             <p>这一天没有记录</p>
           </div>
         ) : (
@@ -356,15 +356,15 @@ export default function TimelineComponent({ selectedBabyId, onSelectBaby }: Prop
               return (
                 <div
                   key={record.id}
-                  className="flex items-center justify-between p-4 hover:bg-gray-50 transition"
+                  className="flex items-center justify-between p-3 sm:p-4 hover:bg-gray-50 transition"
                 >
-                  <div className="flex items-center space-x-4">
-                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
+                  <div className="flex items-center space-x-3 min-w-0">
+                    <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
                       {getRecordIcon(record.type)}
                     </div>
-                    <div>
-                      <p className="font-medium text-gray-900">{getRecordTitle(record)}</p>
-                      <p className="text-sm text-gray-500">
+                    <div className="min-w-0">
+                      <p className="font-medium text-gray-900 text-sm truncate">{getRecordTitle(record)}</p>
+                      <p className="text-xs text-gray-500">
                         {format(new Date(time), 'HH:mm')}
                         {record.notes && ` · ${record.notes}`}
                       </p>
@@ -372,9 +372,9 @@ export default function TimelineComponent({ selectedBabyId, onSelectBaby }: Prop
                   </div>
                   <button
                     onClick={() => handleDelete(record.id, isFeeding ? 'feeding' : 'health')}
-                    className="p-2 text-gray-400 hover:text-red-500 transition"
+                    className="p-2 text-gray-400 hover:text-red-500 transition flex-shrink-0 ml-2"
                   >
-                    <Trash2 size={18} />
+                    <Trash2 size={16} />
                   </button>
                 </div>
               )

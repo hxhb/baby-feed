@@ -110,20 +110,20 @@ export default function FeedingForm({ initialType }: Props) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* 返回按钮 */}
       <button
         onClick={() => router.back()}
         className="flex items-center text-gray-600 hover:text-gray-900 transition"
       >
-        <ArrowLeft size={20} className="mr-2" />
-        返回
+        <ArrowLeft size={20} className="mr-1" />
+        <span className="text-sm">返回</span>
       </button>
 
-      <div className="bg-white rounded-2xl p-6 shadow-sm">
-        <h2 className="text-xl font-bold text-gray-900 mb-6">添加喂养记录</h2>
+      <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm">
+        <h2 className="text-lg font-bold text-gray-900 mb-4">添加喂养记录</h2>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-5">
           {/* 选择宝宝 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">

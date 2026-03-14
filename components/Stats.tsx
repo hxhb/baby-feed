@@ -16,7 +16,7 @@ import {
   Legend,
   LabelList
 } from 'recharts'
-import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Calendar, Scale } from 'lucide-react'
 
 interface Baby {
   id: string
@@ -36,6 +36,11 @@ interface DailyStats {
   temperature?: number
 }
 
+interface WeightPoint {
+  date: string
+  weight: number
+}
+
 interface Props {
   selectedBabyId: string | null
   onSelectBaby: (id: string | null) => void
@@ -53,6 +58,7 @@ export default function StatsComponent({ selectedBabyId, onSelectBaby }: Props) 
       totalBreastDuration: number
       totalBreastMilkAmount: number
     }
+    weightTrend: WeightPoint[]
   } | null>(null)
   const [loading, setLoading] = useState(true)
   const [days, setDays] = useState(7)
@@ -154,39 +160,45 @@ export default function StatsComponent({ selectedBabyId, onSelectBaby }: Props) 
     )
   }
 
-  const chartData = stats?.lastDays.map(day => ({
-    date: format(new Date(day.date), 'M/d'),
-    母乳时长: day.totalBreastDuration,
-    母乳瓶喂量: day.totalBreastMilkAmount,
-    奶粉量: day.totalFormulaAmount,
-    母乳次数: day.breastFeedingCount,
-    母乳瓶喂次数: day.breastBottleCount
-  })) || []
+  const chartData = stats?.lastDays.map(day => {
+    const parts = day.date.split('-')
+    return {
+      date: `${parseInt(parts[1])}/${parseInt(parts[2])}`,
+      母乳时长: day.totalBreastDuration,
+      母乳瓶喂量: day.totalBreastMilkAmount,
+      奶粉量: day.totalFormulaAmount,
+    }
+  }) || []
 
-  const weightData = stats?.lastDays
-    .filter(day => day.weight)
-    .map(day => ({
-      date: format(new Date(day.date), 'M/d'),
-      体重: day.weight
-    })) || []
+  // 使用 API 返回的完整体重趋势数据
+  const weightData = (stats?.weightTrend || []).map(p => {
+    const parts = p.date.split('-')
+    return {
+      date: `${parseInt(parts[1])}/${parseInt(parts[2])}`,
+      体重: p.weight
+    }
+  })
 
   const tempData = stats?.lastDays
     .filter(day => day.temperature)
-    .map(day => ({
-      date: format(new Date(day.date), 'M/d'),
-      体温: day.temperature
-    })) || []
+    .map(day => {
+      const parts = day.date.split('-')
+      return {
+        date: `${parseInt(parts[1])}/${parseInt(parts[2])}`,
+        体温: day.temperature
+      }
+    }) || []
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+    <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 space-y-4">
       {/* 宝宝选择器 */}
       {babies.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto pb-2">
+        <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
           {babies.map(baby => (
             <button
               key={baby.id}
               onClick={() => onSelectBaby(baby.id)}
-              className={`px-4 py-2 rounded-full whitespace-nowrap transition ${
+              className={`px-4 py-2 rounded-full whitespace-nowrap transition text-sm ${
                 baby.id === selectedBabyId
                   ? 'bg-blue-600 text-white'
                   : 'bg-white text-gray-700 hover:bg-gray-50'
@@ -199,16 +211,16 @@ export default function StatsComponent({ selectedBabyId, onSelectBaby }: Props) 
       )}
 
       {/* 日期选择器 */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm">
+      <div className="bg-white rounded-2xl p-3 shadow-sm">
         <div className="flex items-center justify-between">
           <button
             onClick={() => navigateDate('prev')}
             className="p-2 hover:bg-gray-100 rounded-lg transition"
           >
-            <ChevronLeft size={24} />
+            <ChevronLeft size={22} />
           </button>
           <div className="flex items-center gap-2">
-            <Calendar size={20} className="text-gray-500" />
+            <Calendar size={18} className="text-gray-500" />
             <input
               type="date"
               value={selectedDate}
@@ -217,7 +229,7 @@ export default function StatsComponent({ selectedBabyId, onSelectBaby }: Props) 
                 fetchDayStats(e.target.value)
               }}
               max={format(new Date(), 'yyyy-MM-dd')}
-              className="text-lg font-medium text-gray-900 border-none outline-none cursor-pointer"
+              className="text-base font-medium text-gray-900 border-none outline-none cursor-pointer bg-transparent"
             />
           </div>
           <button
@@ -225,57 +237,57 @@ export default function StatsComponent({ selectedBabyId, onSelectBaby }: Props) 
             disabled={selectedDate >= format(new Date(), 'yyyy-MM-dd')}
             className="p-2 hover:bg-gray-100 rounded-lg transition disabled:opacity-30 disabled:cursor-not-allowed"
           >
-            <ChevronRight size={24} />
+            <ChevronRight size={22} />
           </button>
         </div>
       </div>
 
       {/* 当日统计 */}
       {dayStats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-white rounded-xl p-4 shadow-sm text-center">
-            <p className="text-3xl font-bold text-pink-600">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-white rounded-xl p-3 shadow-sm text-center">
+            <p className="text-2xl font-bold text-pink-600">
               {dayStats.breastFeedingCount + dayStats.breastBottleCount}
             </p>
-            <p className="text-sm text-gray-500">母乳</p>
+            <p className="text-xs text-gray-500 mt-0.5">母乳</p>
             <p className="text-xs text-gray-400">{dayStats.totalBreastDuration}分钟 · {dayStats.totalBreastMilkAmount}ml</p>
           </div>
-          <div className="bg-white rounded-xl p-4 shadow-sm text-center">
-            <p className="text-3xl font-bold text-blue-600">{dayStats.formulaCount}</p>
-            <p className="text-sm text-gray-500">奶粉</p>
+          <div className="bg-white rounded-xl p-3 shadow-sm text-center">
+            <p className="text-2xl font-bold text-blue-600">{dayStats.formulaCount}</p>
+            <p className="text-xs text-gray-500 mt-0.5">奶粉</p>
             <p className="text-xs text-gray-400">{dayStats.totalFormulaAmount}ml</p>
           </div>
-          <div className="bg-white rounded-xl p-4 shadow-sm text-center">
-            <p className="text-3xl font-bold text-green-600">
+          <div className="bg-white rounded-xl p-3 shadow-sm text-center">
+            <p className="text-2xl font-bold text-green-600">
               {dayStats.breastFeedingCount + dayStats.breastBottleCount + dayStats.formulaCount}
             </p>
-            <p className="text-sm text-gray-500">总喂养次数</p>
+            <p className="text-xs text-gray-500 mt-0.5">总喂养次数</p>
           </div>
-          <div className="bg-white rounded-xl p-4 shadow-sm text-center">
-            <p className="text-3xl font-bold text-orange-600">
+          <div className="bg-white rounded-xl p-3 shadow-sm text-center">
+            <p className="text-2xl font-bold text-orange-600">
               {dayStats.adGiven ? '✓' : '○'}
             </p>
-            <p className="text-sm text-gray-500">AD</p>
+            <p className="text-xs text-gray-500 mt-0.5">AD</p>
             <p className="text-xs text-gray-400">{dayStats.adGiven ? '已服用' : '未服用'}</p>
           </div>
         </div>
       )}
 
       {/* 时间范围选择 */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm">
-        <h3 className="text-sm font-medium text-gray-500 mb-3">趋势图时间范围</h3>
+      <div className="bg-white rounded-2xl p-3 shadow-sm">
+        <h3 className="text-xs font-medium text-gray-500 mb-2">趋势图时间范围</h3>
         <div className="flex gap-2">
           {[7, 14, 30].map(d => (
             <button
               key={d}
               onClick={() => setDays(d)}
-              className={`px-4 py-2 rounded-lg transition ${
+              className={`flex-1 py-2 rounded-lg transition text-sm ${
                 days === d
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              最近{d}天
+              {d}天
             </button>
           ))}
         </div>
@@ -283,26 +295,26 @@ export default function StatsComponent({ selectedBabyId, onSelectBaby }: Props) 
 
       {/* 母乳喂养趋势图 */}
       {stats && (
-        <div className="bg-white rounded-2xl p-6 shadow-sm">
-          <h3 className="text-lg font-bold text-gray-900 mb-4">母乳喂养趋势</h3>
-          <div className="h-72">
+        <div className="bg-white rounded-2xl p-4 shadow-sm">
+          <h3 className="text-base font-bold text-gray-900 mb-3">母乳喂养趋势</h3>
+          <div className="h-56 sm:h-72 -ml-2">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 30, right: 10, left: 0, bottom: 0 }}>
+              <BarChart data={chartData} margin={{ top: 25, right: 5, left: -10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
+                <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} />
                 <Tooltip formatter={(value, name) => {
-                  if (name === '亲喂时长') {
+                  if (name === '亲喂时长(分钟)') {
                     return [`${value}分钟`, name]
                   }
                   return [`${value}ml`, name]
                 }} />
-                <Legend />
-                <Bar dataKey="母乳时长" fill="#ec4899" name="亲喂时长(分钟)">
-                  <LabelList dataKey="母乳时长" position="top" fill="#ec4899" fontSize={12} fontWeight={600} />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Bar dataKey="母乳时长" fill="#ec4899" name="亲喂时长(分钟)" radius={[2, 2, 0, 0]}>
+                  <LabelList dataKey="母乳时长" position="top" fill="#ec4899" fontSize={10} fontWeight={600} />
                 </Bar>
-                <Bar dataKey="母乳瓶喂量" fill="#a855f7" name="瓶喂量(ml)">
-                  <LabelList dataKey="母乳瓶喂量" position="top" fill="#a855f7" fontSize={12} fontWeight={600} />
+                <Bar dataKey="母乳瓶喂量" fill="#a855f7" name="瓶喂量(ml)" radius={[2, 2, 0, 0]}>
+                  <LabelList dataKey="母乳瓶喂量" position="top" fill="#a855f7" fontSize={10} fontWeight={600} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -312,18 +324,18 @@ export default function StatsComponent({ selectedBabyId, onSelectBaby }: Props) 
 
       {/* 奶粉喂养趋势图 */}
       {stats && (
-        <div className="bg-white rounded-2xl p-6 shadow-sm">
-          <h3 className="text-lg font-bold text-gray-900 mb-4">奶粉喂养趋势</h3>
-          <div className="h-72">
+        <div className="bg-white rounded-2xl p-4 shadow-sm">
+          <h3 className="text-base font-bold text-gray-900 mb-3">奶粉喂养趋势</h3>
+          <div className="h-56 sm:h-72 -ml-2">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 30, right: 10, left: 0, bottom: 0 }}>
+              <BarChart data={chartData} margin={{ top: 25, right: 5, left: -10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
+                <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} />
                 <Tooltip />
-                <Legend />
-                <Bar dataKey="奶粉量" fill="#3b82f6" name="奶粉量(ml)">
-                  <LabelList dataKey="奶粉量" position="top" fill="#3b82f6" fontSize={12} fontWeight={600} />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Bar dataKey="奶粉量" fill="#3b82f6" name="奶粉量(ml)" radius={[2, 2, 0, 0]}>
+                  <LabelList dataKey="奶粉量" position="top" fill="#3b82f6" fontSize={10} fontWeight={600} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -331,36 +343,73 @@ export default function StatsComponent({ selectedBabyId, onSelectBaby }: Props) 
         </div>
       )}
 
-      {/* 体重趋势图 */}
-      {weightData.length > 0 && (
-        <div className="bg-white rounded-2xl p-6 shadow-sm">
-          <h3 className="text-lg font-bold text-gray-900 mb-4">体重趋势</h3>
-          <div className="h-64">
+      {/* 体重趋势图 — 使用全量体重记录 */}
+      <div className="bg-white rounded-2xl p-4 shadow-sm">
+        <div className="flex items-center gap-2 mb-3">
+          <Scale size={18} className="text-green-500" />
+          <h3 className="text-base font-bold text-gray-900">体重趋势</h3>
+        </div>
+        {weightData.length > 0 ? (
+          <div className="h-56 sm:h-64 -ml-2">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={weightData}>
+              <LineChart data={weightData} margin={{ top: 10, right: 15, left: -10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis domain={['dataMin - 0.5', 'dataMax + 0.5']} />
-                <Tooltip />
-                <Line type="monotone" dataKey="体重" stroke="#22c55e" strokeWidth={2} dot={{ fill: '#22c55e' }} />
+                <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                <YAxis 
+                  domain={['dataMin - 0.3', 'dataMax + 0.3']} 
+                  tick={{ fontSize: 11 }}
+                  tickFormatter={(v) => `${v}kg`}
+                />
+                <Tooltip 
+                  formatter={(value: number) => [`${value} kg`, '体重']}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="体重" 
+                  stroke="#22c55e" 
+                  strokeWidth={2.5} 
+                  dot={{ fill: '#22c55e', r: 4 }}
+                  activeDot={{ r: 6 }}
+                >
+                  <LabelList 
+                    dataKey="体重" 
+                    position="top" 
+                    fill="#16a34a" 
+                    fontSize={11} 
+                    fontWeight={600}
+                    formatter={(v: number) => `${v}kg`}
+                  />
+                </Line>
               </LineChart>
             </ResponsiveContainer>
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="text-center py-8 text-gray-400">
+            <Scale size={32} className="mx-auto mb-2 opacity-50" />
+            <p className="text-sm">暂无体重记录</p>
+            <p className="text-xs mt-1">在添加记录中记录宝宝体重后，这里将展示体重变化趋势</p>
+          </div>
+        )}
+      </div>
 
       {/* 体温趋势图 */}
       {tempData.length > 0 && (
-        <div className="bg-white rounded-2xl p-6 shadow-sm">
-          <h3 className="text-lg font-bold text-gray-900 mb-4">体温趋势</h3>
-          <div className="h-64">
+        <div className="bg-white rounded-2xl p-4 shadow-sm">
+          <h3 className="text-base font-bold text-gray-900 mb-3">体温趋势</h3>
+          <div className="h-56 sm:h-64 -ml-2">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={tempData}>
+              <LineChart data={tempData} margin={{ top: 10, right: 15, left: -10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis domain={[36, 38]} />
-                <Tooltip />
-                <Line type="monotone" dataKey="体温" stroke="#ef4444" strokeWidth={2} dot={{ fill: '#ef4444' }} />
+                <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                <YAxis domain={[36, 38]} tick={{ fontSize: 11 }} />
+                <Tooltip formatter={(value: number) => [`${value}°C`, '体温']} />
+                <Line 
+                  type="monotone" 
+                  dataKey="体温" 
+                  stroke="#ef4444" 
+                  strokeWidth={2} 
+                  dot={{ fill: '#ef4444', r: 4 }} 
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -369,30 +418,33 @@ export default function StatsComponent({ selectedBabyId, onSelectBaby }: Props) 
 
       {/* AD服用记录 */}
       {stats && (
-        <div className="bg-white rounded-2xl p-6 shadow-sm">
-          <h3 className="text-lg font-bold text-gray-900 mb-4">AD服用记录</h3>
+        <div className="bg-white rounded-2xl p-4 shadow-sm">
+          <h3 className="text-base font-bold text-gray-900 mb-3">AD服用记录</h3>
           <div className="grid grid-cols-7 gap-1">
-            {stats.lastDays.map(day => (
-              <div
-                key={day.date}
-                className={`aspect-square rounded-lg flex items-center justify-center text-xs font-medium ${
-                  day.adGiven
-                    ? 'bg-orange-100 text-orange-700'
-                    : 'bg-gray-100 text-gray-400'
-                }`}
-                title={format(new Date(day.date), 'M月d日', { locale: zhCN })}
-              >
-                {format(new Date(day.date), 'd')}
-              </div>
-            ))}
+            {stats.lastDays.map(day => {
+              const parts = day.date.split('-')
+              return (
+                <div
+                  key={day.date}
+                  className={`aspect-square rounded-lg flex items-center justify-center text-xs font-medium ${
+                    day.adGiven
+                      ? 'bg-orange-100 text-orange-700'
+                      : 'bg-gray-100 text-gray-400'
+                  }`}
+                  title={`${parseInt(parts[1])}月${parseInt(parts[2])}日`}
+                >
+                  {parseInt(parts[2])}
+                </div>
+              )
+            })}
           </div>
-          <div className="flex justify-center gap-4 mt-4 text-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-orange-100 rounded"></div>
+          <div className="flex justify-center gap-4 mt-3 text-xs">
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 bg-orange-100 rounded"></div>
               <span className="text-gray-600">已服用</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-gray-100 rounded"></div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 bg-gray-100 rounded"></div>
               <span className="text-gray-600">未服用</span>
             </div>
           </div>

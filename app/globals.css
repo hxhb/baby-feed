@@ -3,14 +3,17 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
+  --background: #f9fafb;
   --foreground: #171717;
+  color-scheme: light;
 }
 
+/* 强制亮色模式，防止系统夜间模式影响 */
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #f9fafb;
+    --foreground: #171717;
+    color-scheme: light;
   }
 }
 
@@ -18,6 +21,63 @@ body {
   color: var(--foreground);
   background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* 强制所有表单元素使用亮色样式，防止 iOS/Android 夜间模式覆盖 */
+input,
+select,
+textarea,
+button {
+  color: #111827;
+  background-color: #ffffff;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #9ca3af;
+}
+
+/* select 下拉框在移动端夜间模式的修复 */
+select {
+  color: #111827;
+  background-color: #ffffff;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.75rem center;
+  background-repeat: no-repeat;
+  background-size: 1.25em 1.25em;
+  padding-right: 2.5rem;
+}
+
+select option {
+  color: #111827;
+  background-color: #ffffff;
+}
+
+/* datetime-local / date 输入框 */
+input[type="date"],
+input[type="datetime-local"],
+input[type="time"] {
+  color: #111827;
+  background-color: #ffffff;
+}
+
+/* iOS Safari 夜间模式修复 */
+input[type="date"]::-webkit-date-and-time-value,
+input[type="datetime-local"]::-webkit-date-and-time-value {
+  color: #111827;
+}
+
+/* 禁用移动端点击高亮 */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 优化安全区域（刘海屏等） */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 @layer utilities {
