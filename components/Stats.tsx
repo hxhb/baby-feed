@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { format, parseISO } from 'date-fns'
 import { 
   BarChart, 
   Bar, 
@@ -15,24 +14,11 @@ import {
   Legend,
   LabelList
 } from 'recharts'
-import { ChevronLeft, ChevronRight, Calendar, Scale } from 'lucide-react'
+import { Scale } from 'lucide-react'
 
 interface Baby {
   id: string
   name: string
-}
-
-interface DailyStats {
-  date: string
-  breastFeedingCount: number
-  totalBreastDuration: number
-  breastBottleCount: number
-  totalBreastMilkAmount: number
-  formulaCount: number
-  totalFormulaAmount: number
-  adGiven: boolean
-  weight?: number
-  temperature?: number
 }
 
 interface WeightPoint {
@@ -49,8 +35,15 @@ export default function StatsComponent({ selectedBabyId, onSelectBaby }: Props) 
   const [babies, setBabies] = useState<Baby[]>([])
   const [stats, setStats] = useState<{
     baby: Baby
-    todayStats: DailyStats
-    lastDays: DailyStats[]
+    todayStats: Record<string, unknown>
+    lastDays: {
+      date: string
+      totalBreastDuration: number
+      totalBreastMilkAmount: number
+      totalFormulaAmount: number
+      adGiven: boolean
+      temperature?: number
+    }[]
     totalStats: {
       totalFeedings: number
       totalFormulaAmount: number
@@ -61,8 +54,6 @@ export default function StatsComponent({ selectedBabyId, onSelectBaby }: Props) 
   } | null>(null)
   const [loading, setLoading] = useState(true)
   const [days, setDays] = useState(7)
-  const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'))
-  const [dayStats, setDayStats] = useState<DailyStats | null>(null)
 
   const fetchBabies = useCallback(async () => {
     try {
@@ -103,29 +94,6 @@ export default function StatsComponent({ selectedBabyId, onSelectBaby }: Props) 
     }
   }, [selectedBabyId, days])
 
-  const fetchDayStats = useCallback(async (date: string) => {
-    if (!selectedBabyId) return
-    
-    try {
-      const response = await fetch(`/api/stats/day?babyId=${selectedBabyId}&date=${date}`)
-      if (response.ok) {
-        const data = await response.json()
-        setDayStats(data)
-      }
-    } catch (error) {
-      console.error('获取单日统计数据失败:', error)
-    }
-  }, [selectedBabyId])
-
-  const navigateDate = (direction: 'prev' | 'next') => {
-    const current = parseISO(selectedDate)
-    const newDate = new Date(current)
-    newDate.setDate(newDate.getDate() + (direction === 'next' ? 1 : -1))
-    const newDateStr = format(newDate, 'yyyy-MM-dd')
-    setSelectedDate(newDateStr)
-    fetchDayStats(newDateStr)
-  }
-
   useEffect(() => {
     fetchBabies()
   }, [fetchBabies])
@@ -133,12 +101,6 @@ export default function StatsComponent({ selectedBabyId, onSelectBaby }: Props) 
   useEffect(() => {
     fetchStats()
   }, [fetchStats])
-
-  useEffect(() => {
-    if (selectedBabyId) {
-      fetchDayStats(selectedDate)
-    }
-  }, [selectedBabyId, selectedDate, fetchDayStats])
 
   if (loading) {
     return (
@@ -206,69 +168,6 @@ export default function StatsComponent({ selectedBabyId, onSelectBaby }: Props) 
               {baby.name}
             </button>
           ))}
-        </div>
-      )}
-
-      {/* 日期选择器 */}
-      <div className="bg-white rounded-2xl p-3 shadow-sm">
-        <div className="flex items-center justify-between">
-          <button
-            onClick={() => navigateDate('prev')}
-            className="p-2 hover:bg-gray-100 rounded-lg transition"
-          >
-            <ChevronLeft size={22} />
-          </button>
-          <div className="flex items-center gap-2">
-            <Calendar size={18} className="text-gray-500" />
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => {
-                setSelectedDate(e.target.value)
-                fetchDayStats(e.target.value)
-              }}
-              max={format(new Date(), 'yyyy-MM-dd')}
-              className="text-base font-medium text-gray-900 border-none outline-none cursor-pointer bg-transparent"
-            />
-          </div>
-          <button
-            onClick={() => navigateDate('next')}
-            disabled={selectedDate >= format(new Date(), 'yyyy-MM-dd')}
-            className="p-2 hover:bg-gray-100 rounded-lg transition disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            <ChevronRight size={22} />
-          </button>
-        </div>
-      </div>
-
-      {/* 当日统计 */}
-      {dayStats && (
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-white rounded-xl p-3 shadow-sm text-center">
-            <p className="text-2xl font-bold text-pink-600">
-              {dayStats.breastFeedingCount + dayStats.breastBottleCount}
-            </p>
-            <p className="text-xs text-gray-500 mt-0.5">母乳</p>
-            <p className="text-xs text-gray-400">{dayStats.totalBreastDuration}分钟 · {dayStats.totalBreastMilkAmount}ml</p>
-          </div>
-          <div className="bg-white rounded-xl p-3 shadow-sm text-center">
-            <p className="text-2xl font-bold text-blue-600">{dayStats.formulaCount}</p>
-            <p className="text-xs text-gray-500 mt-0.5">奶粉</p>
-            <p className="text-xs text-gray-400">{dayStats.totalFormulaAmount}ml</p>
-          </div>
-          <div className="bg-white rounded-xl p-3 shadow-sm text-center">
-            <p className="text-2xl font-bold text-green-600">
-              {dayStats.breastFeedingCount + dayStats.breastBottleCount + dayStats.formulaCount}
-            </p>
-            <p className="text-xs text-gray-500 mt-0.5">总喂养次数</p>
-          </div>
-          <div className="bg-white rounded-xl p-3 shadow-sm text-center">
-            <p className="text-2xl font-bold text-orange-600">
-              {dayStats.adGiven ? '✓' : '○'}
-            </p>
-            <p className="text-xs text-gray-500 mt-0.5">AD</p>
-            <p className="text-xs text-gray-400">{dayStats.adGiven ? '已服用' : '未服用'}</p>
-          </div>
         </div>
       )}
 

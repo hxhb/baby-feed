@@ -88,7 +88,7 @@ export default function HealthForm({ initialType }: Props) {
       const data: Record<string, unknown> = {
         babyId,
         type,
-        recordedAt: `${recordedAt}:00+08:00`,
+        recordedAt: toBeijingISO(recordedAt),
         notes: notes || null
       }
 

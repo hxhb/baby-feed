@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-const CACHE_NAME = 'baby-feed-v1'
+const CACHE_NAME = 'baby-feed-v2'
 const OFFLINE_URL = '/offline'
 
 // 预缓存的静态资源
@@ -38,7 +38,21 @@ self.addEventListener('activate', (event) => {
   )
 })
 
-// 请求拦截：网络优先策略
+// 带超时的网络请求（用于导航请求加速）
+function fetchWithTimeout(request, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timeout')), timeoutMs)
+    fetch(request).then((response) => {
+      clearTimeout(timer)
+      resolve(response)
+    }).catch((err) => {
+      clearTimeout(timer)
+      reject(err)
+    })
+  })
+}
+
+// 请求拦截
 self.addEventListener('fetch', (event) => {
   const { request } = event
   const url = new URL(request.url)
@@ -55,12 +69,19 @@ self.addEventListener('fetch', (event) => {
   // 跳过浏览器扩展请求
   if (!url.protocol.startsWith('http')) return
 
-  // 导航请求（页面跳转）：网络优先，失败则显示离线页
+  // 跳过 Next.js RSC (React Server Components) 请求，避免缓存过期的动态数据
+  if (url.searchParams.has('_rsc') || request.headers.get('RSC') === '1') return
+
+  // 跳过 Next.js data 请求
+  if (url.pathname.startsWith('/_next/data/')) return
+
+  // 导航请求（页面跳转）：网络优先 + 超时竞速
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
-        .then((response) => {
-          // 成功响应则缓存
+      (async () => {
+        try {
+          // 3秒内网络响应则使用网络版本
+          const response = await fetchWithTimeout(request, 3000)
           if (response.ok) {
             const clone = response.clone()
             caches.open(CACHE_NAME).then((cache) => {
@@ -68,13 +89,15 @@ self.addEventListener('fetch', (event) => {
             })
           }
           return response
-        })
-        .catch(() => {
-          // 网络失败，尝试从缓存获取
-          return caches.match(request).then((cached) => {
-            return cached || caches.match(OFFLINE_URL)
-          })
-        })
+        } catch {
+          // 网络超时或失败，立即从缓存取
+          const cached = await caches.match(request)
+          if (cached) return cached
+          // 无缓存则显示离线页
+          const offlinePage = await caches.match(OFFLINE_URL)
+          return offlinePage || new Response('Offline', { status: 503 })
+        }
+      })()
     )
     return
   }

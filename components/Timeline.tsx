@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { format, isToday, isYesterday } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
-import { formatBeijingTime, getBeijingHour, toBeijingDatetimeLocal } from '@/lib/time'
+import { formatBeijingTime, getBeijingHour, toBeijingDatetimeLocal, toBeijingISO } from '@/lib/time'
 import Link from 'next/link'
 import { 
   Droplets, 
@@ -138,7 +138,7 @@ function EditRecordModal({
   const [adGiven, setAdGiven] = useState(healthRecord?.adGiven ?? true)
 
   const handleSave = () => {
-    const timeISO = `${editTime}:00+08:00`
+    const timeISO = toBeijingISO(editTime)
     const data: Record<string, unknown> = {
       type: record.type,
       notes: editNotes || null
@@ -824,8 +824,12 @@ export default function TimelineComponent({ selectedBabyId, onSelectBaby }: Prop
             <p className="text-xs text-gray-500">母乳</p>
             <p className="text-[10px] text-gray-400 leading-tight mt-0.5">
               亲喂{breastFeedingCount}次
-              {breastBottleCount > 0 && ` · 瓶喂${totalBreastMilkBottleAmount}ml`}
             </p>
+            {breastBottleCount > 0 && (
+              <p className="text-[10px] text-gray-400 leading-tight">
+                瓶喂{breastBottleCount}次（{totalBreastMilkBottleAmount}ml）
+              </p>
+            )}
           </div>
           <div>
             <p className="text-xl font-bold text-blue-600">

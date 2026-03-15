@@ -62,11 +62,18 @@ export function getBeijingNow(): string {
 
 /**
  * 将 datetime-local 的值转为带时区的 ISO 字符串
- * @param localValue 如 "2026-03-14T03:54"
+ * @param localValue 如 "2026-03-14T03:54" 或 "2026-03-14T03:54:00"
  * @returns "2026-03-14T03:54:00+08:00"
  */
 export function toBeijingISO(localValue: string): string {
-  return `${localValue}:00+08:00`
+  // datetime-local 可能返回 "YYYY-MM-DDTHH:MM" 或 "YYYY-MM-DDTHH:MM:SS"
+  // 统一处理：先去掉可能存在的秒数部分，再附加 :00+08:00
+  const parts = localValue.split('T')
+  if (parts.length !== 2) return `${localValue}:00+08:00`
+  const timeParts = parts[1].split(':')
+  // 只取时和分，忽略可能存在的秒
+  const normalizedTime = `${timeParts[0]}:${timeParts[1]}`
+  return `${parts[0]}T${normalizedTime}:00+08:00`
 }
 
 /**

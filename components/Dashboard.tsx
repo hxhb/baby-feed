@@ -263,8 +263,13 @@ export default function Dashboard({ selectedBabyId, onSelectBaby }: Props) {
             {(stats?.breastFeedingCount || 0) + (stats?.breastBottleCount || 0)}
           </p>
           <p className="text-xs text-gray-500">
-            {stats?.totalBreastDuration || 0}分钟 · {stats?.totalBreastMilkAmount || 0}ml
+            亲喂{stats?.breastFeedingCount || 0}次 · {stats?.totalBreastDuration || 0}分钟
           </p>
+          {(stats?.breastBottleCount || 0) > 0 && (
+            <p className="text-xs text-gray-500">
+              瓶喂{stats?.breastBottleCount || 0}次（{stats?.totalBreastMilkAmount || 0}ml）
+            </p>
+          )}
         </div>
 
         <div className="bg-white rounded-xl p-3 shadow-sm">

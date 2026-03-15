@@ -76,7 +76,7 @@ export default function FeedingForm({ initialType }: Props) {
       const data: Record<string, unknown> = {
         babyId,
         type,
-        startTime: `${startTime}:00+08:00`,
+        startTime: toBeijingISO(startTime),
         notes: notes || null
       }
 
