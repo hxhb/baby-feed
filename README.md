@@ -36,6 +36,7 @@
 - 支持多宝宝管理（增删改）
 - 移动端响应式设计
 - **PWA 支持**：可安装到手机桌面，支持离线访问
+- **API Key 外部集成**：支持通过 HTTP API 从外部程序（iOS 快捷指令、自动化脚本等）读写数据
 - Docker 一键部署
 - 数据本地持久化（SQLite）
 - 启动时自动数据库迁移
@@ -76,9 +77,10 @@ baby-feed/
 │   │   ├── feeding/            # 喂养记录 CRUD
 │   │   ├── health/             # 健康记录 CRUD
 │   │   ├── stats/              # 统计数据（总览 + 按日）
-│   │   └── user/               # 用户管理（资料/密码/注销）
+│   │   └── user/               # 用户管理（资料/密码/注销/API Key）
 │   └── generated/prisma/       # Prisma 自动生成的客户端代码
 ├── components/                 # React 组件
+│   ├── ApiKeyManager.tsx       # API Key 管理组件
 │   ├── Dashboard.tsx           # 首页仪表盘
 │   ├── FeedingForm.tsx         # 喂养记录表单
 │   ├── HealthForm.tsx          # 健康记录表单
@@ -88,13 +90,15 @@ baby-feed/
 │   ├── Stats.tsx               # 统计图表组件
 │   └── Timeline.tsx            # 时间轴组件
 ├── lib/                        # 工具库
+│   ├── api-key.ts              # API Key 生成、验证、速率限制
 │   ├── prisma.ts               # Prisma 客户端实例
-│   └── auth.ts                 # NextAuth 认证配置
+│   └── auth.ts                 # NextAuth 认证配置（支持 Cookie + API Key）
 ├── prisma/                     # 数据库配置
 │   ├── schema.prisma           # 数据库模型定义
 │   └── migrations/             # 数据库迁移文件
 ├── scripts/
-│   └── migrate.mjs             # 轻量级迁移脚本（无需 Prisma CLI）
+│   ├── migrate.mjs             # 轻量级迁移脚本（无需 Prisma CLI）
+│   └── set-admin.mjs           # 设置管理员脚本
 ├── public/                     # 静态资源
 │   ├── manifest.json           # PWA 配置
 │   ├── sw.js                   # Service Worker
@@ -370,6 +374,42 @@ User（用户）
 
 ## 🔌 API 接口
 
+所有业务 API 接口均需要认证，支持两种认证方式：
+
+1. **Cookie/Session 认证**（Web 端登录后自动使用）
+2. **API Key 认证**（适用于外部程序调用，如 iOS 快捷指令、自动化脚本等）
+
+### API Key 认证
+
+#### 获取 API Key
+
+登录 Web 端后，进入 **设置 → API Key 管理**，创建一个新的 API Key。Key 创建后**仅显示一次**，请立即保存。
+
+#### 使用方式
+
+在 HTTP 请求头中携带 `Authorization: Bearer <your-api-key>`：
+
+```bash
+curl -H "Authorization: Bearer bfk_your_api_key_here" \
+  "https://your-domain/api/babies"
+```
+
+#### 安全说明
+
+| 安全措施 | 说明 |
+|---|---|
+| **哈希存储** | 数据库只存储 Key 的 SHA-256 哈希值，即使数据库泄露也不会暴露明文 |
+| **单次显示** | API Key 创建时显示一次，关闭后无法再查看 |
+| **用户隔离** | 每个 Key 绑定创建者，只能操作该用户的数据 |
+| **速率限制** | 每 IP 每分钟最多 30 次失败认证，防止暴力枚举 |
+| **过期机制** | 支持设置 7/30/90/180/365 天有效期 |
+| **数量上限** | 每用户最多 10 个 Key |
+| **CORS 支持** | 业务 API 已开启 CORS，支持跨域调用 |
+
+---
+
+### 接口概览
+
 | 路径 | 方法 | 说明 |
 |------|------|------|
 | `/api/auth/[...nextauth]` | GET/POST | NextAuth 认证入口 |
@@ -378,6 +418,7 @@ User（用户）
 | `/api/user/profile` | GET/PUT | 获取/修改用户资料 |
 | `/api/user/password` | PUT | 修改密码 |
 | `/api/user/delete` | DELETE | 注销账户 |
+| `/api/user/api-keys` | GET/POST/DELETE | API Key 管理（列出/创建/吊销） |
 | `/api/babies` | GET/POST | 宝宝列表/添加宝宝 |
 | `/api/babies/[id]` | PUT/DELETE | 修改/删除宝宝 |
 | `/api/feeding` | GET/POST | 喂养记录列表/添加记录 |
@@ -386,6 +427,354 @@ User（用户）
 | `/api/health/[id]` | PUT/DELETE | 修改/删除健康记录 |
 | `/api/stats` | GET | 统计数据总览 |
 | `/api/stats/day` | GET | 按日统计数据 |
+
+---
+
+### 接口详细说明
+
+> 以下所有接口均需认证（Cookie 或 API Key），未认证返回 `401: { error: "未授权" }`。
+> 所有时间字段使用 ISO 8601 格式（如 `2026-03-16T08:00:00+08:00`）。
+
+#### 🍼 宝宝管理
+
+##### GET /api/babies — 获取宝宝列表
+
+```bash
+curl -H "Authorization: Bearer bfk_xxx" \
+  "https://your-domain/api/babies"
+```
+
+**响应：**
+```json
+[
+  {
+    "id": "cm...",
+    "name": "宝宝",
+    "birthDate": "2026-01-01T00:00:00.000Z",
+    "gender": "MALE",
+    "userId": "...",
+    "createdAt": "..."
+  }
+]
+```
+
+##### POST /api/babies — 添加宝宝
+
+```bash
+curl -X POST -H "Authorization: Bearer bfk_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"宝宝","birthDate":"2026-01-01","gender":"MALE"}' \
+  "https://your-domain/api/babies"
+```
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `name` | string | ✅ | 宝宝名称 |
+| `birthDate` | string | ✅ | 出生日期（ISO 格式） |
+| `gender` | string | ✅ | 性别，可选值：`MALE`、`FEMALE`、`UNKNOWN` |
+
+---
+
+#### 🍼 喂养记录
+
+##### GET /api/feeding — 获取喂养记录列表
+
+```bash
+# 获取所有记录
+curl -H "Authorization: Bearer bfk_xxx" \
+  "https://your-domain/api/feeding"
+
+# 按宝宝和日期筛选
+curl -H "Authorization: Bearer bfk_xxx" \
+  "https://your-domain/api/feeding?babyId=xxx&date=2026-03-16"
+```
+
+| 查询参数 | 类型 | 必填 | 说明 |
+|----------|------|------|------|
+| `babyId` | string | 否 | 按宝宝 ID 过滤 |
+| `date` | string | 否 | 按日期过滤，格式 `YYYY-MM-DD`（北京时间） |
+
+##### POST /api/feeding — 添加喂养记录
+
+```bash
+# 奶粉喂养
+curl -X POST -H "Authorization: Bearer bfk_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "babyId": "xxx",
+    "type": "FORMULA",
+    "startTime": "2026-03-16T08:00:00+08:00",
+    "formulaAmount": 120
+  }' \
+  "https://your-domain/api/feeding"
+
+# 母乳亲喂
+curl -X POST -H "Authorization: Bearer bfk_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "babyId": "xxx",
+    "type": "BREAST",
+    "startTime": "2026-03-16T10:00:00+08:00",
+    "leftBreastDuration": 15,
+    "rightBreastDuration": 10
+  }' \
+  "https://your-domain/api/feeding"
+```
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `babyId` | string | ✅ | 宝宝 ID |
+| `type` | string | ✅ | 喂养类型：`BREAST`（亲喂）、`BREAST_BOTTLE`（母乳瓶喂）、`FORMULA`（奶粉）、`AD`（AD 滴剂） |
+| `startTime` | string | ✅ | 开始时间（ISO 格式） |
+| `leftBreastDuration` | number | 否 | 左乳喂养时长（分钟），亲喂时使用 |
+| `rightBreastDuration` | number | 否 | 右乳喂养时长（分钟），亲喂时使用 |
+| `breastMilkAmount` | number | 否 | 母乳瓶喂量（毫升） |
+| `formulaAmount` | number | 否 | 奶粉喂养量（毫升） |
+| `endTime` | string | 否 | 结束时间（ISO 格式） |
+| `notes` | string | 否 | 备注 |
+
+##### PUT /api/feeding/{id} — 修改喂养记录
+
+```bash
+curl -X PUT -H "Authorization: Bearer bfk_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{"formulaAmount": 150, "notes": "宝宝吃得多"}' \
+  "https://your-domain/api/feeding/record_id"
+```
+
+##### DELETE /api/feeding/{id} — 删除喂养记录
+
+```bash
+curl -X DELETE -H "Authorization: Bearer bfk_xxx" \
+  "https://your-domain/api/feeding/record_id"
+```
+
+---
+
+#### 🏥 健康记录
+
+##### GET /api/health — 获取健康记录列表
+
+```bash
+# 获取所有记录
+curl -H "Authorization: Bearer bfk_xxx" \
+  "https://your-domain/api/health"
+
+# 按宝宝、日期、类型筛选
+curl -H "Authorization: Bearer bfk_xxx" \
+  "https://your-domain/api/health?babyId=xxx&date=2026-03-16&type=WEIGHT"
+```
+
+| 查询参数 | 类型 | 必填 | 说明 |
+|----------|------|------|------|
+| `babyId` | string | 否 | 按宝宝 ID 过滤 |
+| `date` | string | 否 | 按日期过滤，格式 `YYYY-MM-DD` |
+| `type` | string | 否 | 按类型过滤：`WEIGHT`、`HEIGHT`、`TEMPERATURE`、`MEDICATION`、`VACCINE`、`DIAPER` |
+
+##### POST /api/health — 添加健康记录
+
+```bash
+# 体重记录
+curl -X POST -H "Authorization: Bearer bfk_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "babyId": "xxx",
+    "type": "WEIGHT",
+    "recordedAt": "2026-03-16T09:00:00+08:00",
+    "weight": 5.2
+  }' \
+  "https://your-domain/api/health"
+
+# 体温记录
+curl -X POST -H "Authorization: Bearer bfk_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "babyId": "xxx",
+    "type": "TEMPERATURE",
+    "recordedAt": "2026-03-16T09:00:00+08:00",
+    "temperature": 36.5
+  }' \
+  "https://your-domain/api/health"
+```
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `babyId` | string | ✅ | 宝宝 ID |
+| `type` | string | ✅ | 记录类型：`WEIGHT`、`HEIGHT`、`TEMPERATURE`、`MEDICATION`、`VACCINE`、`DIAPER` |
+| `recordedAt` | string | ✅ | 记录时间（ISO 格式） |
+| `weight` | number | 否 | 体重（kg），`WEIGHT` 类型时使用 |
+| `height` | number | 否 | 身高（cm），`HEIGHT` 类型时使用 |
+| `temperature` | number | 否 | 体温（°C），`TEMPERATURE` 类型时使用 |
+| `medicationName` | string | 否 | 药物名称，`MEDICATION` 类型时使用 |
+| `medicationDose` | string | 否 | 药物剂量，`MEDICATION` 类型时使用 |
+| `vaccineName` | string | 否 | 疫苗名称，`VACCINE` 类型时使用 |
+| `diaperType` | string | 否 | 大小便类型，`DIAPER` 类型时使用 |
+| `diaperStatus` | string | 否 | 大小便状态，`DIAPER` 类型时使用 |
+| `notes` | string | 否 | 备注 |
+
+##### PUT /api/health/{id} — 修改健康记录
+
+```bash
+curl -X PUT -H "Authorization: Bearer bfk_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{"weight": 5.3}' \
+  "https://your-domain/api/health/record_id"
+```
+
+##### DELETE /api/health/{id} — 删除健康记录
+
+```bash
+curl -X DELETE -H "Authorization: Bearer bfk_xxx" \
+  "https://your-domain/api/health/record_id"
+```
+
+---
+
+#### 📊 统计数据
+
+##### GET /api/stats — 获取多日统计
+
+```bash
+# 默认最近 7 天
+curl -H "Authorization: Bearer bfk_xxx" \
+  "https://your-domain/api/stats?babyId=xxx"
+
+# 最近 30 天
+curl -H "Authorization: Bearer bfk_xxx" \
+  "https://your-domain/api/stats?babyId=xxx&days=30"
+```
+
+| 查询参数 | 类型 | 必填 | 说明 |
+|----------|------|------|------|
+| `babyId` | string | ✅ | 宝宝 ID |
+| `days` | number | 否 | 统计天数，默认 7，范围 1-365 |
+
+**响应示例：**
+```json
+{
+  "baby": { "id": "...", "name": "宝宝", "birthDate": "..." },
+  "todayStats": {
+    "date": "2026-03-16",
+    "breastFeedingCount": 3,
+    "totalBreastDuration": 45,
+    "breastBottleCount": 1,
+    "totalBreastMilkAmount": 80,
+    "formulaCount": 2,
+    "totalFormulaAmount": 240,
+    "adGiven": true,
+    "weight": 5.2,
+    "temperature": 36.5
+  },
+  "lastDays": [ "..." ],
+  "totalStats": {
+    "totalFeedings": 42,
+    "totalFormulaAmount": 2520,
+    "totalBreastDuration": 630,
+    "totalBreastMilkAmount": 560
+  },
+  "weightTrend": [
+    { "date": "2026-03-10", "weight": 5.0 },
+    { "date": "2026-03-14", "weight": 5.2 }
+  ]
+}
+```
+
+##### GET /api/stats/day — 获取单日统计
+
+```bash
+curl -H "Authorization: Bearer bfk_xxx" \
+  "https://your-domain/api/stats/day?babyId=xxx&date=2026-03-16"
+```
+
+| 查询参数 | 类型 | 必填 | 说明 |
+|----------|------|------|------|
+| `babyId` | string | ✅ | 宝宝 ID |
+| `date` | string | ✅ | 日期，格式 `YYYY-MM-DD` |
+
+---
+
+#### 🔑 API Key 管理
+
+##### GET /api/user/api-keys — 获取 Key 列表
+
+```bash
+curl -H "Authorization: Bearer bfk_xxx" \
+  "https://your-domain/api/user/api-keys"
+```
+
+**响应：**
+```json
+[
+  {
+    "id": "...",
+    "name": "iOS快捷指令",
+    "prefix": "bfk_a1b2",
+    "lastUsedAt": "2026-03-16T08:00:00.000Z",
+    "expiresAt": "2026-06-16T00:00:00.000Z",
+    "createdAt": "2026-03-01T00:00:00.000Z"
+  }
+]
+```
+
+##### POST /api/user/api-keys — 创建新 Key
+
+```bash
+curl -X POST -H "Authorization: Bearer bfk_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"自动化脚本","expiresInDays":90}' \
+  "https://your-domain/api/user/api-keys"
+```
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `name` | string | ✅ | Key 名称（最长 100 字符） |
+| `expiresInDays` | number | 否 | 有效天数（1-365），不填则永不过期 |
+
+**响应（⚠️ 明文 Key 仅此一次返回）：**
+```json
+{
+  "id": "...",
+  "name": "自动化脚本",
+  "prefix": "bfk_a1b2",
+  "expiresAt": "2026-06-16T00:00:00.000Z",
+  "createdAt": "2026-03-16T00:00:00.000Z",
+  "key": "bfk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "message": "请立即保存此 API Key，之后将无法再次查看完整 Key。"
+}
+```
+
+##### DELETE /api/user/api-keys — 吊销 Key
+
+```bash
+curl -X DELETE -H "Authorization: Bearer bfk_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{"keyId":"key_id_here"}' \
+  "https://your-domain/api/user/api-keys"
+```
+
+---
+
+### 错误响应格式
+
+所有接口的错误响应统一为 JSON 格式：
+
+```json
+{
+  "error": "错误描述信息"
+}
+```
+
+常见 HTTP 状态码：
+
+| 状态码 | 说明 |
+|--------|------|
+| `200` | 请求成功 |
+| `201` | 创建成功 |
+| `400` | 请求参数错误 |
+| `401` | 未授权（未登录或 API Key 无效/过期） |
+| `404` | 资源不存在 |
+| `429` | 请求过于频繁（API Key 验证失败次数过多） |
+| `500` | 服务器内部错误 |
 
 ## ❓ 常见问题
 
