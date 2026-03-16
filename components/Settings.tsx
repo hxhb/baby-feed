@@ -12,6 +12,7 @@ import {
   Trash2, 
   Edit2,
   X,
+  Key,
   KeyRound,
   UserPen,
   AlertTriangle,
@@ -380,6 +381,17 @@ export default function SettingsComponent({ userName, userEmail }: Props) {
             <div className="flex items-center space-x-3">
               <KeyRound size={18} className="text-gray-400 group-hover:text-blue-500 transition" />
               <span className="text-gray-700">修改密码</span>
+            </div>
+            <span className="text-gray-400 text-sm">›</span>
+          </button>
+
+          <button
+            onClick={() => router.push('/settings/api-keys')}
+            className="w-full flex items-center justify-between py-3 px-1 text-left hover:bg-gray-50 rounded-lg transition group"
+          >
+            <div className="flex items-center space-x-3">
+              <Key size={18} className="text-gray-400 group-hover:text-blue-500 transition" />
+              <span className="text-gray-700">API Key 管理</span>
             </div>
             <span className="text-gray-400 text-sm">›</span>
           </button>

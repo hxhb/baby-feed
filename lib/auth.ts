@@ -4,6 +4,7 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import { prisma } from './prisma'
 import { NextRequest } from 'next/server'
+import { authByApiKey } from './api-key'
 
 interface SessionUser {
   id: string
@@ -168,6 +169,7 @@ export function invalidateUserCache(userId: string) {
 
 export async function auth(request: NextRequest): Promise<Session | null> {
   try {
+    // 1. 优先尝试 Cookie/Session 认证
     const token = await getToken({ 
       req: request,
       secret: process.env.NEXTAUTH_SECRET,
@@ -177,25 +179,26 @@ export async function auth(request: NextRequest): Promise<Session | null> {
       secureCookie: useSecureCookies,
     })
     
-    if (!token) {
-      return null
+    if (token) {
+      // 检查用户是否仍然存在（防止被管理员删除后 JWT 仍有效）
+      const userId = token.id as string
+      if (!userId || !(await checkUserExists(userId))) {
+        return null
+      }
+      
+      return {
+        user: {
+          id: token.id as string,
+          email: token.email as string,
+          name: token.name as string,
+          role: (token.role as string) || 'USER'
+        },
+        expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+      }
     }
 
-    // 检查用户是否仍然存在（防止被管理员删除后 JWT 仍有效）
-    const userId = token.id as string
-    if (!userId || !(await checkUserExists(userId))) {
-      return null
-    }
-    
-    return {
-      user: {
-        id: token.id as string,
-        email: token.email as string,
-        name: token.name as string,
-        role: (token.role as string) || 'USER'
-      },
-      expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-    }
+    // 2. Cookie 无效时，尝试 API Key 认证（从 Authorization: Bearer bfk_xxx 头）
+    return await authByApiKey(request)
   } catch (error) {
     console.error('Auth error:', error)
     return null

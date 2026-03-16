@@ -18,12 +18,25 @@ model User {
   babies    Baby[]
   feedingRecords FeedingRecord[]
   healthRecords HealthRecord[]
+  apiKeys   ApiKey[]
 }
 
 model SiteSettings {
   id    String @id @default("singleton")
   key   String @unique
   value String
+}
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  name        String                          // 用户自定义名称，如 "iOS快捷指令"
+  prefix      String                          // Key 前缀，如 "bfk_a1b2"，用于识别
+  keyHash     String    @unique               // SHA-256 哈希值，不存储明文
+  userId      String                          // 所属用户
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastUsedAt  DateTime?                       // 最后使用时间
+  expiresAt   DateTime?                       // 过期时间（可选）
+  createdAt   DateTime  @default(now())
 }
 
 model Baby {

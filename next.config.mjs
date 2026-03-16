@@ -24,6 +24,29 @@ const nextConfig = {
         ],
       },
       {
+        // 为业务 API 添加 CORS 支持（供外部程序通过 API Key 调用）
+        // 注意：只允许简单的 Authorization 和 Content-Type 头
+        source: '/api/:path((?!auth/).*)',
+        headers: [
+          {
+            key: 'Access-Control-Allow-Origin',
+            value: '*',
+          },
+          {
+            key: 'Access-Control-Allow-Methods',
+            value: 'GET, POST, PUT, DELETE, OPTIONS',
+          },
+          {
+            key: 'Access-Control-Allow-Headers',
+            value: 'Authorization, Content-Type',
+          },
+          {
+            key: 'Access-Control-Max-Age',
+            value: '86400',
+          },
+        ],
+      },
+      {
         // 所有路由添加安全响应头
         source: '/:path*',
         headers: [

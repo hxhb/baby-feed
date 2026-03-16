@@ -1,8 +1,19 @@
 import { withAuth } from 'next-auth/middleware'
-import { NextResponse } from 'next/server'
+import { NextResponse, NextRequest } from 'next/server'
 
 const useSecureCookies = process.env.NEXTAUTH_URL?.startsWith('https://') ?? false
 const cookiePrefix = useSecureCookies ? '__Secure-' : ''
+
+/**
+ * 检查请求是否携带了 API Key（Bearer bfk_xxx 格式）
+ * API Key 的实际验证在 lib/auth.ts 的 auth() 函数中进行
+ * 这里只做格式检查，让 API Key 请求绕过 NextAuth 的 cookie 检查
+ */
+function hasApiKeyHeader(req: NextRequest): boolean {
+  const authHeader = req.headers.get('authorization')
+  if (!authHeader) return false
+  return /^Bearer\s+bfk_[a-f0-9]{64}$/i.test(authHeader)
+}
 
 export default withAuth(
   function middleware(req) {
@@ -39,8 +50,19 @@ export default withAuth(
         ) {
           return true
         }
+
+        // 携带 API Key 的 API 请求：让其通过 middleware，
+        // 实际的 API Key 验证在各路由的 auth() 函数中进行
+        if (pathname.startsWith('/api/') && hasApiKeyHeader(req)) {
+          return true
+        }
+
+        // CORS preflight 请求（OPTIONS）直接放行
+        if (req.method === 'OPTIONS' && pathname.startsWith('/api/')) {
+          return true
+        }
         
-        // 其他所有路由都需要登录
+        // 其他所有路由都需要登录（cookie/session）
         return !!token
       },
     },
