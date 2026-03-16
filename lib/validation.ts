@@ -16,10 +16,9 @@ export const GENDERS = ['MALE', 'FEMALE'] as const
 export type Gender = typeof GENDERS[number]
 
 // 尿布类型白名单
-export const DIAPER_TYPES = ['WET', 'DIRTY', 'BOTH', 'DRY'] as const
+export const DIAPER_TYPES = ['PEE', 'POOP', 'BOTH'] as const
 
-// 尿布状态白名单
-export const DIAPER_STATUSES = ['NORMAL', 'ABNORMAL'] as const
+// 尿布状态为自由文本，不需要白名单验证
 
 // 验证结果
 interface ValidationResult {
@@ -166,7 +165,7 @@ export function validateHealthInput(body: Record<string, unknown>) {
     validateString(body.medicationDose, '药品剂量', 200),
     validateString(body.vaccineName, '疫苗名称', 200),
     validateEnum(body.diaperType, DIAPER_TYPES, '尿布类型'),
-    validateEnum(body.diaperStatus, DIAPER_STATUSES, '尿布状态'),
+    validateString(body.diaperStatus, '尿布状态', 200),
     validateBoolean(body.adGiven, 'AD补充'),
     validateDateString(body.recordedAt, '记录时间'),
     validateString(body.notes, '备注', 1000)
