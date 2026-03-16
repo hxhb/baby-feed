@@ -9,6 +9,7 @@ interface SessionUser {
   id: string
   email: string
   name: string
+  role: string
 }
 
 declare module 'next-auth' {
@@ -20,6 +21,7 @@ declare module 'next-auth' {
 declare module 'next-auth/jwt' {
   interface JWT {
     id: string
+    role: string
   }
 }
 
@@ -63,7 +65,8 @@ export const authOptions: AuthOptions = {
         return {
           id: user.id,
           email: user.email,
-          name: user.name
+          name: user.name,
+          role: user.role
         }
       }
     })
@@ -111,18 +114,56 @@ export const authOptions: AuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id
+        token.role = (user as SessionUser).role
       }
       return token
     },
     async session({ session, token }: { session: Session; token: JWT }) {
       if (session.user) {
         session.user.id = token.id as string
+        session.user.role = token.role as string
       }
       return session
     }
   },
   // 生产环境开启 debug 以便排查问题，确认正常后可关闭
   debug: process.env.NEXTAUTH_DEBUG === 'true',
+}
+
+// 用户存在性缓存（5分钟TTL），避免每次请求都查询数据库
+// 用于检测已被管理员删除但JWT尚未过期的用户
+const userExistsCache = new Map<string, { exists: boolean; expiry: number }>()
+const USER_CACHE_TTL = 5 * 60 * 1000 // 5分钟
+const USER_CACHE_MAX_SIZE = 5000
+
+async function checkUserExists(userId: string): Promise<boolean> {
+  const now = Date.now()
+  const cached = userExistsCache.get(userId)
+  
+  if (cached && now < cached.expiry) {
+    return cached.exists
+  }
+
+  // 清理过期缓存
+  if (userExistsCache.size > USER_CACHE_MAX_SIZE) {
+    for (const [key, val] of userExistsCache) {
+      if (now > val.expiry) userExistsCache.delete(key)
+    }
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true }
+  })
+  
+  const exists = !!user
+  userExistsCache.set(userId, { exists, expiry: now + USER_CACHE_TTL })
+  return exists
+}
+
+// 当用户被删除时，清除缓存（供 admin API 调用）
+export function invalidateUserCache(userId: string) {
+  userExistsCache.delete(userId)
 }
 
 export async function auth(request: NextRequest): Promise<Session | null> {
@@ -139,12 +180,19 @@ export async function auth(request: NextRequest): Promise<Session | null> {
     if (!token) {
       return null
     }
+
+    // 检查用户是否仍然存在（防止被管理员删除后 JWT 仍有效）
+    const userId = token.id as string
+    if (!userId || !(await checkUserExists(userId))) {
+      return null
+    }
     
     return {
       user: {
         id: token.id as string,
         email: token.email as string,
-        name: token.name as string
+        name: token.name as string,
+        role: (token.role as string) || 'USER'
       },
       expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
     }

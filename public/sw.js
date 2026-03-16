@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-const CACHE_NAME = 'baby-feed-v2'
+const CACHE_NAME = 'baby-feed-v3'
 const OFFLINE_URL = '/offline'
 
 // 预缓存的静态资源

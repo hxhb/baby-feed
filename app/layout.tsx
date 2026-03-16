@@ -27,6 +27,12 @@ export const metadata: Metadata = {
   title: "Baby Feed - 新生儿喂养记录系统",
   description: "记录新生儿的喂养状态，包括母乳、奶粉、AD服用等",
   manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: "/icons/icon-192x192.svg",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -49,7 +55,6 @@ export default function RootLayout({
     <html lang="zh-CN" style={{ colorScheme: 'light' }}>
       <head>
         <meta name="color-scheme" content="light" />
-        <link rel="apple-touch-icon" href="/icons/icon-192x192.svg" />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}

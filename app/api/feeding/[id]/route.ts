@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { validateFeedingInput } from '@/lib/validation'
 
 export async function PUT(
   request: NextRequest,
@@ -14,6 +15,13 @@ export async function PUT(
     }
 
     const body = await request.json()
+
+    // 验证输入
+    const validation = validateFeedingInput(body)
+    if (!validation.valid) {
+      return NextResponse.json({ error: validation.error }, { status: 400 })
+    }
+
     const {
       type,
       leftBreastDuration,

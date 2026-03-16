@@ -23,6 +23,11 @@ export default withAuth(
           return true
         }
         
+        // 允许访问公开的站点信息 API（精确匹配，避免未来新增路由被意外放行）
+        if (pathname === '/api/site/registration-status') {
+          return true
+        }
+        
         // 允许访问 PWA 资源和静态文件（精确匹配常见静态资源后缀）
         if (
           pathname.startsWith('/_next') ||
@@ -59,6 +64,6 @@ export const config = {
      * - _next/image (图片优化文件)
      * - favicon.ico (网站图标)
      */
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    '/((?!_next/static|_next/image|favicon.ico|icon.svg).*)',
   ],
 }

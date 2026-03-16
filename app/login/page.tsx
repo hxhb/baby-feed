@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -10,7 +10,15 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [registrationAllowed, setRegistrationAllowed] = useState(true)
   const router = useRouter()
+
+  useEffect(() => {
+    fetch('/api/site/registration-status')
+      .then(res => res.json())
+      .then(data => setRegistrationAllowed(data.allowRegistration))
+      .catch(() => {})
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -103,12 +111,14 @@ export default function LoginPage() {
             {loading ? '登录中...' : '登录'}
           </button>
 
-          <div className="text-center text-sm">
-            <span className="text-gray-600">还没有账号？</span>
-            <Link href="/register" className="text-blue-600 hover:text-blue-700 font-medium ml-1">
-              立即注册
-            </Link>
-          </div>
+          {registrationAllowed && (
+            <div className="text-center text-sm">
+              <span className="text-gray-600">还没有账号？</span>
+              <Link href="/register" className="text-blue-600 hover:text-blue-700 font-medium ml-1">
+                立即注册
+              </Link>
+            </div>
+          )}
         </form>
       </div>
     </div>

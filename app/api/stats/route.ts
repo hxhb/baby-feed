@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { validateId } from '@/lib/validation'
 
 // 获取北京时间的 yyyy-MM-dd
 function getBeijingDateStr(date: Date): string {
@@ -40,10 +41,19 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const babyId = searchParams.get('babyId')
-    const days = parseInt(searchParams.get('days') || '7')
+    const daysParam = parseInt(searchParams.get('days') || '7')
+    
+    // 限制 days 范围为 1-365，防止过大值导致数据库查询过慢
+    const days = Math.max(1, Math.min(365, isNaN(daysParam) ? 7 : daysParam))
 
     if (!babyId) {
       return NextResponse.json({ error: '缺少babyId参数' }, { status: 400 })
+    }
+
+    // 验证 babyId 格式
+    const idCheck = validateId(babyId, 'babyId')
+    if (!idCheck.valid) {
+      return NextResponse.json({ error: idCheck.error }, { status: 400 })
     }
 
     const baby = await prisma.baby.findFirst({

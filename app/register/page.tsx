@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -12,6 +12,14 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [registrationAllowed, setRegistrationAllowed] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    fetch('/api/site/registration-status')
+      .then(res => res.json())
+      .then(data => setRegistrationAllowed(data.allowRegistration))
+      .catch(() => setRegistrationAllowed(true))
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -43,11 +51,51 @@ export default function RegisterPage() {
       } else {
         router.push('/login')
       }
-} catch {
-        setError('注册失败，请重试')
+    } catch {
+      setError('注册失败，请重试')
     } finally {
       setLoading(false)
     }
+  }
+
+  // 加载中
+  if (registrationAllowed === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-pink-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
+
+  // 注册已关闭
+  if (!registrationAllowed) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-pink-50 px-4">
+        <div className="max-w-md w-full space-y-8">
+          <div className="text-center">
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">🍼 Baby Feed</h1>
+            <p className="text-gray-600">新生儿喂养记录系统</p>
+          </div>
+
+          <div className="bg-white p-8 rounded-2xl shadow-lg text-center">
+            <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-3xl">🔒</span>
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">注册已关闭</h2>
+            <p className="text-gray-500 mb-6">
+              管理员已关闭新用户注册功能。<br />
+              如需使用，请联系管理员。
+            </p>
+            <Link
+              href="/login"
+              className="inline-block w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition text-center"
+            >
+              返回登录
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (

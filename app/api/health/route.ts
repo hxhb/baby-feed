@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { validateHealthInput, validateId, HEALTH_TYPES } from '@/lib/validation'
 
 // 获取北京时间（UTC+8）的一天起止
 function getBeijingDayRange(dateStr: string) {
@@ -80,6 +81,23 @@ export async function POST(request: NextRequest) {
 
     if (!babyId || !type || !recordedAt) {
       return NextResponse.json({ error: '缺少必要字段' }, { status: 400 })
+    }
+
+    // 验证 babyId 格式
+    const idCheck = validateId(babyId, 'babyId')
+    if (!idCheck.valid) {
+      return NextResponse.json({ error: idCheck.error }, { status: 400 })
+    }
+
+    // 验证输入字段（类型枚举、数值范围等）
+    const validation = validateHealthInput(body)
+    if (!validation.valid) {
+      return NextResponse.json({ error: validation.error }, { status: 400 })
+    }
+
+    // 验证 type 必填枚举
+    if (!HEALTH_TYPES.includes(type)) {
+      return NextResponse.json({ error: '无效的健康记录类型' }, { status: 400 })
     }
 
     // 验证婴儿是否属于当前用户

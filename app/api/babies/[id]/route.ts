@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { validateBabyInput } from '@/lib/validation'
 
 export async function GET(
   request: NextRequest,
@@ -44,6 +45,12 @@ export async function PUT(
 
     const body = await request.json()
     const { name, birthDate, gender } = body
+
+    // 验证输入
+    const validation = validateBabyInput(body)
+    if (!validation.valid) {
+      return NextResponse.json({ error: validation.error }, { status: 400 })
+    }
 
     const existingBaby = await prisma.baby.findFirst({
       where: {

@@ -18,7 +18,8 @@ import {
   Check,
   Eye,
   EyeOff,
-  LogOut
+  LogOut,
+  UserCog
 } from 'lucide-react'
 
 interface BabyInfo {
@@ -42,6 +43,7 @@ export default function SettingsComponent({ userName, userEmail }: Props) {
   const [loading, setLoading] = useState(true)
   const [activeModal, setActiveModal] = useState<ModalType>(null)
   const [editingBaby, setEditingBaby] = useState<BabyInfo | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   
   // 宝宝表单
   const [babyName, setBabyName] = useState('')
@@ -75,6 +77,11 @@ export default function SettingsComponent({ userName, userEmail }: Props) {
 
   useEffect(() => {
     fetchBabies()
+    // 检查是否为管理员
+    fetch('/api/admin/check')
+      .then(res => res.json())
+      .then(data => setIsAdmin(data.isAdmin))
+      .catch(() => {})
   }, [])
 
   const fetchBabies = async () => {
@@ -387,6 +394,19 @@ export default function SettingsComponent({ userName, userEmail }: Props) {
             </div>
             <span className="text-gray-400 text-sm">›</span>
           </button>
+
+          {isAdmin && (
+            <button
+              onClick={() => router.push('/admin')}
+              className="w-full flex items-center justify-between py-3 px-1 text-left hover:bg-gray-50 rounded-lg transition group"
+            >
+              <div className="flex items-center space-x-3">
+                <UserCog size={18} className="text-gray-400 group-hover:text-purple-500 transition" />
+                <span className="text-gray-700">站点管理</span>
+              </div>
+              <span className="text-gray-400 text-sm">›</span>
+            </button>
+          )}
         </div>
       </div>
 

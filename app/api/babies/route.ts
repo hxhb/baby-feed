@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { validateBabyInput, GENDERS } from '@/lib/validation'
 
 export async function GET(request: NextRequest) {
   try {
@@ -33,6 +34,16 @@ export async function POST(request: NextRequest) {
 
     if (!name || !birthDate || !gender) {
       return NextResponse.json({ error: '缺少必要字段' }, { status: 400 })
+    }
+
+    // 验证输入（性别枚举、名称长度、日期格式）
+    const validation = validateBabyInput(body)
+    if (!validation.valid) {
+      return NextResponse.json({ error: validation.error }, { status: 400 })
+    }
+
+    if (!GENDERS.includes(gender)) {
+      return NextResponse.json({ error: '无效的性别值' }, { status: 400 })
     }
 
     const baby = await prisma.baby.create({

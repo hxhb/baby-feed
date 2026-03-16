@@ -12,11 +12,18 @@ model User {
   email     String   @unique
   name      String
   password  String
+  role      String   @default("USER")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   babies    Baby[]
   feedingRecords FeedingRecord[]
   healthRecords HealthRecord[]
+}
+
+model SiteSettings {
+  id    String @id @default("singleton")
+  key   String @unique
+  value String
 }
 
 model Baby {

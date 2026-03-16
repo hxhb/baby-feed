@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { validateId } from '@/lib/validation'
 
 // 获取北京时间（UTC+8）的一天起止
 function getBeijingDayRange(dateStr: string) {
@@ -22,6 +23,17 @@ export async function GET(request: NextRequest) {
 
     if (!babyId || !dateStr) {
       return NextResponse.json({ error: '缺少参数' }, { status: 400 })
+    }
+
+    // 验证 babyId 格式
+    const idCheck = validateId(babyId, 'babyId')
+    if (!idCheck.valid) {
+      return NextResponse.json({ error: idCheck.error }, { status: 400 })
+    }
+
+    // 验证日期格式（YYYY-MM-DD）
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      return NextResponse.json({ error: '日期格式无效，应为 YYYY-MM-DD' }, { status: 400 })
     }
 
     const baby = await prisma.baby.findFirst({

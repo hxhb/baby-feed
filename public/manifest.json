@@ -4,7 +4,7 @@
   "description": "记录新生儿的喂养状态，包括母乳、奶粉、AD服用等",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
+  "background_color": "#eff6ff",
   "theme_color": "#3b82f6",
   "orientation": "portrait-primary",
   "scope": "/",

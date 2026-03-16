@@ -24,9 +24,20 @@ function validatePassword(password: string): string | null {
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
 const RATE_LIMIT_WINDOW = 60 * 1000 // 1 分钟
 const RATE_LIMIT_MAX = 5
+const RATE_LIMIT_MAP_MAX_SIZE = 10000 // 防止内存泄漏
 
 function checkRateLimit(ip: string): boolean {
   const now = Date.now()
+  
+  // 定期清理过期条目，防止内存泄漏
+  if (rateLimitMap.size > RATE_LIMIT_MAP_MAX_SIZE) {
+    for (const [key, val] of rateLimitMap) {
+      if (now > val.resetTime) {
+        rateLimitMap.delete(key)
+      }
+    }
+  }
+
   const record = rateLimitMap.get(ip)
 
   if (!record || now > record.resetTime) {
@@ -45,6 +56,14 @@ function checkRateLimit(ip: string): boolean {
 // POST /api/auth/register - 用户注册
 export async function POST(request: NextRequest) {
   try {
+    // 检查是否允许注册
+    const regSetting = await prisma.siteSettings.findUnique({
+      where: { key: 'allowRegistration' }
+    })
+    if (regSetting?.value === 'false') {
+      return NextResponse.json({ error: '管理员已关闭注册功能' }, { status: 403 })
+    }
+
     // 速率限制检查
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() 
       || request.headers.get('x-real-ip') 

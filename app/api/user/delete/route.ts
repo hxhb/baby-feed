@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
-import { auth } from '@/lib/auth'
+import { auth, invalidateUserCache } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 // DELETE /api/user/delete - 注销账户（删除用户及所有关联数据）
@@ -33,38 +33,20 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: '密码不正确' }, { status: 400 })
     }
 
-    // 删除用户的所有关联数据（利用 Prisma 的级联删除）
-    // 先删除子记录，再删除父记录
+    // 利用数据库级联删除（schema 中已配置 onDelete: Cascade）
+    // 使用事务确保原子性：删除用户时自动级联删除所有关联的 Baby、FeedingRecord、HealthRecord
     const userId = session.user.id
 
-    // 获取该用户创建的所有宝宝
-    const babies = await prisma.baby.findMany({
-      where: { createdBy: userId },
-      select: { id: true }
+    await prisma.$transaction(async (tx) => {
+      // 手动删除用户创建的喂养和健康记录（通过 createdBy 关联）
+      await tx.feedingRecord.deleteMany({ where: { createdBy: userId } })
+      await tx.healthRecord.deleteMany({ where: { createdBy: userId } })
+      await tx.baby.deleteMany({ where: { createdBy: userId } })
+      await tx.user.delete({ where: { id: userId } })
     })
-    const babyIds = babies.map(b => b.id)
 
-    // 删除所有相关喂养记录
-    if (babyIds.length > 0) {
-      await prisma.feedingRecord.deleteMany({
-        where: { babyId: { in: babyIds } }
-      })
-
-      // 删除所有相关健康记录
-      await prisma.healthRecord.deleteMany({
-        where: { babyId: { in: babyIds } }
-      })
-
-      // 删除所有宝宝
-      await prisma.baby.deleteMany({
-        where: { createdBy: userId }
-      })
-    }
-
-    // 最后删除用户
-    await prisma.user.delete({
-      where: { id: userId }
-    })
+    // 清除缓存，使 JWT 立即失效
+    invalidateUserCache(userId)
 
     return NextResponse.json({ message: '账户已注销' })
   } catch (error) {

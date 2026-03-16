@@ -1,24 +1,44 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#60a5fa"/>
+      <stop offset="0%" style="stop-color:#93c5fd"/>
+      <stop offset="50%" style="stop-color:#60a5fa"/>
       <stop offset="100%" style="stop-color:#3b82f6"/>
     </linearGradient>
+    <linearGradient id="milk" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#fef3c7"/>
+      <stop offset="100%" style="stop-color:#fbbf24"/>
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#1e40af" flood-opacity="0.15"/>
+    </filter>
   </defs>
-  <rect width="512" height="512" rx="96" ry="96" fill="url(#bg)"/>
-  <!-- 奶瓶主体 -->
-  <rect x="180" y="160" width="152" height="216" rx="32" ry="32" fill="white" opacity="0.95"/>
-  <!-- 奶瓶瓶口 -->
-  <rect x="206" y="116" width="100" height="52" rx="16" ry="16" fill="white" opacity="0.95"/>
-  <!-- 奶嘴 -->
-  <path d="M230 116 Q256 72 282 116" fill="white" opacity="0.95" stroke="white" stroke-width="4"/>
+  <!-- 背景圆角矩形 -->
+  <rect width="512" height="512" rx="100" ry="100" fill="url(#bg)"/>
+  <!-- 柔光效果 -->
+  <ellipse cx="200" cy="150" rx="160" ry="100" fill="white" opacity="0.08"/>
+  <!-- 奶瓶组 -->
+  <g filter="url(#shadow)">
+    <!-- 奶瓶主体 -->
+    <rect x="176" y="172" width="160" height="216" rx="32" ry="32" fill="white" opacity="0.95"/>
+    <!-- 奶瓶瓶口 -->
+    <rect x="206" y="124" width="100" height="56" rx="16" ry="16" fill="white" opacity="0.95"/>
+    <!-- 奶嘴 -->
+    <path d="M232 124 Q256 80 280 124" fill="white" opacity="0.95" stroke="white" stroke-width="4"/>
+  </g>
   <!-- 奶液 -->
-  <rect x="188" y="256" width="136" height="112" rx="24" ry="24" fill="#fbbf24" opacity="0.6"/>
+  <rect x="184" y="270" width="144" height="110" rx="24" ry="24" fill="url(#milk)" opacity="0.5"/>
   <!-- 刻度线 -->
-  <line x1="188" y1="210" x2="220" y2="210" stroke="#93c5fd" stroke-width="5" stroke-linecap="round"/>
-  <line x1="188" y1="236" x2="210" y2="236" stroke="#93c5fd" stroke-width="5" stroke-linecap="round"/>
-  <line x1="188" y1="262" x2="220" y2="262" stroke="#93c5fd" stroke-width="5" stroke-linecap="round"/>
-  <line x1="188" y1="288" x2="210" y2="288" stroke="#93c5fd" stroke-width="5" stroke-linecap="round"/>
+  <line x1="184" y1="218" x2="222" y2="218" stroke="#93c5fd" stroke-width="4" stroke-linecap="round"/>
+  <line x1="184" y1="244" x2="210" y2="244" stroke="#93c5fd" stroke-width="4" stroke-linecap="round"/>
+  <line x1="184" y1="270" x2="222" y2="270" stroke="#93c5fd" stroke-width="4" stroke-linecap="round"/>
+  <line x1="184" y1="296" x2="210" y2="296" stroke="#93c5fd" stroke-width="4" stroke-linecap="round"/>
+  <line x1="184" y1="322" x2="222" y2="322" stroke="#93c5fd" stroke-width="4" stroke-linecap="round"/>
   <!-- 心形装饰 -->
-  <path d="M356 396 C356 386 372 374 380 384 C388 374 404 386 404 396 C404 412 380 428 380 428 C380 428 356 412 356 396Z" fill="#f472b6" opacity="0.8"/>
+  <path d="M362 388 C362 378 378 370 385 378 C392 370 408 378 408 388 C408 402 385 416 385 416 C385 416 362 402 362 388Z" fill="#f9a8d4" opacity="0.85"/>
+  <!-- 小星星装饰 -->
+  <circle cx="120" cy="120" r="8" fill="white" opacity="0.35"/>
+  <circle cx="400" cy="140" r="6" fill="white" opacity="0.25"/>
+  <circle cx="110" cy="370" r="6" fill="white" opacity="0.2"/>
+  <circle cx="410" cy="110" r="4" fill="white" opacity="0.3"/>
 </svg>

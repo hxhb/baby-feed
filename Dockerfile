@@ -92,8 +92,9 @@ COPY --from=builder /app/prisma ./prisma
 # 复制 Prisma 生成的客户端代码
 COPY --from=builder /app/app/generated/prisma ./app/generated/prisma
 
-# 复制轻量级迁移脚本（替代 prisma migrate deploy，无需 Prisma CLI）
+# 复制脚本（轻量级迁移 + 设置管理员，均使用 @libsql/client，无需 Prisma CLI）
 COPY --from=builder /app/scripts/migrate.mjs ./scripts/migrate.mjs
+COPY --from=builder /app/scripts/set-admin.mjs ./scripts/set-admin.mjs
 
 # 复制启动脚本
 COPY --from=builder /app/start.sh ./start.sh

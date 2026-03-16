@@ -1,18 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="128" height="128">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#60a5fa"/>
+      <stop offset="0%" style="stop-color:#93c5fd"/>
+      <stop offset="50%" style="stop-color:#60a5fa"/>
       <stop offset="100%" style="stop-color:#3b82f6"/>
     </linearGradient>
   </defs>
-  <rect width="192" height="192" rx="38" ry="38" fill="url(#bg)"/>
-  <rect x="68" y="60" width="56" height="80" rx="12" ry="12" fill="white" opacity="0.95"/>
-  <rect x="78" y="44" width="36" height="20" rx="6" ry="6" fill="white" opacity="0.95"/>
-  <path d="M88 44 Q96 28 104 44" fill="white" opacity="0.95" stroke="white" stroke-width="2"/>
-  <rect x="72" y="95" width="48" height="41" rx="8" ry="8" fill="#fbbf24" opacity="0.6"/>
-  <line x1="72" y1="80" x2="84" y2="80" stroke="#93c5fd" stroke-width="2" stroke-linecap="round"/>
-  <line x1="72" y1="90" x2="80" y2="90" stroke="#93c5fd" stroke-width="2" stroke-linecap="round"/>
-  <line x1="72" y1="100" x2="84" y2="100" stroke="#93c5fd" stroke-width="2" stroke-linecap="round"/>
-  <line x1="72" y1="110" x2="80" y2="110" stroke="#93c5fd" stroke-width="2" stroke-linecap="round"/>
-  <path d="M134 148 C134 144 140 140 143 144 C146 140 152 144 152 148 C152 154 143 160 143 160 C143 160 134 154 134 148Z" fill="#f472b6" opacity="0.8"/>
+  <rect width="128" height="128" rx="28" ry="28" fill="url(#bg)"/>
+  <ellipse cx="54" cy="42" rx="40" ry="26" fill="white" opacity="0.06"/>
+  <rect x="44" y="42" width="40" height="54" rx="9" ry="9" fill="white" opacity="0.95"/>
+  <rect x="50" y="30" width="28" height="15" rx="5" ry="5" fill="white" opacity="0.95"/>
+  <path d="M56 30 Q64 19 72 30" fill="white" opacity="0.95" stroke="white" stroke-width="1.5"/>
+  <rect x="46" y="66" width="36" height="27" rx="7" ry="7" fill="#fbbf24" opacity="0.5"/>
+  <line x1="46" y1="53" x2="56" y2="53" stroke="#93c5fd" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="46" y1="60" x2="52" y2="60" stroke="#93c5fd" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="46" y1="67" x2="56" y2="67" stroke="#93c5fd" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M90 96 C90 92 96 89 98.5 92 C101 89 107 92 107 96 C107 101 98.5 106 98.5 106 C98.5 106 90 101 90 96Z" fill="#f9a8d4" opacity="0.8"/>
 </svg>

@@ -6,12 +6,7 @@ export interface User {
 
 export interface SessionUser extends User {
   id: string
-}
-
-declare module 'next-auth' {
-  interface Session {
-    user: SessionUser
-  }
+  role: string
 }
 
 export interface Baby {
