@@ -127,8 +127,8 @@ export const authOptions: AuthOptions = {
       return session
     }
   },
-  // 生产环境开启 debug 以便排查问题，确认正常后可关闭
-  debug: process.env.NEXTAUTH_DEBUG === 'true',
+  // 仅允许在非生产环境开启 debug，避免生产日志泄露敏感信息
+  debug: process.env.NODE_ENV !== 'production' && process.env.NEXTAUTH_DEBUG === 'true',
 }
 
 // 用户存在性缓存（5分钟TTL），避免每次请求都查询数据库

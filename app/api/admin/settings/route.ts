@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { safeParseBody, validateSameOrigin } from '@/lib/validation'
+
+const noStoreHeaders = {
+  'Cache-Control': 'no-store, max-age=0',
+  'Pragma': 'no-cache',
+}
 
 // 检查是否为管理员
 async function checkAdmin(request: NextRequest) {
@@ -34,6 +40,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       allowRegistration: settingsMap['allowRegistration'] !== 'false', // 默认允许
+    }, {
+      headers: noStoreHeaders,
     })
   } catch (error) {
     console.error('获取站点设置失败:', error)
@@ -49,7 +57,11 @@ export async function PUT(request: NextRequest) {
   }
 
   try {
-    const body = await request.json()
+    const { data: body, error: parseError } = await safeParseBody(request)
+    if (parseError || !body) {
+      return NextResponse.json({ error: parseError || '请求体格式不正确' }, { status: 400 })
+    }
+
     const { allowRegistration } = body
 
     if (typeof allowRegistration === 'boolean') {

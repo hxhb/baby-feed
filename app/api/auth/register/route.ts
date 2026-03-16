@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
+import { safeParseBody } from '@/lib/validation'
 
 // 邮箱格式验证
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -72,7 +73,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '请求过于频繁，请稍后再试' }, { status: 429 })
     }
 
-    const body = await request.json()
+    const { data: body, error: parseError } = await safeParseBody(request)
+    if (parseError || !body) {
+      return NextResponse.json({ error: parseError || '请求体格式不正确' }, { status: 400 })
+    }
+
     const { email, password, name } = body
 
     if (!email || !password || !name) {

@@ -3,6 +3,11 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { validateId } from '@/lib/validation'
 
+const noStoreHeaders = {
+  'Cache-Control': 'no-store, max-age=0',
+  'Pragma': 'no-cache',
+}
+
 // 获取北京时间的 yyyy-MM-dd
 function getBeijingDateStr(date: Date): string {
   const utcMs = date.getTime()
@@ -36,24 +41,34 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth(request)
     if (!session?.user) {
-      return NextResponse.json({ error: '未授权' }, { status: 401 })
+      return NextResponse.json({ error: '未授权' }, { status: 401, headers: noStoreHeaders })
     }
 
     const { searchParams } = new URL(request.url)
     const babyId = searchParams.get('babyId')
-    const daysParam = parseInt(searchParams.get('days') || '7')
-    
-    // 限制 days 范围为 1-365，防止过大值导致数据库查询过慢
-    const days = Math.max(1, Math.min(365, isNaN(daysParam) ? 7 : daysParam))
+    const daysRaw = searchParams.get('days')
+
+    let days = 7
+    if (daysRaw !== null) {
+      if (!/^\d{1,3}$/.test(daysRaw)) {
+        return NextResponse.json({ error: 'days 参数无效' }, { status: 400, headers: noStoreHeaders })
+      }
+
+      const parsedDays = Number.parseInt(daysRaw, 10)
+      if (parsedDays < 1 || parsedDays > 365) {
+        return NextResponse.json({ error: 'days 参数超出范围 (1-365)' }, { status: 400, headers: noStoreHeaders })
+      }
+      days = parsedDays
+    }
 
     if (!babyId) {
-      return NextResponse.json({ error: '缺少babyId参数' }, { status: 400 })
+      return NextResponse.json({ error: '缺少babyId参数' }, { status: 400, headers: noStoreHeaders })
     }
 
     // 验证 babyId 格式
     const idCheck = validateId(babyId, 'babyId')
     if (!idCheck.valid) {
-      return NextResponse.json({ error: idCheck.error }, { status: 400 })
+      return NextResponse.json({ error: idCheck.error }, { status: 400, headers: noStoreHeaders })
     }
 
     const baby = await prisma.baby.findFirst({
@@ -64,7 +79,7 @@ export async function GET(request: NextRequest) {
     })
 
     if (!baby) {
-      return NextResponse.json({ error: '婴儿不存在' }, { status: 404 })
+      return NextResponse.json({ error: '婴儿不存在' }, { status: 404, headers: noStoreHeaders })
     }
 
     const todayStr = getBeijingToday()
@@ -192,9 +207,9 @@ export async function GET(request: NextRequest) {
       lastDays: Array.from(statsMap.values()).reverse(),
       totalStats,
       weightTrend
-    })
+    }, { headers: noStoreHeaders })
   } catch (error) {
     console.error('获取统计数据失败:', error)
-    return NextResponse.json({ error: '获取失败' }, { status: 500 })
+    return NextResponse.json({ error: '获取失败' }, { status: 500, headers: noStoreHeaders })
   }
 }

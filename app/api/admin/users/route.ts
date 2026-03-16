@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, invalidateUserCache } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { validateId } from '@/lib/validation'
+import { validateId, safeParseBody, validateSameOrigin } from '@/lib/validation'
+
+const noStoreHeaders = {
+  'Cache-Control': 'no-store, max-age=0',
+  'Pragma': 'no-cache',
+}
 
 // 检查是否为管理员
 async function checkAdmin(request: NextRequest) {
@@ -45,7 +50,9 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' }
     })
 
-    return NextResponse.json(users)
+    return NextResponse.json(users, {
+      headers: noStoreHeaders,
+    })
   } catch (error) {
     console.error('获取用户列表失败:', error)
     return NextResponse.json({ error: '获取用户列表失败' }, { status: 500 })
@@ -60,9 +67,19 @@ export async function DELETE(request: NextRequest) {
   }
 
   try {
-    const { userId } = await request.json()
+    const originCheck = validateSameOrigin(request)
+    if (!originCheck.valid) {
+      return NextResponse.json({ error: originCheck.error }, { status: 403 })
+    }
+
+    const { data: body, error: parseError } = await safeParseBody(request)
+    if (parseError || !body) {
+      return NextResponse.json({ error: parseError || '请求体格式不正确' }, { status: 400 })
+    }
+
+    const { userId } = body
     
-    if (!userId) {
+    if (typeof userId !== 'string' || !userId) {
       return NextResponse.json({ error: '缺少用户ID' }, { status: 400 })
     }
 
@@ -113,9 +130,19 @@ export async function PUT(request: NextRequest) {
   }
 
   try {
-    const { userId, role } = await request.json()
+    const originCheck = validateSameOrigin(request)
+    if (!originCheck.valid) {
+      return NextResponse.json({ error: originCheck.error }, { status: 403 })
+    }
 
-    if (!userId || !role) {
+    const { data: body, error: parseError } = await safeParseBody(request)
+    if (parseError || !body) {
+      return NextResponse.json({ error: parseError || '请求体格式不正确' }, { status: 400 })
+    }
+
+    const { userId, role } = body
+
+    if (typeof userId !== 'string' || typeof role !== 'string' || !userId || !role) {
       return NextResponse.json({ error: '缺少参数' }, { status: 400 })
     }
 

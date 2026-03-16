@@ -1,4 +1,14 @@
 /** @type {import('next').NextConfig} */
+const trustedCorsOrigin = (() => {
+  const rawOrigin = process.env.CORS_ALLOWED_ORIGIN || process.env.NEXTAUTH_URL || 'http://localhost:3000';
+
+  try {
+    return new URL(rawOrigin).origin;
+  } catch {
+    return 'http://localhost:3000';
+  }
+})();
+
 const nextConfig = {
   output: 'standalone',
   // 标记为外部包，确保 Next.js 从 node_modules 加载而非 bundle
@@ -15,6 +25,19 @@ const nextConfig = {
   async headers() {
     return [
       {
+        source: '/api/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-store, max-age=0',
+          },
+          {
+            key: 'Pragma',
+            value: 'no-cache',
+          },
+        ],
+      },
+      {
         source: '/api/auth/:path*',
         headers: [
           {
@@ -24,13 +47,13 @@ const nextConfig = {
         ],
       },
       {
-        // 为业务 API 添加 CORS 支持（供外部程序通过 API Key 调用）
-        // 注意：只允许简单的 Authorization 和 Content-Type 头
+        // 为业务 API 添加受限 CORS 支持（供受信任前端通过 API Key 调用）
+        // 不再使用通配符，避免任意第三方站点跨域读取敏感数据
         source: '/api/:path((?!auth/).*)',
         headers: [
           {
             key: 'Access-Control-Allow-Origin',
-            value: '*',
+            value: trustedCorsOrigin,
           },
           {
             key: 'Access-Control-Allow-Methods',
@@ -43,6 +66,10 @@ const nextConfig = {
           {
             key: 'Access-Control-Max-Age',
             value: '86400',
+          },
+          {
+            key: 'Vary',
+            value: 'Origin',
           },
         ],
       },

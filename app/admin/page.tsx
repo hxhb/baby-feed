@@ -1,51 +1,32 @@
-'use client'
-
-import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { headers } from 'next/headers'
+import { redirect } from 'next/navigation'
+import { NextRequest } from 'next/server'
 import { Layout } from '@/components/Providers'
 import AdminPanel from '@/components/AdminPanel'
+import { auth } from '@/lib/auth'
 
-export default function AdminPage() {
-  const { data: session, status } = useSession()
-  const router = useRouter()
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
+async function getServerSession() {
+  const headerStore = await headers()
+  const protocol = headerStore.get('x-forwarded-proto') ?? 'http'
+  const host = headerStore.get('x-forwarded-host') ?? headerStore.get('host') ?? 'localhost:3000'
 
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/login')
-    }
-  }, [status, router])
+  return auth(new NextRequest(`${protocol}://${host}`, { headers: headerStore }))
+}
 
-  useEffect(() => {
-    if (session?.user?.id) {
-      fetch('/api/admin/check')
-        .then(res => res.json())
-        .then(data => {
-          if (!data.isAdmin) {
-            router.push('/')
-          } else {
-            setIsAdmin(true)
-          }
-        })
-        .catch(() => router.push('/'))
-    }
-  }, [session, router])
+export default async function AdminPage() {
+  const session = await getServerSession()
 
-  if (status === 'loading' || !session || isAdmin === null) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    )
+  if (!session?.user) {
+    redirect('/login')
+  }
+
+  if (session.user.role !== 'ADMIN') {
+    redirect('/')
   }
 
   return (
     <Layout>
-      <AdminPanel 
-        currentUserId={session.user.id} 
-        onBack={() => router.push('/settings')} 
-      />
+      <AdminPanel currentUserId={session.user.id} />
     </Layout>
   )
 }
