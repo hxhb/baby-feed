@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { auth, invalidateUserCache } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
 import { safeParseBody, validateSameOrigin } from '@/lib/validation'
 
 const noStoreHeaders = {
@@ -20,6 +21,24 @@ export async function DELETE(request: NextRequest) {
     const originCheck = validateSameOrigin(request)
     if (!originCheck.valid) {
       return NextResponse.json({ error: originCheck.error }, { status: 403, headers: noStoreHeaders })
+    }
+
+    const deleteAccountRateLimit = enforceRateLimit({
+      key: buildUserActionKey('user-delete-account', session.user.id, request),
+      limit: 3,
+      windowMs: 15 * 60 * 1000,
+    })
+    if (!deleteAccountRateLimit.allowed) {
+      return NextResponse.json(
+        { error: '请求过于频繁，请稍后再试' },
+        {
+          status: 429,
+          headers: {
+            ...noStoreHeaders,
+            'Retry-After': String(deleteAccountRateLimit.retryAfterSeconds),
+          },
+        }
+      )
     }
 
     const { data: body, error: parseError } = await safeParseBody(request)

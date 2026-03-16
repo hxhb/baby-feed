@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { generateApiKey } from '@/lib/api-key'
+import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
 import { validateString, validateId, safeParseBody, validateSameOrigin } from '@/lib/validation'
 
 const noStoreHeaders = {
@@ -66,6 +67,24 @@ export async function POST(request: NextRequest) {
     const originCheck = validateSameOrigin(request)
     if (!originCheck.valid) {
       return NextResponse.json({ error: originCheck.error }, { status: 403, headers: noStoreHeaders })
+    }
+
+    const createApiKeyRateLimit = enforceRateLimit({
+      key: buildUserActionKey('user-api-key-create', session.user.id, request),
+      limit: 5,
+      windowMs: 10 * 60 * 1000,
+    })
+    if (!createApiKeyRateLimit.allowed) {
+      return NextResponse.json(
+        { error: '请求过于频繁，请稍后再试' },
+        {
+          status: 429,
+          headers: {
+            ...noStoreHeaders,
+            'Retry-After': String(createApiKeyRateLimit.retryAfterSeconds),
+          },
+        }
+      )
     }
 
     const { data: body, error: parseError } = await safeParseBody(request)
@@ -156,6 +175,24 @@ export async function DELETE(request: NextRequest) {
     const originCheck = validateSameOrigin(request)
     if (!originCheck.valid) {
       return NextResponse.json({ error: originCheck.error }, { status: 403, headers: noStoreHeaders })
+    }
+
+    const deleteApiKeyRateLimit = enforceRateLimit({
+      key: buildUserActionKey('user-api-key-delete', session.user.id, request),
+      limit: 10,
+      windowMs: 10 * 60 * 1000,
+    })
+    if (!deleteApiKeyRateLimit.allowed) {
+      return NextResponse.json(
+        { error: '请求过于频繁，请稍后再试' },
+        {
+          status: 429,
+          headers: {
+            ...noStoreHeaders,
+            'Retry-After': String(deleteApiKeyRateLimit.retryAfterSeconds),
+          },
+        }
+      )
     }
 
     const { data: body, error: parseError } = await safeParseBody(request)

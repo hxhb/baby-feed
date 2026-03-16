@@ -3,8 +3,13 @@
 import { useState } from 'react'
 import { Layout } from '@/components/Providers'
 import Stats from '@/components/Stats'
+import type { PreloadedBaby } from '@/lib/server-babies'
 
-export default function StatsPageClient() {
+interface Props {
+  initialBabies: PreloadedBaby[]
+}
+
+export default function StatsPageClient({ initialBabies }: Props) {
   const [selectedBabyId, setSelectedBabyId] = useState<string | null>(null)
 
   return (
@@ -12,6 +17,7 @@ export default function StatsPageClient() {
       <Stats
         selectedBabyId={selectedBabyId}
         onSelectBaby={setSelectedBabyId}
+        initialBabies={initialBabies}
       />
     </Layout>
   )

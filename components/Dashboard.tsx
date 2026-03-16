@@ -68,16 +68,27 @@ interface DailyStats {
 }
 
 interface Props {
-  selectedBabyId: string | null
-  onSelectBaby: (id: string | null) => void
+  selectedBabyId?: string | null
+  onSelectBaby?: (id: string | null) => void
+  initialBabies?: Baby[]
 }
 
-export default function Dashboard({ selectedBabyId, onSelectBaby }: Props) {
-  const [babies, setBabies] = useState<Baby[]>([])
+export default function Dashboard({ selectedBabyId, onSelectBaby, initialBabies = [] }: Props) {
+  const [babies, setBabies] = useState<Baby[]>(initialBabies)
+  const [internalSelectedBabyId, setInternalSelectedBabyId] = useState<string | null>(initialBabies[0]?.id ?? null)
   const [todayRecords, setTodayRecords] = useState<FeedingRecord[]>([])
   const [todayHealthRecords, setTodayHealthRecords] = useState<HealthRecord[]>([])
   const [stats, setStats] = useState<DailyStats | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(initialBabies.length === 0)
+
+  const resolvedSelectedBabyId = selectedBabyId ?? internalSelectedBabyId
+  const handleSelectBaby = useCallback((id: string | null) => {
+    if (onSelectBaby) {
+      onSelectBaby(id)
+      return
+    }
+    setInternalSelectedBabyId(id)
+  }, [onSelectBaby])
 
   const fetchBabies = useCallback(async () => {
     try {
@@ -90,8 +101,8 @@ export default function Dashboard({ selectedBabyId, onSelectBaby }: Props) {
       const data = await response.json()
       if (Array.isArray(data)) {
         setBabies(data)
-        if (data.length > 0 && !selectedBabyId) {
-          onSelectBaby(data[0].id)
+        if (data.length > 0 && !resolvedSelectedBabyId) {
+          handleSelectBaby(data[0].id)
         }
       } else {
         setBabies([])
@@ -102,23 +113,23 @@ export default function Dashboard({ selectedBabyId, onSelectBaby }: Props) {
     } finally {
       setLoading(false)
     }
-  }, [selectedBabyId, onSelectBaby])
+  }, [resolvedSelectedBabyId, handleSelectBaby])
 
   const fetchTodayData = useCallback(async () => {
-    if (!selectedBabyId) return
+    if (!resolvedSelectedBabyId) return
     
     try {
       const today = getBeijingToday()
       
       const feedingResponse = await fetch(
-        `/api/feeding?babyId=${selectedBabyId}&date=${today}`
+        `/api/feeding?babyId=${resolvedSelectedBabyId}&date=${today}`
       )
       const feedingDataRaw = feedingResponse.ok ? await feedingResponse.json() : []
       const feedingData: FeedingRecord[] = Array.isArray(feedingDataRaw) ? feedingDataRaw : []
       setTodayRecords(feedingData.map(r => ({ ...r, recordType: 'feeding' as const })))
 
       const healthResponse = await fetch(
-        `/api/health?babyId=${selectedBabyId}&date=${today}`
+        `/api/health?babyId=${resolvedSelectedBabyId}&date=${today}`
       )
       const healthDataRaw = healthResponse.ok ? await healthResponse.json() : []
       const healthData: HealthRecord[] = Array.isArray(healthDataRaw) ? healthDataRaw : []
@@ -148,11 +159,20 @@ export default function Dashboard({ selectedBabyId, onSelectBaby }: Props) {
     } catch (error) {
       console.error('获取今日数据失败:', error)
     }
-  }, [selectedBabyId])
+  }, [resolvedSelectedBabyId])
 
   useEffect(() => {
+    if (initialBabies.length > 0) {
+      setBabies(initialBabies)
+      setLoading(false)
+      if (!resolvedSelectedBabyId) {
+        handleSelectBaby(initialBabies[0].id)
+      }
+      return
+    }
+
     fetchBabies()
-  }, [fetchBabies])
+  }, [fetchBabies, handleSelectBaby, initialBabies, resolvedSelectedBabyId])
 
   useEffect(() => {
     fetchTodayData()
@@ -211,7 +231,7 @@ export default function Dashboard({ selectedBabyId, onSelectBaby }: Props) {
     )
   }
 
-  const selectedBaby = babies.find(b => b.id === selectedBabyId)
+  const selectedBaby = babies.find(b => b.id === resolvedSelectedBabyId)
 
   return (
     <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 space-y-4">
@@ -221,9 +241,9 @@ export default function Dashboard({ selectedBabyId, onSelectBaby }: Props) {
           {babies.map(baby => (
             <button
               key={baby.id}
-              onClick={() => onSelectBaby(baby.id)}
+              onClick={() => handleSelectBaby(baby.id)}
               className={`px-4 py-2 rounded-full whitespace-nowrap transition text-sm ${
-                baby.id === selectedBabyId
+                baby.id === resolvedSelectedBabyId
                   ? 'bg-blue-600 text-white'
                   : 'bg-white text-gray-700 hover:bg-gray-50'
               }`}

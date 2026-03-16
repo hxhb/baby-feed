@@ -3,8 +3,13 @@
 import { useState } from 'react'
 import { Layout } from '@/components/Providers'
 import Timeline from '@/components/Timeline'
+import type { PreloadedBaby } from '@/lib/server-babies'
 
-export default function TimelinePageClient() {
+interface Props {
+  initialBabies: PreloadedBaby[]
+}
+
+export default function TimelinePageClient({ initialBabies }: Props) {
   const [selectedBabyId, setSelectedBabyId] = useState<string | null>(null)
 
   return (
@@ -12,6 +17,7 @@ export default function TimelinePageClient() {
       <Timeline
         selectedBabyId={selectedBabyId}
         onSelectBaby={setSelectedBabyId}
+        initialBabies={initialBabies}
       />
     </Layout>
   )

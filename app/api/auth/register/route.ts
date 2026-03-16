@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
+import { enforceRateLimit, buildIpActionKey } from '@/lib/rate-limit'
 import { safeParseBody } from '@/lib/validation'
 
 // 邮箱格式验证
@@ -66,11 +67,21 @@ export async function POST(request: NextRequest) {
     }
 
     // 速率限制检查
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() 
-      || request.headers.get('x-real-ip') 
-      || 'unknown'
-    if (!checkRateLimit(ip)) {
-      return NextResponse.json({ error: '请求过于频繁，请稍后再试' }, { status: 429 })
+    const registerRateLimit = enforceRateLimit({
+      key: buildIpActionKey('auth-register', request),
+      limit: 5,
+      windowMs: 60 * 1000,
+    })
+    if (!registerRateLimit.allowed) {
+      return NextResponse.json(
+        { error: '请求过于频繁，请稍后再试' },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': String(registerRateLimit.retryAfterSeconds),
+          },
+        }
+      )
     }
 
     const { data: body, error: parseError } = await safeParseBody(request)

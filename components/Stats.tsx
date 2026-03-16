@@ -29,10 +29,11 @@ interface WeightPoint {
 interface Props {
   selectedBabyId: string | null
   onSelectBaby: (id: string | null) => void
+  initialBabies?: Baby[]
 }
 
-export default function StatsComponent({ selectedBabyId, onSelectBaby }: Props) {
-  const [babies, setBabies] = useState<Baby[]>([])
+export default function StatsComponent({ selectedBabyId, onSelectBaby, initialBabies = [] }: Props) {
+  const [babies, setBabies] = useState<Baby[]>(initialBabies)
   const [stats, setStats] = useState<{
     baby: Baby
     todayStats: Record<string, unknown>
@@ -52,7 +53,7 @@ export default function StatsComponent({ selectedBabyId, onSelectBaby }: Props) 
     }
     weightTrend: WeightPoint[]
   } | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(initialBabies.length === 0)
   const [days, setDays] = useState(7)
 
   const fetchBabies = useCallback(async () => {
@@ -95,8 +96,17 @@ export default function StatsComponent({ selectedBabyId, onSelectBaby }: Props) 
   }, [selectedBabyId, days])
 
   useEffect(() => {
+    if (initialBabies.length > 0) {
+      setBabies(initialBabies)
+      setLoading(false)
+      if (!selectedBabyId) {
+        onSelectBaby(initialBabies[0].id)
+      }
+      return
+    }
+
     fetchBabies()
-  }, [fetchBabies])
+  }, [fetchBabies, initialBabies, onSelectBaby, selectedBabyId])
 
   useEffect(() => {
     fetchStats()

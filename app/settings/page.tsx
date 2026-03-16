@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server'
 import { Layout } from '@/components/Providers'
 import Settings from '@/components/Settings'
 import { auth } from '@/lib/auth'
+import { getPreloadedBabies } from '@/lib/server-babies'
 
 async function getServerSession() {
   const headerStore = await headers()
@@ -14,7 +15,10 @@ async function getServerSession() {
 }
 
 export default async function SettingsPage() {
-  const session = await getServerSession()
+  const [session, initialBabies] = await Promise.all([
+    getServerSession(),
+    getPreloadedBabies(),
+  ])
 
   if (!session?.user) {
     redirect('/login')
@@ -22,7 +26,11 @@ export default async function SettingsPage() {
 
   return (
     <Layout>
-      <Settings userName={session.user.name} userEmail={session.user.email} />
+      <Settings
+        userName={session.user.name}
+        userEmail={session.user.email}
+        initialBabies={initialBabies}
+      />
     </Layout>
   )
 }

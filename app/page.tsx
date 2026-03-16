@@ -2,11 +2,14 @@
 
 import Dashboard from '@/components/Dashboard'
 import { Layout } from '@/components/Providers'
+import { getPreloadedBabies } from '@/lib/server-babies'
 
-export default function Home() {
+export default async function Home() {
+  const initialBabies = await getPreloadedBabies()
+
   return (
     <Layout>
-      <Dashboard />
+      <Dashboard initialBabies={initialBabies} />
     </Layout>
   )
 }

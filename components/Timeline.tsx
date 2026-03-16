@@ -66,6 +66,7 @@ type TimelineRecord = FeedingRecord | HealthRecord
 interface Props {
   selectedBabyId: string | null
   onSelectBaby: (id: string | null) => void
+  initialBabies?: Baby[]
 }
 
 // 删除确认弹窗组件
@@ -436,10 +437,10 @@ function EditRecordModal({
   )
 }
 
-export default function TimelineComponent({ selectedBabyId, onSelectBaby }: Props) {
-  const [babies, setBabies] = useState<Baby[]>([])
+export default function TimelineComponent({ selectedBabyId, onSelectBaby, initialBabies = [] }: Props) {
+  const [babies, setBabies] = useState<Baby[]>(initialBabies)
   const [records, setRecords] = useState<(FeedingRecord | HealthRecord)[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(initialBabies.length === 0)
   const [currentDate, setCurrentDate] = useState(new Date())
   
   // 删除确认状态
@@ -506,8 +507,17 @@ export default function TimelineComponent({ selectedBabyId, onSelectBaby }: Prop
   }, [selectedBabyId, currentDate])
 
   useEffect(() => {
+    if (initialBabies.length > 0) {
+      setBabies(initialBabies)
+      setLoading(false)
+      if (!selectedBabyId) {
+        onSelectBaby(initialBabies[0].id)
+      }
+      return
+    }
+
     fetchBabies()
-  }, [fetchBabies])
+  }, [fetchBabies, initialBabies, onSelectBaby, selectedBabyId])
 
   useEffect(() => {
     fetchRecords()

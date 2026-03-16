@@ -34,14 +34,15 @@ interface BabyInfo {
 interface Props {
   userName: string
   userEmail: string
+  initialBabies?: BabyInfo[]
 }
 
 type ModalType = 'addBaby' | 'editBaby' | 'editName' | 'changePassword' | 'deleteAccount' | null
 
-export default function SettingsComponent({ userName, userEmail }: Props) {
+export default function SettingsComponent({ userName, userEmail, initialBabies = [] }: Props) {
   const router = useRouter()
-  const [babies, setBabies] = useState<BabyInfo[]>([])
-  const [loading, setLoading] = useState(true)
+  const [babies, setBabies] = useState<BabyInfo[]>(initialBabies)
+  const [loading, setLoading] = useState(initialBabies.length === 0)
   const [activeModal, setActiveModal] = useState<ModalType>(null)
   const [editingBaby, setEditingBaby] = useState<BabyInfo | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
@@ -77,13 +78,19 @@ export default function SettingsComponent({ userName, userEmail }: Props) {
   const [displayName, setDisplayName] = useState(userName)
 
   useEffect(() => {
-    fetchBabies()
+    if (initialBabies.length > 0) {
+      setBabies(initialBabies)
+      setLoading(false)
+    } else {
+      fetchBabies()
+    }
+
     // 检查是否为管理员
     fetch('/api/admin/check')
       .then(res => res.json())
       .then(data => setIsAdmin(data.isAdmin))
       .catch(() => {})
-  }, [])
+  }, [initialBabies])
 
   const fetchBabies = async () => {
     try {
