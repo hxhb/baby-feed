@@ -56,6 +56,11 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: check.error }, { status: check.status })
   }
 
+  const originCheck = validateSameOrigin(request)
+  if (!originCheck.valid) {
+    return NextResponse.json({ error: originCheck.error }, { status: 403 })
+  }
+
   try {
     const { data: body, error: parseError } = await safeParseBody(request)
     if (parseError || !body) {

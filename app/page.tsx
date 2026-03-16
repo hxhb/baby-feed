@@ -1,5 +1,3 @@
-'use client'
-
 import Dashboard from '@/components/Dashboard'
 import { Layout } from '@/components/Providers'
 import { getPreloadedBabies } from '@/lib/server-babies'
