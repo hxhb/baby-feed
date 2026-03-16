@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { validateId } from '@/lib/validation'
+import { validateId, validateDateOnlyString } from '@/lib/validation'
+import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
 
-// 获取北京时间（UTC+8）的一天起止
+const noStoreHeaders = {
+  'Cache-Control': 'no-store, max-age=0',
+  'Pragma': 'no-cache',
+}
+
 function getBeijingDayRange(dateStr: string) {
   const start = new Date(`${dateStr}T00:00:00+08:00`)
   const end = new Date(`${dateStr}T23:59:59.999+08:00`)
@@ -14,7 +19,22 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth(request)
     if (!session?.user) {
-      return NextResponse.json({ error: '未授权' }, { status: 401 })
+      return NextResponse.json({ error: '未授权' }, { status: 401, headers: noStoreHeaders })
+    }
+
+    const dayStatsRateLimit = enforceRateLimit({
+      key: buildUserActionKey('stats-day-query', session.user.id, request),
+      limit: 120,
+      windowMs: 60 * 1000,
+    })
+    if (!dayStatsRateLimit.allowed) {
+      return NextResponse.json({ error: '请求过于频繁，请稍后再试' }, {
+        status: 429,
+        headers: {
+          ...noStoreHeaders,
+          'Retry-After': String(dayStatsRateLimit.retryAfterSeconds),
+        },
+      })
     }
 
     const { searchParams } = new URL(request.url)
@@ -22,18 +42,17 @@ export async function GET(request: NextRequest) {
     const dateStr = searchParams.get('date')
 
     if (!babyId || !dateStr) {
-      return NextResponse.json({ error: '缺少参数' }, { status: 400 })
+      return NextResponse.json({ error: '缺少参数' }, { status: 400, headers: noStoreHeaders })
     }
 
-    // 验证 babyId 格式
     const idCheck = validateId(babyId, 'babyId')
     if (!idCheck.valid) {
-      return NextResponse.json({ error: idCheck.error }, { status: 400 })
+      return NextResponse.json({ error: idCheck.error }, { status: 400, headers: noStoreHeaders })
     }
 
-    // 验证日期格式（YYYY-MM-DD）
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-      return NextResponse.json({ error: '日期格式无效，应为 YYYY-MM-DD' }, { status: 400 })
+    const dateCheck = validateDateOnlyString(dateStr, '日期')
+    if (!dateCheck.valid) {
+      return NextResponse.json({ error: dateCheck.error }, { status: 400, headers: noStoreHeaders })
     }
 
     const baby = await prisma.baby.findFirst({
@@ -44,7 +63,7 @@ export async function GET(request: NextRequest) {
     })
 
     if (!baby) {
-      return NextResponse.json({ error: '婴儿不存在' }, { status: 404 })
+      return NextResponse.json({ error: '婴儿不存在' }, { status: 404, headers: noStoreHeaders })
     }
 
     const { start: dayStart, end: dayEnd } = getBeijingDayRange(dateStr)
@@ -97,9 +116,9 @@ export async function GET(request: NextRequest) {
       temperature: healthRecords.find(r => r.type === 'TEMPERATURE')?.temperature
     }
 
-    return NextResponse.json(dayStats)
+    return NextResponse.json(dayStats, { headers: noStoreHeaders })
   } catch (error) {
     console.error('获取单日统计失败:', error)
-    return NextResponse.json({ error: '获取失败' }, { status: 500 })
+    return NextResponse.json({ error: '获取失败' }, { status: 500, headers: noStoreHeaders })
   }
 }

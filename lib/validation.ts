@@ -114,6 +114,35 @@ export function validateDateString(value: unknown, fieldName: string): Validatio
   return { valid: true }
 }
 
+// 验证 YYYY-MM-DD 格式日期
+export function validateDateOnlyString(value: unknown, fieldName: string): ValidationResult {
+  if (value === undefined || value === null) {
+    return { valid: true }
+  }
+  if (typeof value !== 'string') {
+    return { valid: false, error: `${fieldName} 必须是字符串` }
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return { valid: false, error: `${fieldName} 格式无效，应为 YYYY-MM-DD` }
+  }
+
+  const [year, month, day] = value.split('-').map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day))
+  if (isNaN(date.getTime())) {
+    return { valid: false, error: `${fieldName} 不是有效的日期` }
+  }
+
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() + 1 !== month ||
+    date.getUTCDate() !== day
+  ) {
+    return { valid: false, error: `${fieldName} 不是有效的日期` }
+  }
+
+  return validateDateString(date.toISOString(), fieldName)
+}
+
 // 验证 CUID 格式的 ID
 export function validateId(value: unknown, fieldName: string = 'ID'): ValidationResult {
   if (value === undefined || value === null) {
@@ -184,13 +213,27 @@ export function validateBabyInput(body: Record<string, unknown>) {
 // 安全解析请求体，限制大小
 export async function safeParseBody(request: Request, maxSize: number = 10 * 1024): Promise<{ data?: Record<string, unknown>; error?: string }> {
   try {
+    const contentType = request.headers.get('content-type')
+    if (contentType && !contentType.toLowerCase().includes('application/json')) {
+      return { error: '请求体必须为 JSON' }
+    }
+
     // 检查 Content-Length
     const contentLength = request.headers.get('content-length')
-    if (contentLength && parseInt(contentLength) > maxSize) {
-      return { error: '请求体过大' }
+    if (contentLength) {
+      const parsedLength = Number.parseInt(contentLength, 10)
+      if (!Number.isFinite(parsedLength)) {
+        return { error: '请求体长度无效' }
+      }
+      if (parsedLength > maxSize) {
+        return { error: '请求体过大' }
+      }
     }
     
     const text = await request.text()
+    if (!text.trim()) {
+      return { error: '请求体不能为空' }
+    }
     if (text.length > maxSize) {
       return { error: '请求体过大' }
     }
@@ -199,9 +242,53 @@ export async function safeParseBody(request: Request, maxSize: number = 10 * 102
     if (typeof data !== 'object' || data === null || Array.isArray(data)) {
       return { error: '请求体格式不正确' }
     }
+
+    const prototype = Object.getPrototypeOf(data)
+    if (prototype !== Object.prototype && prototype !== null) {
+      return { error: '请求体格式不正确' }
+    }
     
-    return { data }
+    return { data: data as Record<string, unknown> }
   } catch {
     return { error: '请求体解析失败' }
   }
+}
+
+function isApiKeyRequest(request: Request): boolean {
+  const authHeader = request.headers.get('authorization')
+  return !!authHeader && /^Bearer\s+bfk_[a-f0-9]{64}$/i.test(authHeader)
+}
+
+export function validateSameOrigin(request: Request): ValidationResult {
+  if (isApiKeyRequest(request)) {
+    return { valid: true }
+  }
+
+  const requestUrl = new URL(request.url)
+  const forwardedProto = request.headers.get('x-forwarded-proto')
+  const forwardedHost = request.headers.get('x-forwarded-host')
+  const host = forwardedHost || request.headers.get('host') || requestUrl.host
+  const protocol = forwardedProto || requestUrl.protocol.replace(':', '')
+  const expectedOrigin = `${protocol}://${host}`
+
+  const origin = request.headers.get('origin')
+  if (origin) {
+    return origin === expectedOrigin
+      ? { valid: true }
+      : { valid: false, error: '非法请求来源' }
+  }
+
+  const referer = request.headers.get('referer')
+  if (referer) {
+    try {
+      const refererUrl = new URL(referer)
+      return refererUrl.origin === expectedOrigin
+        ? { valid: true }
+        : { valid: false, error: '非法请求来源' }
+    } catch {
+      return { valid: false, error: '非法请求来源' }
+    }
+  }
+
+  return { valid: false, error: '缺少合法的请求来源' }
 }

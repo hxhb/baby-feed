@@ -1,51 +1,13 @@
-'use client'
-
-import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
-import { Layout } from '@/components/Providers'
+import { redirect } from 'next/navigation'
 import AdminPanel from '@/components/AdminPanel'
+import { requireServerAdmin } from '@/lib/admin'
 
-export default function AdminPage() {
-  const { data: session, status } = useSession()
-  const router = useRouter()
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
+export default async function AdminPage() {
+  const check = await requireServerAdmin()
 
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/login')
-    }
-  }, [status, router])
-
-  useEffect(() => {
-    if (session?.user?.id) {
-      fetch('/api/admin/check')
-        .then(res => res.json())
-        .then(data => {
-          if (!data.isAdmin) {
-            router.push('/')
-          } else {
-            setIsAdmin(true)
-          }
-        })
-        .catch(() => router.push('/'))
-    }
-  }, [session, router])
-
-  if (status === 'loading' || !session || isAdmin === null) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    )
+  if ('error' in check) {
+    redirect(check.status === 401 ? '/login' : '/')
   }
 
-  return (
-    <Layout>
-      <AdminPanel 
-        currentUserId={session.user.id} 
-        onBack={() => router.push('/settings')} 
-      />
-    </Layout>
-  )
+  return <AdminPanel currentUserId={check.session.user.id} />
 }

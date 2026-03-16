@@ -20,11 +20,12 @@ interface BabyInfo {
 
 interface Props {
   initialType: 'breast' | 'breast_bottle' | 'formula' | null
+  initialBabies?: BabyInfo[]
 }
 
-export default function FeedingForm({ initialType }: Props) {
+export default function FeedingForm({ initialType, initialBabies = [] }: Props) {
   const router = useRouter()
-  const [babies, setBabies] = useState<BabyInfo[]>([])
+  const [babies, setBabies] = useState<BabyInfo[]>(initialBabies)
   const [loading, setLoading] = useState(false)
   
   const [babyId, setBabyId] = useState('')
@@ -42,8 +43,14 @@ export default function FeedingForm({ initialType }: Props) {
   const [notes, setNotes] = useState('')
 
   useEffect(() => {
+    if (initialBabies.length > 0) {
+      setBabies(initialBabies)
+      setBabyId(currentBabyId => currentBabyId || initialBabies[0].id)
+      return
+    }
+
     fetchBabies()
-  }, [])
+  }, [initialBabies])
 
   const fetchBabies = async () => {
     try {

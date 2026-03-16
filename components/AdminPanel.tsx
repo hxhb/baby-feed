@@ -30,7 +30,7 @@ interface UserInfo {
 
 interface Props {
   currentUserId: string
-  onBack: () => void
+  onBack?: () => void
 }
 
 export default function AdminPanel({ currentUserId, onBack }: Props) {
@@ -149,12 +149,14 @@ export default function AdminPanel({ currentUserId, onBack }: Props) {
     <div className="max-w-2xl mx-auto px-3 sm:px-4 py-4 space-y-4">
       {/* 顶部导航 */}
       <div className="flex items-center space-x-3">
-        <button
-          onClick={onBack}
-          className="p-2 hover:bg-gray-100 rounded-lg transition"
-        >
-          <ArrowLeft size={20} />
-        </button>
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="p-2 hover:bg-gray-100 rounded-lg transition"
+          >
+            <ArrowLeft size={20} />
+          </button>
+        )}
         <div className="flex items-center space-x-2">
           <UserCog size={22} className="text-blue-600" />
           <h1 className="text-xl font-bold text-gray-900">站点管理</h1>

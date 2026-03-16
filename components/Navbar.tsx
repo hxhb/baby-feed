@@ -1,8 +1,9 @@
 'use client'
 
+import { useEffect, useCallback } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { 
   Home, 
   Calendar, 
@@ -23,6 +24,33 @@ const navItems = [
 export default function Navbar() {
   const { data: session } = useSession()
   const pathname = usePathname()
+  const router = useRouter()
+
+  const prefetchRoute = useCallback((href: string) => {
+    if (href === pathname) {
+      return
+    }
+
+    router.prefetch(href)
+  }, [pathname, router])
+
+  useEffect(() => {
+    if (!session) {
+      return
+    }
+
+    const warmRoutes = () => {
+      navItems.forEach((item) => {
+        prefetchRoute(item.href)
+      })
+    }
+
+    const timeoutId = window.setTimeout(warmRoutes, 150)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [prefetchRoute, session])
 
   if (!session) return null
 
@@ -47,6 +75,9 @@ export default function Navbar() {
                   <Link
                     key={item.href}
                     href={item.href}
+                    onMouseEnter={() => prefetchRoute(item.href)}
+                    onFocus={() => prefetchRoute(item.href)}
+                    onTouchStart={() => prefetchRoute(item.href)}
                     className={`flex items-center space-x-1 px-4 py-2 rounded-lg transition ${
                       isActive
                         ? 'bg-blue-50 text-blue-600'
@@ -83,6 +114,9 @@ export default function Navbar() {
                 <Link
                   key={item.href}
                   href={item.href}
+                  onMouseEnter={() => prefetchRoute(item.href)}
+                  onFocus={() => prefetchRoute(item.href)}
+                  onTouchStart={() => prefetchRoute(item.href)}
                   className="flex flex-col items-center justify-center -mt-4"
                 >
                   <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg ${
@@ -98,6 +132,9 @@ export default function Navbar() {
               <Link
                 key={item.href}
                 href={item.href}
+                onMouseEnter={() => prefetchRoute(item.href)}
+                onFocus={() => prefetchRoute(item.href)}
+                onTouchStart={() => prefetchRoute(item.href)}
                 className={`flex flex-col items-center justify-center flex-1 py-1 transition ${
                   isActive
                     ? 'text-blue-600'
