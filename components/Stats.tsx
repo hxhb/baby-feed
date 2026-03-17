@@ -23,11 +23,6 @@ interface Baby {
   name: string
 }
 
-interface WeightPoint {
-  date: string
-  weight: number
-}
-
 type StatsData = PreloadedStatsData
 
 interface Props {

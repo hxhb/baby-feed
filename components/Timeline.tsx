@@ -88,7 +88,7 @@ function formatBreastFeedingDetails(record: FeedingRecord) {
     return '母乳亲喂'
   }
 
-  return `母乳亲喂 ${parts.join('，')}分钟`
+  return `母乳亲喂 ${parts.join(' ')}分钟`
 }
 
 function DeleteConfirmDialog({ 
