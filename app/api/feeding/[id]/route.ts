@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { validateFeedingInput, validateId, safeParseBody, validateSameOrigin } from '@/lib/validation'
+import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
 
 const noStoreHeaders = {
   'Cache-Control': 'no-store, max-age=0',
@@ -19,6 +20,21 @@ export async function PUT(
       return NextResponse.json({ error: '未授权' }, { status: 401, headers: noStoreHeaders })
     }
 
+    const updateRateLimit = enforceRateLimit({
+      key: buildUserActionKey('feeding-update', session.user.id, request),
+      limit: 30,
+      windowMs: 10 * 60 * 1000,
+    })
+    if (!updateRateLimit.allowed) {
+      return NextResponse.json({ error: '操作过于频繁，请稍后再试' }, {
+        status: 429,
+        headers: {
+          ...noStoreHeaders,
+          'Retry-After': String(updateRateLimit.retryAfterSeconds),
+        },
+      })
+    }
+
     const originCheck = validateSameOrigin(request)
     if (!originCheck.valid) {
       return NextResponse.json({ error: originCheck.error }, { status: 403, headers: noStoreHeaders })
@@ -34,7 +50,6 @@ export async function PUT(
       return NextResponse.json({ error: parseError || '请求体格式不正确' }, { status: 400, headers: noStoreHeaders })
     }
 
-    // 验证输入
     const validation = validateFeedingInput(body)
     if (!validation.valid) {
       return NextResponse.json({ error: validation.error }, { status: 400, headers: noStoreHeaders })
@@ -160,6 +175,21 @@ export async function DELETE(
     const session = await auth(request)
     if (!session?.user) {
       return NextResponse.json({ error: '未授权' }, { status: 401, headers: noStoreHeaders })
+    }
+
+    const deleteRateLimit = enforceRateLimit({
+      key: buildUserActionKey('feeding-delete', session.user.id, request),
+      limit: 20,
+      windowMs: 15 * 60 * 1000,
+    })
+    if (!deleteRateLimit.allowed) {
+      return NextResponse.json({ error: '操作过于频繁，请稍后再试' }, {
+        status: 429,
+        headers: {
+          ...noStoreHeaders,
+          'Retry-After': String(deleteRateLimit.retryAfterSeconds),
+        },
+      })
     }
 
     const originCheck = validateSameOrigin(request)

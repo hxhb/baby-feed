@@ -1,7 +1,5 @@
-import { headers } from 'next/headers'
-import { NextRequest } from 'next/server'
-import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getServerSession } from '@/lib/server-auth'
 
 export interface PreloadedBaby {
   id: string
@@ -9,14 +7,6 @@ export interface PreloadedBaby {
   birthDate: string
   gender: string
   createdAt: string
-}
-
-async function getServerSession() {
-  const headerStore = await headers()
-  const protocol = headerStore.get('x-forwarded-proto') ?? 'http'
-  const host = headerStore.get('x-forwarded-host') ?? headerStore.get('host') ?? 'localhost:3000'
-
-  return auth(new NextRequest(`${protocol}://${host}`, { headers: headerStore }))
 }
 
 export async function getPreloadedBabies(): Promise<PreloadedBaby[]> {

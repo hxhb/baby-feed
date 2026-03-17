@@ -1,8 +1,18 @@
 import StatsPageClient from './StatsPageClient'
-import { getPreloadedBabies } from '@/lib/server-babies'
+import { getPreloadedStatsPageData } from '@/lib/server-stats'
 
 export default async function StatsPage() {
-  const initialBabies = await getPreloadedBabies()
+  const {
+    initialBabies,
+    initialSelectedBabyId,
+    initialStats,
+  } = await getPreloadedStatsPageData()
 
-  return <StatsPageClient initialBabies={initialBabies} />
+  return (
+    <StatsPageClient
+      initialBabies={initialBabies}
+      initialSelectedBabyId={initialSelectedBabyId}
+      initialStats={initialStats}
+    />
+  )
 }

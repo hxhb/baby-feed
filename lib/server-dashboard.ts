@@ -1,0 +1,133 @@
+import { prisma } from '@/lib/prisma'
+import { getBeijingToday } from '@/lib/time'
+import { getPreloadedBabies } from '@/lib/server-babies'
+import { getServerSession } from '@/lib/server-auth'
+
+export interface PreloadedDashboardFeedingRecord {
+  id: string
+  type: string
+  startTime: string
+  leftBreastDuration?: number
+  rightBreastDuration?: number
+  breastMilkAmount?: number
+  formulaAmount?: number
+  adGiven?: boolean
+  notes?: string | null
+  recordType: 'feeding'
+}
+
+export interface PreloadedDashboardHealthRecord {
+  id: string
+  type: string
+  recordedAt: string
+  weight?: number
+  height?: number
+  temperature?: number
+  medicationName?: string | null
+  vaccineName?: string | null
+  diaperType?: string | null
+  diaperStatus?: string | null
+  adGiven?: boolean
+  notes?: string | null
+  recordType: 'health'
+}
+
+export interface PreloadedDashboardData {
+  initialBabies: Awaited<ReturnType<typeof getPreloadedBabies>>
+  initialSelectedBabyId: string | null
+  initialTodayRecords: PreloadedDashboardFeedingRecord[]
+  initialTodayHealthRecords: PreloadedDashboardHealthRecord[]
+}
+
+function getBeijingDayRange(dateStr: string) {
+  return {
+    start: new Date(`${dateStr}T00:00:00+08:00`),
+    end: new Date(`${dateStr}T23:59:59.999+08:00`),
+  }
+}
+
+export async function getPreloadedDashboardData(): Promise<PreloadedDashboardData> {
+  const session = await getServerSession()
+  if (!session?.user?.id) {
+    return {
+      initialBabies: [],
+      initialSelectedBabyId: null,
+      initialTodayRecords: [],
+      initialTodayHealthRecords: [],
+    }
+  }
+
+  const initialBabies = await getPreloadedBabies()
+  const initialSelectedBabyId = initialBabies[0]?.id ?? null
+
+  if (!initialSelectedBabyId) {
+    return {
+      initialBabies,
+      initialSelectedBabyId: null,
+      initialTodayRecords: [],
+      initialTodayHealthRecords: [],
+    }
+  }
+
+  const today = getBeijingToday()
+  const { start, end } = getBeijingDayRange(today)
+
+  const [feedingRecords, healthRecords] = await Promise.all([
+    prisma.feedingRecord.findMany({
+      where: {
+        babyId: initialSelectedBabyId,
+        createdBy: session.user.id,
+        startTime: { gte: start, lte: end },
+      },
+      orderBy: { startTime: 'desc' },
+      select: {
+        id: true,
+        type: true,
+        startTime: true,
+        leftBreastDuration: true,
+        rightBreastDuration: true,
+        breastMilkAmount: true,
+        formulaAmount: true,
+        adGiven: true,
+        notes: true,
+      },
+    }),
+    prisma.healthRecord.findMany({
+      where: {
+        babyId: initialSelectedBabyId,
+        createdBy: session.user.id,
+        recordedAt: { gte: start, lte: end },
+      },
+      orderBy: { recordedAt: 'desc' },
+      select: {
+        id: true,
+        type: true,
+        recordedAt: true,
+        weight: true,
+        height: true,
+        temperature: true,
+        medicationName: true,
+        vaccineName: true,
+        diaperType: true,
+        diaperStatus: true,
+        adGiven: true,
+        notes: true,
+      },
+    }),
+  ])
+
+  return {
+    initialBabies,
+    initialSelectedBabyId,
+    initialTodayRecords: feedingRecords.map((record) => ({
+      ...record,
+      startTime: record.startTime.toISOString(),
+      recordType: 'feeding',
+    })),
+    initialTodayHealthRecords: healthRecords.map((record) => ({
+      ...record,
+      recordedAt: record.recordedAt.toISOString(),
+      recordType: 'health',
+    })),
+  }
+}

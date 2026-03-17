@@ -83,3 +83,7 @@ export function buildUserActionKey(action: string, userId: string, request: Next
 export function buildIpActionKey(action: string, request: NextRequest): string {
   return `${action}:${getClientIp(request)}`
 }
+
+export function buildUserScopedKey(prefix: string, userId: string, suffix?: string): string {
+  return suffix ? `${prefix}:${userId}:${suffix}` : `${prefix}:${userId}`
+}

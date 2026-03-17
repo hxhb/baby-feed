@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { validateId, validateDateOnlyString } from '@/lib/validation'
+import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
 
 const noStoreHeaders = {
   'Cache-Control': 'no-store, max-age=0',
   'Pragma': 'no-cache',
 }
 
-// 获取北京时间（UTC+8）的一天起止
 function getBeijingDayRange(dateStr: string) {
   const start = new Date(`${dateStr}T00:00:00+08:00`)
   const end = new Date(`${dateStr}T23:59:59.999+08:00`)
@@ -22,6 +22,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: '未授权' }, { status: 401, headers: noStoreHeaders })
     }
 
+    const dayStatsRateLimit = enforceRateLimit({
+      key: buildUserActionKey('stats-day-query', session.user.id, request),
+      limit: 120,
+      windowMs: 60 * 1000,
+    })
+    if (!dayStatsRateLimit.allowed) {
+      return NextResponse.json({ error: '请求过于频繁，请稍后再试' }, {
+        status: 429,
+        headers: {
+          ...noStoreHeaders,
+          'Retry-After': String(dayStatsRateLimit.retryAfterSeconds),
+        },
+      })
+    }
+
     const { searchParams } = new URL(request.url)
     const babyId = searchParams.get('babyId')
     const dateStr = searchParams.get('date')
@@ -30,7 +45,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: '缺少参数' }, { status: 400, headers: noStoreHeaders })
     }
 
-    // 验证 babyId 格式
     const idCheck = validateId(babyId, 'babyId')
     if (!idCheck.valid) {
       return NextResponse.json({ error: idCheck.error }, { status: 400, headers: noStoreHeaders })

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { validateBabyInput, GENDERS, safeParseBody, validateSameOrigin } from '@/lib/validation'
+import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
 
 const noStoreHeaders = {
   'Cache-Control': 'no-store, max-age=0',
@@ -13,6 +14,21 @@ export async function GET(request: NextRequest) {
     const session = await auth(request)
     if (!session?.user?.id) {
       return NextResponse.json({ error: '未授权' }, { status: 401, headers: noStoreHeaders })
+    }
+
+    const listRateLimit = enforceRateLimit({
+      key: buildUserActionKey('babies-list', session.user.id, request),
+      limit: 120,
+      windowMs: 60 * 1000,
+    })
+    if (!listRateLimit.allowed) {
+      return NextResponse.json({ error: '请求过于频繁，请稍后再试' }, {
+        status: 429,
+        headers: {
+          ...noStoreHeaders,
+          'Retry-After': String(listRateLimit.retryAfterSeconds),
+        },
+      })
     }
 
     const babies = await prisma.baby.findMany({
@@ -32,6 +48,21 @@ export async function POST(request: NextRequest) {
     const session = await auth(request)
     if (!session?.user?.id) {
       return NextResponse.json({ error: '未授权' }, { status: 401, headers: noStoreHeaders })
+    }
+
+    const createRateLimit = enforceRateLimit({
+      key: buildUserActionKey('babies-create', session.user.id, request),
+      limit: 20,
+      windowMs: 10 * 60 * 1000,
+    })
+    if (!createRateLimit.allowed) {
+      return NextResponse.json({ error: '操作过于频繁，请稍后再试' }, {
+        status: 429,
+        headers: {
+          ...noStoreHeaders,
+          'Retry-After': String(createRateLimit.retryAfterSeconds),
+        },
+      })
     }
 
     const originCheck = validateSameOrigin(request)
@@ -54,7 +85,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '字段类型无效' }, { status: 400, headers: noStoreHeaders })
     }
 
-    // 验证输入（性别枚举、名称长度、日期格式）
     const validation = validateBabyInput(body)
     if (!validation.valid) {
       return NextResponse.json({ error: validation.error }, { status: 400, headers: noStoreHeaders })

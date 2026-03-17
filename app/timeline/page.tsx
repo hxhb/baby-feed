@@ -1,8 +1,20 @@
 import TimelinePageClient from './TimelinePageClient'
-import { getPreloadedBabies } from '@/lib/server-babies'
+import { getPreloadedTimelinePageData } from '@/lib/server-timeline'
 
 export default async function TimelinePage() {
-  const initialBabies = await getPreloadedBabies()
+  const {
+    initialBabies,
+    initialSelectedBabyId,
+    initialDate,
+    initialRecords,
+  } = await getPreloadedTimelinePageData()
 
-  return <TimelinePageClient initialBabies={initialBabies} />
+  return (
+    <TimelinePageClient
+      initialBabies={initialBabies}
+      initialSelectedBabyId={initialSelectedBabyId}
+      initialDate={initialDate}
+      initialRecords={initialRecords}
+    />
+  )
 }

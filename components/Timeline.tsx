@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { format, isToday, isYesterday } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
 import { formatBeijingTime, getBeijingHour, toBeijingDatetimeLocal, toBeijingISO } from '@/lib/time'
+import { dedupeRequest, invalidateRequestCache } from '@/lib/client-request-cache'
+import type { PreloadedTimelineRecord } from '@/lib/server-timeline'
 import Link from 'next/link'
 import { 
   Droplets, 
@@ -32,13 +34,13 @@ interface FeedingRecord {
   id: string
   type: string
   startTime: string
-  endTime?: string
-  leftBreastDuration?: number
-  rightBreastDuration?: number
-  breastMilkAmount?: number
-  formulaAmount?: number
-  adGiven?: boolean
-  notes?: string
+  endTime?: string | null
+  leftBreastDuration?: number | null
+  rightBreastDuration?: number | null
+  breastMilkAmount?: number | null
+  formulaAmount?: number | null
+  adGiven?: boolean | null
+  notes?: string | null
   baby?: Baby
   recordType: 'feeding'
 }
@@ -47,16 +49,16 @@ interface HealthRecord {
   id: string
   type: string
   recordedAt: string
-  weight?: number
-  height?: number
-  temperature?: number
-  medicationName?: string
-  medicationDose?: string
-  vaccineName?: string
-  diaperType?: string
-  diaperStatus?: string
-  adGiven?: boolean
-  notes?: string
+  weight?: number | null
+  height?: number | null
+  temperature?: number | null
+  medicationName?: string | null
+  medicationDose?: string | null
+  vaccineName?: string | null
+  diaperType?: string | null
+  diaperStatus?: string | null
+  adGiven?: boolean | null
+  notes?: string | null
   baby?: Baby
   recordType: 'health'
 }
@@ -67,9 +69,28 @@ interface Props {
   selectedBabyId: string | null
   onSelectBaby: (id: string | null) => void
   initialBabies?: Baby[]
+  initialSelectedBabyId?: string | null
+  initialDate?: string
+  initialRecords?: PreloadedTimelineRecord[]
 }
 
-// 删除确认弹窗组件
+function buildTimelineCacheKey(babyId: string, dateStr: string) {
+  return `timeline:${babyId}:${dateStr}`
+}
+
+function formatBreastFeedingDetails(record: FeedingRecord) {
+  const parts = [
+    record.leftBreastDuration ? `左${record.leftBreastDuration}` : null,
+    record.rightBreastDuration ? `右${record.rightBreastDuration}` : null,
+  ].filter((part): part is string => Boolean(part))
+
+  if (parts.length === 0) {
+    return '母乳亲喂'
+  }
+
+  return `母乳亲喂 ${parts.join('，')}分钟`
+}
+
 function DeleteConfirmDialog({ 
   onConfirm, 
   onCancel 
@@ -101,7 +122,6 @@ function DeleteConfirmDialog({
   )
 }
 
-// 编辑弹窗组件
 function EditRecordModal({
   record,
   onSave,
@@ -121,13 +141,11 @@ function EditRecordModal({
   const [editTime, setEditTime] = useState(toBeijingDatetimeLocal(timeStr))
   const [editNotes, setEditNotes] = useState(record.notes || '')
 
-  // Feeding fields
   const [leftDuration, setLeftDuration] = useState(String(feedingRecord?.leftBreastDuration || ''))
   const [rightDuration, setRightDuration] = useState(String(feedingRecord?.rightBreastDuration || ''))
   const [breastMilkAmt, setBreastMilkAmt] = useState(String(feedingRecord?.breastMilkAmount || ''))
   const [formulaAmt, setFormulaAmt] = useState(String(feedingRecord?.formulaAmount || ''))
 
-  // Health fields
   const [weight, setWeight] = useState(String(healthRecord?.weight || ''))
   const [height, setHeight] = useState(String(healthRecord?.height || ''))
   const [temperature, setTemperature] = useState(String(healthRecord?.temperature || ''))
@@ -202,7 +220,6 @@ function EditRecordModal({
         </div>
 
         <div className="space-y-4">
-          {/* 记录时间 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
               <Clock size={14} className="inline mr-1" />
@@ -216,28 +233,15 @@ function EditRecordModal({
             />
           </div>
 
-          {/* 根据类型显示不同字段 */}
           {record.type === 'BREAST_MILK' && (
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">左侧（分钟）</label>
-                <input
-                  type="number"
-                  value={leftDuration}
-                  onChange={(e) => setLeftDuration(e.target.value)}
-                  min="0"
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
-                />
+                <input type="number" value={leftDuration} onChange={(e) => setLeftDuration(e.target.value)} min="0" className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">右侧（分钟）</label>
-                <input
-                  type="number"
-                  value={rightDuration}
-                  onChange={(e) => setRightDuration(e.target.value)}
-                  min="0"
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
-                />
+                <input type="number" value={rightDuration} onChange={(e) => setRightDuration(e.target.value)} min="0" className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm" />
               </div>
             </div>
           )}
@@ -245,71 +249,35 @@ function EditRecordModal({
           {record.type === 'BREAST_MILK_BOTTLE' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">母乳量（ml）</label>
-              <input
-                type="number"
-                value={breastMilkAmt}
-                onChange={(e) => setBreastMilkAmt(e.target.value)}
-                min="0"
-                step="5"
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
-              />
+              <input type="number" value={breastMilkAmt} onChange={(e) => setBreastMilkAmt(e.target.value)} min="0" step="5" className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm" />
             </div>
           )}
 
           {record.type === 'FORMULA' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">奶粉量（ml）</label>
-              <input
-                type="number"
-                value={formulaAmt}
-                onChange={(e) => setFormulaAmt(e.target.value)}
-                min="0"
-                step="5"
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
-              />
+              <input type="number" value={formulaAmt} onChange={(e) => setFormulaAmt(e.target.value)} min="0" step="5" className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm" />
             </div>
           )}
 
           {record.type === 'WEIGHT' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">体重（kg）</label>
-              <input
-                type="number"
-                value={weight}
-                onChange={(e) => setWeight(e.target.value)}
-                min="0"
-                step="0.01"
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
-              />
+              <input type="number" value={weight} onChange={(e) => setWeight(e.target.value)} min="0" step="0.01" className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm" />
             </div>
           )}
 
           {record.type === 'HEIGHT' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">身高（cm）</label>
-              <input
-                type="number"
-                value={height}
-                onChange={(e) => setHeight(e.target.value)}
-                min="0"
-                step="0.1"
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
-              />
+              <input type="number" value={height} onChange={(e) => setHeight(e.target.value)} min="0" step="0.1" className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm" />
             </div>
           )}
 
           {record.type === 'TEMPERATURE' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">体温（°C）</label>
-              <input
-                type="number"
-                value={temperature}
-                onChange={(e) => setTemperature(e.target.value)}
-                min="35"
-                max="42"
-                step="0.1"
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
-              />
+              <input type="number" value={temperature} onChange={(e) => setTemperature(e.target.value)} min="35" max="42" step="0.1" className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm" />
             </div>
           )}
 
@@ -317,21 +285,11 @@ function EditRecordModal({
             <div className="space-y-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">药物名称</label>
-                <input
-                  type="text"
-                  value={medicationName}
-                  onChange={(e) => setMedicationName(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
-                />
+                <input type="text" value={medicationName} onChange={(e) => setMedicationName(e.target.value)} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">剂量</label>
-                <input
-                  type="text"
-                  value={medicationDose}
-                  onChange={(e) => setMedicationDose(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
-                />
+                <input type="text" value={medicationDose} onChange={(e) => setMedicationDose(e.target.value)} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm" />
               </div>
             </div>
           )}
@@ -339,12 +297,7 @@ function EditRecordModal({
           {record.type === 'VACCINE' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">疫苗名称</label>
-              <input
-                type="text"
-                value={vaccineName}
-                onChange={(e) => setVaccineName(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
-              />
+              <input type="text" value={vaccineName} onChange={(e) => setVaccineName(e.target.value)} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm" />
             </div>
           )}
 
@@ -375,60 +328,27 @@ function EditRecordModal({
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">状态（可选）</label>
-                <input
-                  type="text"
-                  value={diaperStatus}
-                  onChange={(e) => setDiaperStatus(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
-                  placeholder="例如：正常、稀便等"
-                />
+                <input type="text" value={diaperStatus} onChange={(e) => setDiaperStatus(e.target.value)} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm" placeholder="例如：正常、稀便等" />
               </div>
             </div>
           )}
 
           {record.type === 'AD_VITAMIN' && (
             <label className="flex items-center space-x-3">
-              <input
-                type="checkbox"
-                checked={adGiven}
-                onChange={(e) => setAdGiven(e.target.checked)}
-                className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
+              <input type="checkbox" checked={adGiven} onChange={(e) => setAdGiven(e.target.checked)} className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
               <span className="text-sm font-medium text-gray-700">已服用AD滴剂</span>
             </label>
           )}
 
-          {/* 备注 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">备注</label>
-            <textarea
-              value={editNotes}
-              onChange={(e) => setEditNotes(e.target.value)}
-              rows={2}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none text-sm"
-              placeholder="添加备注..."
-            />
+            <textarea value={editNotes} onChange={(e) => setEditNotes(e.target.value)} rows={2} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none text-sm" placeholder="添加备注..." />
           </div>
 
-          {/* 操作按钮 */}
           <div className="flex gap-3 pt-1">
-            <button
-              onClick={onCancel}
-              className="flex-1 py-2.5 px-4 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition text-sm"
-            >
-              取消
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex-1 py-2.5 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition disabled:opacity-50 text-sm flex items-center justify-center gap-1"
-            >
-              {saving ? '保存中...' : (
-                <>
-                  <Check size={16} />
-                  保存
-                </>
-              )}
+            <button onClick={onCancel} className="flex-1 py-2.5 px-4 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition text-sm">取消</button>
+            <button onClick={handleSave} disabled={saving} className="flex-1 py-2.5 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition disabled:opacity-50 text-sm flex items-center justify-center gap-1">
+              {saving ? '保存中...' : (<><Check size={16} />保存</>)}
             </button>
           </div>
         </div>
@@ -437,18 +357,23 @@ function EditRecordModal({
   )
 }
 
-export default function TimelineComponent({ selectedBabyId, onSelectBaby, initialBabies = [] }: Props) {
+export default function TimelineComponent({
+  selectedBabyId,
+  onSelectBaby,
+  initialBabies = [],
+  initialSelectedBabyId = null,
+  initialDate,
+  initialRecords = [],
+}: Props) {
   const [babies, setBabies] = useState<Baby[]>(initialBabies)
-  const [records, setRecords] = useState<(FeedingRecord | HealthRecord)[]>([])
+  const [records, setRecords] = useState<TimelineRecord[]>(initialRecords)
   const [loading, setLoading] = useState(initialBabies.length === 0)
-  const [currentDate, setCurrentDate] = useState(new Date())
-  
-  // 删除确认状态
+  const [currentDate, setCurrentDate] = useState(initialDate ? new Date(`${initialDate}T12:00:00+08:00`) : new Date())
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; type: 'feeding' | 'health' } | null>(null)
-  
-  // 编辑状态
   const [editingRecord, setEditingRecord] = useState<TimelineRecord | null>(null)
   const [saving, setSaving] = useState(false)
+  const currentDateStr = format(currentDate, 'yyyy-MM-dd')
+  const hasInitialRecords = !!initialDate && selectedBabyId === initialSelectedBabyId && currentDateStr === initialDate
 
   const fetchBabies = useCallback(async () => {
     try {
@@ -477,34 +402,40 @@ export default function TimelineComponent({ selectedBabyId, onSelectBaby, initia
 
   const fetchRecords = useCallback(async () => {
     if (!selectedBabyId) return
+
+    if (hasInitialRecords) {
+      setRecords(initialRecords)
+      return
+    }
     
     try {
-      const dateStr = format(currentDate, 'yyyy-MM-dd')
-      
-      const [feedingResponse, healthResponse] = await Promise.all([
-        fetch(`/api/feeding?babyId=${selectedBabyId}&date=${dateStr}`),
-        fetch(`/api/health?babyId=${selectedBabyId}&date=${dateStr}`)
-      ])
+      const cacheKey = buildTimelineCacheKey(selectedBabyId, currentDateStr)
+      const allRecords = await dedupeRequest(cacheKey, async () => {
+        const [feedingResponse, healthResponse] = await Promise.all([
+          fetch(`/api/feeding?babyId=${selectedBabyId}&date=${currentDateStr}`),
+          fetch(`/api/health?babyId=${selectedBabyId}&date=${currentDateStr}`)
+        ])
 
-      const feedingDataRaw = feedingResponse.ok ? await feedingResponse.json() : []
-      const healthDataRaw = healthResponse.ok ? await healthResponse.json() : []
-      const feedingData = Array.isArray(feedingDataRaw) ? feedingDataRaw : []
-      const healthData = Array.isArray(healthDataRaw) ? healthDataRaw : []
+        const feedingDataRaw = feedingResponse.ok ? await feedingResponse.json() : []
+        const healthDataRaw = healthResponse.ok ? await healthResponse.json() : []
+        const feedingData = Array.isArray(feedingDataRaw) ? feedingDataRaw : []
+        const healthData = Array.isArray(healthDataRaw) ? healthDataRaw : []
 
-      const allRecords = [
-        ...feedingData.map((r: FeedingRecord) => ({ ...r, recordType: 'feeding' as const })),
-        ...healthData.map((r: HealthRecord) => ({ ...r, recordType: 'health' as const }))
-      ].sort((a, b) => {
-        const timeA = new Date(a.recordType === 'feeding' ? a.startTime : a.recordedAt).getTime()
-        const timeB = new Date(b.recordType === 'feeding' ? b.startTime : b.recordedAt).getTime()
-        return timeB - timeA
+        return [
+          ...feedingData.map((r: FeedingRecord) => ({ ...r, recordType: 'feeding' as const })),
+          ...healthData.map((r: HealthRecord) => ({ ...r, recordType: 'health' as const }))
+        ].sort((a, b) => {
+          const timeA = new Date(a.recordType === 'feeding' ? a.startTime : a.recordedAt).getTime()
+          const timeB = new Date(b.recordType === 'feeding' ? b.startTime : b.recordedAt).getTime()
+          return timeB - timeA
+        })
       })
 
       setRecords(allRecords)
     } catch (error) {
       console.error('获取记录失败:', error)
     }
-  }, [selectedBabyId, currentDate])
+  }, [selectedBabyId, currentDateStr, hasInitialRecords, initialRecords])
 
   useEffect(() => {
     if (initialBabies.length > 0) {
@@ -523,13 +454,12 @@ export default function TimelineComponent({ selectedBabyId, onSelectBaby, initia
     fetchRecords()
   }, [fetchRecords])
 
-  // 删除确认流程
   const handleDeleteClick = (id: string, type: 'feeding' | 'health') => {
     setDeleteTarget({ id, type })
   }
 
   const handleDeleteConfirm = async () => {
-    if (!deleteTarget) return
+    if (!deleteTarget || !selectedBabyId) return
 
     try {
       const endpoint = deleteTarget.type === 'feeding' 
@@ -538,6 +468,7 @@ export default function TimelineComponent({ selectedBabyId, onSelectBaby, initia
       const response = await fetch(endpoint, { method: 'DELETE' })
       
       if (response.ok) {
+        invalidateRequestCache(buildTimelineCacheKey(selectedBabyId, currentDateStr))
         fetchRecords()
       }
     } catch (error) {
@@ -547,9 +478,8 @@ export default function TimelineComponent({ selectedBabyId, onSelectBaby, initia
     }
   }
 
-  // 编辑保存
   const handleEditSave = async (data: Record<string, unknown>) => {
-    if (!editingRecord) return
+    if (!editingRecord || !selectedBabyId) return
 
     setSaving(true)
     try {
@@ -566,6 +496,7 @@ export default function TimelineComponent({ selectedBabyId, onSelectBaby, initia
 
       if (response.ok) {
         setEditingRecord(null)
+        invalidateRequestCache(buildTimelineCacheKey(selectedBabyId, currentDateStr))
         fetchRecords()
       } else {
         const err = await response.json()
@@ -620,7 +551,7 @@ export default function TimelineComponent({ selectedBabyId, onSelectBaby, initia
     switch (record.type) {
       case 'BREAST_MILK': {
         const feeding = record as FeedingRecord
-        return `母乳亲喂 ${feeding.leftBreastDuration || 0}+${feeding.rightBreastDuration || 0}分钟`
+        return formatBreastFeedingDetails(feeding)
       }
       case 'BREAST_MILK_BOTTLE': {
         const feeding = record as FeedingRecord
@@ -664,14 +595,13 @@ export default function TimelineComponent({ selectedBabyId, onSelectBaby, initia
     }
   }
 
-  // 按上午/下午分组
-  const groupRecordsByPeriod = (records: TimelineRecord[]) => {
+  const groupedRecords = useMemo(() => {
     const morning: TimelineRecord[] = []
     const afternoon: TimelineRecord[] = []
-    
+
     records.forEach(record => {
-      const time = record.recordType === 'feeding' 
-        ? (record as FeedingRecord).startTime 
+      const time = record.recordType === 'feeding'
+        ? (record as FeedingRecord).startTime
         : (record as HealthRecord).recordedAt
       const hour = getBeijingHour(time)
       if (hour < 12) {
@@ -682,14 +612,60 @@ export default function TimelineComponent({ selectedBabyId, onSelectBaby, initia
     })
 
     return { morning, afternoon }
-  }
+  }, [records])
 
-  // 母乳统计：亲喂次数 + 瓶喂毫升
-  const breastFeedingCount = records.filter(r => r.type === 'BREAST_MILK').length
-  const breastBottleCount = records.filter(r => r.type === 'BREAST_MILK_BOTTLE').length
-  const totalBreastMilkBottleAmount = records
-    .filter((r): r is FeedingRecord => r.type === 'BREAST_MILK_BOTTLE')
-    .reduce((sum, r) => sum + (r.breastMilkAmount || 0), 0)
+  const timelineSummary = useMemo(() => {
+    let breastFeedingCount = 0
+    let breastBottleCount = 0
+    let totalBreastMilkBottleAmount = 0
+    let totalFormulaAmount = 0
+    let peeCount = 0
+    let poopCount = 0
+    let hasAdVitamin = false
+
+    records.forEach((record) => {
+      if (record.type === 'BREAST_MILK') {
+        breastFeedingCount += 1
+        return
+      }
+
+      if (record.type === 'BREAST_MILK_BOTTLE') {
+        breastBottleCount += 1
+        totalBreastMilkBottleAmount += (record as FeedingRecord).breastMilkAmount || 0
+        return
+      }
+
+      if (record.type === 'FORMULA') {
+        totalFormulaAmount += (record as FeedingRecord).formulaAmount || 0
+        return
+      }
+
+      if (record.type === 'DIAPER') {
+        const diaperType = (record as HealthRecord).diaperType || ''
+        if (diaperType === 'PEE' || diaperType === 'BOTH') {
+          peeCount += 1
+        }
+        if (diaperType === 'POOP' || diaperType === 'BOTH') {
+          poopCount += 1
+        }
+        return
+      }
+
+      if (record.type === 'AD_VITAMIN' && (record as HealthRecord).adGiven) {
+        hasAdVitamin = true
+      }
+    })
+
+    return {
+      breastFeedingCount,
+      breastBottleCount,
+      totalBreastMilkBottleAmount,
+      totalFormulaAmount,
+      peeCount,
+      poopCount,
+      hasAdVitamin,
+    }
+  }, [records])
 
   if (loading) {
     return (
@@ -705,10 +681,7 @@ export default function TimelineComponent({ selectedBabyId, onSelectBaby, initia
         <div className="text-center py-16">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">还没有添加宝宝</h2>
           <p className="text-gray-600 mb-6">请先添加宝宝信息开始记录</p>
-          <Link
-            href="/settings"
-            className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-          >
+          <Link href="/settings" className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
             添加宝宝
           </Link>
         </div>
@@ -716,17 +689,14 @@ export default function TimelineComponent({ selectedBabyId, onSelectBaby, initia
     )
   }
 
-  const { morning, afternoon } = groupRecordsByPeriod(records)
+  const { morning, afternoon } = groupedRecords
 
   const renderRecordItem = (record: TimelineRecord) => {
     const time = record.recordType === 'feeding' ? record.startTime : record.recordedAt
     const isFeeding = record.recordType === 'feeding'
     
     return (
-      <div
-        key={record.id}
-        className="flex items-center justify-between p-3 sm:p-4 hover:bg-gray-50 transition"
-      >
+      <div key={record.id} className="flex items-center justify-between p-3 sm:p-4 hover:bg-gray-50 transition">
         <div className="flex items-center space-x-3 min-w-0 flex-1">
           <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
             {getRecordIcon(record.type)}
@@ -740,18 +710,10 @@ export default function TimelineComponent({ selectedBabyId, onSelectBaby, initia
           </div>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-          <button
-            onClick={() => setEditingRecord(record)}
-            className="p-2 text-gray-400 hover:text-blue-500 transition"
-            title="编辑"
-          >
+          <button onClick={() => setEditingRecord(record)} className="p-2 text-gray-400 hover:text-blue-500 transition" title="编辑">
             <Pencil size={15} />
           </button>
-          <button
-            onClick={() => handleDeleteClick(record.id, isFeeding ? 'feeding' : 'health')}
-            className="p-2 text-gray-400 hover:text-red-500 transition"
-            title="删除"
-          >
+          <button onClick={() => handleDeleteClick(record.id, isFeeding ? 'feeding' : 'health')} className="p-2 text-gray-400 hover:text-red-500 transition" title="删除">
             <Trash2 size={15} />
           </button>
         </div>
@@ -777,7 +739,6 @@ export default function TimelineComponent({ selectedBabyId, onSelectBaby, initia
 
   return (
     <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 space-y-4">
-      {/* 宝宝选择器 */}
       {babies.length > 1 && (
         <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
           {babies.map(baby => (
@@ -796,13 +757,9 @@ export default function TimelineComponent({ selectedBabyId, onSelectBaby, initia
         </div>
       )}
 
-      {/* 日期导航 */}
       <div className="bg-white rounded-2xl p-3 shadow-sm">
         <div className="flex items-center justify-between">
-          <button
-            onClick={goToPreviousDay}
-            className="p-2 hover:bg-gray-100 rounded-lg transition"
-          >
+          <button onClick={goToPreviousDay} className="p-2 hover:bg-gray-100 rounded-lg transition">
             <ChevronLeft size={22} />
           </button>
           <div className="text-center">
@@ -823,50 +780,36 @@ export default function TimelineComponent({ selectedBabyId, onSelectBaby, initia
         </div>
       </div>
 
-      {/* 日统计 */}
       <div className="bg-white rounded-2xl p-3 shadow-sm">
         <h3 className="font-bold text-gray-900 mb-2 text-sm">当日统计</h3>
         <div className="grid grid-cols-4 gap-2 text-center">
           <div>
-            <p className="text-xl font-bold text-pink-600">
-              {breastFeedingCount + breastBottleCount}
-            </p>
+            <p className="text-xl font-bold text-pink-600">{timelineSummary.breastFeedingCount + timelineSummary.breastBottleCount}</p>
             <p className="text-xs text-gray-500">母乳</p>
-            <p className="text-[10px] text-gray-400 leading-tight mt-0.5">
-              亲喂{breastFeedingCount}次
-            </p>
-            {breastBottleCount > 0 && (
-              <p className="text-[10px] text-gray-400 leading-tight">
-                瓶喂{breastBottleCount}次（{totalBreastMilkBottleAmount}ml）
-              </p>
+            <p className="text-[10px] text-gray-400 leading-tight mt-0.5">亲喂{timelineSummary.breastFeedingCount}次</p>
+            {timelineSummary.breastBottleCount > 0 && (
+              <p className="text-[10px] text-gray-400 leading-tight">瓶喂{timelineSummary.breastBottleCount}次（{timelineSummary.totalBreastMilkBottleAmount}ml）</p>
             )}
           </div>
           <div>
-            <p className="text-xl font-bold text-blue-600">
-              {records
-                .filter((r): r is FeedingRecord => r.type === 'FORMULA')
-                .reduce((sum, r) => sum + (r.formulaAmount || 0), 0)}
-            </p>
+            <p className="text-xl font-bold text-blue-600">{timelineSummary.totalFormulaAmount}</p>
             <p className="text-xs text-gray-500">奶粉(ml)</p>
           </div>
           <div>
             <p className="text-xl font-bold text-amber-600">
-              {records.filter((r) => r.type === 'DIAPER' && ['PEE', 'BOTH'].includes((r as HealthRecord).diaperType || '')).length}
+              {timelineSummary.peeCount}
               {'/'}
-              {records.filter((r) => r.type === 'DIAPER' && ['POOP', 'BOTH'].includes((r as HealthRecord).diaperType || '')).length}
+              {timelineSummary.poopCount}
             </p>
             <p className="text-xs text-gray-500">小便/大便</p>
           </div>
           <div>
-            <p className="text-xl font-bold text-orange-600">
-              {records.some((r) => r.type === 'AD_VITAMIN' && (r as HealthRecord).adGiven) ? '✓' : '○'}
-            </p>
+            <p className="text-xl font-bold text-orange-600">{timelineSummary.hasAdVitamin ? '✓' : '○'}</p>
             <p className="text-xs text-gray-500">AD</p>
           </div>
         </div>
       </div>
 
-      {/* 记录列表（按上午/下午分组） */}
       <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
         {records.length === 0 ? (
           <div className="text-center py-10 text-gray-500">
@@ -880,22 +823,12 @@ export default function TimelineComponent({ selectedBabyId, onSelectBaby, initia
         )}
       </div>
 
-      {/* 删除确认弹窗 */}
       {deleteTarget && (
-        <DeleteConfirmDialog
-          onConfirm={handleDeleteConfirm}
-          onCancel={() => setDeleteTarget(null)}
-        />
+        <DeleteConfirmDialog onConfirm={handleDeleteConfirm} onCancel={() => setDeleteTarget(null)} />
       )}
 
-      {/* 编辑弹窗 */}
       {editingRecord && (
-        <EditRecordModal
-          record={editingRecord}
-          onSave={handleEditSave}
-          onCancel={() => setEditingRecord(null)}
-          saving={saving}
-        />
+        <EditRecordModal record={editingRecord} onSave={handleEditSave} onCancel={() => setEditingRecord(null)} saving={saving} />
       )}
     </div>
   )

@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { validateHealthInput, validateId, HEALTH_TYPES, safeParseBody, validateDateOnlyString, validateEnum, validateSameOrigin } from '@/lib/validation'
+import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
 
 const noStoreHeaders = {
   'Cache-Control': 'no-store, max-age=0',
   'Pragma': 'no-cache',
 }
 
-// 获取北京时间（UTC+8）的一天起止
 function getBeijingDayRange(dateStr: string) {
   const start = new Date(`${dateStr}T00:00:00+08:00`)
   const end = new Date(`${dateStr}T23:59:59.999+08:00`)
@@ -20,6 +20,21 @@ export async function GET(request: NextRequest) {
     const session = await auth(request)
     if (!session?.user) {
       return NextResponse.json({ error: '未授权' }, { status: 401, headers: noStoreHeaders })
+    }
+
+    const listRateLimit = enforceRateLimit({
+      key: buildUserActionKey('health-list', session.user.id, request),
+      limit: 180,
+      windowMs: 60 * 1000,
+    })
+    if (!listRateLimit.allowed) {
+      return NextResponse.json({ error: '请求过于频繁，请稍后再试' }, {
+        status: 429,
+        headers: {
+          ...noStoreHeaders,
+          'Retry-After': String(listRateLimit.retryAfterSeconds),
+        },
+      })
     }
 
     const { searchParams } = new URL(request.url)
@@ -88,6 +103,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '未授权' }, { status: 401, headers: noStoreHeaders })
     }
 
+    const createRateLimit = enforceRateLimit({
+      key: buildUserActionKey('health-create', session.user.id, request),
+      limit: 60,
+      windowMs: 10 * 60 * 1000,
+    })
+    if (!createRateLimit.allowed) {
+      return NextResponse.json({ error: '操作过于频繁，请稍后再试' }, {
+        status: 429,
+        headers: {
+          ...noStoreHeaders,
+          'Retry-After': String(createRateLimit.retryAfterSeconds),
+        },
+      })
+    }
+
     const originCheck = validateSameOrigin(request)
     if (!originCheck.valid) {
       return NextResponse.json({ error: originCheck.error }, { status: 403, headers: noStoreHeaders })
@@ -122,19 +152,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '字段类型无效' }, { status: 400, headers: noStoreHeaders })
     }
 
-    // 验证 babyId 格式
     const idCheck = validateId(babyId, 'babyId')
     if (!idCheck.valid) {
       return NextResponse.json({ error: idCheck.error }, { status: 400, headers: noStoreHeaders })
     }
 
-    // 验证输入字段（类型枚举、数值范围等）
     const validation = validateHealthInput(body)
     if (!validation.valid) {
       return NextResponse.json({ error: validation.error }, { status: 400, headers: noStoreHeaders })
     }
 
-    // 验证 type 必填枚举
     const typedType = type as (typeof HEALTH_TYPES)[number]
     if (!HEALTH_TYPES.includes(typedType)) {
       return NextResponse.json({ error: '无效的健康记录类型' }, { status: 400, headers: noStoreHeaders })
@@ -151,7 +178,6 @@ export async function POST(request: NextRequest) {
     const typedAdGiven = typeof adGiven === 'boolean' ? adGiven : undefined
     const typedNotes = typeof notes === 'string' ? notes : undefined
 
-    // 验证婴儿是否属于当前用户
     const baby = await prisma.baby.findFirst({
       where: {
         id: babyId,

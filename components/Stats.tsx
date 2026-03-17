@@ -15,6 +15,8 @@ import {
   LabelList
 } from 'recharts'
 import { Scale } from 'lucide-react'
+import { dedupeRequest } from '@/lib/client-request-cache'
+import type { PreloadedStatsData } from '@/lib/server-stats'
 
 interface Baby {
   id: string
@@ -26,35 +28,26 @@ interface WeightPoint {
   weight: number
 }
 
+type StatsData = PreloadedStatsData
+
 interface Props {
   selectedBabyId: string | null
   onSelectBaby: (id: string | null) => void
   initialBabies?: Baby[]
+  initialStats?: PreloadedStatsData | null
 }
 
-export default function StatsComponent({ selectedBabyId, onSelectBaby, initialBabies = [] }: Props) {
+export default function StatsComponent({
+  selectedBabyId,
+  onSelectBaby,
+  initialBabies = [],
+  initialStats = null,
+}: Props) {
   const [babies, setBabies] = useState<Baby[]>(initialBabies)
-  const [stats, setStats] = useState<{
-    baby: Baby
-    todayStats: Record<string, unknown>
-    lastDays: {
-      date: string
-      totalBreastDuration: number
-      totalBreastMilkAmount: number
-      totalFormulaAmount: number
-      adGiven: boolean
-      temperature?: number
-    }[]
-    totalStats: {
-      totalFeedings: number
-      totalFormulaAmount: number
-      totalBreastDuration: number
-      totalBreastMilkAmount: number
-    }
-    weightTrend: WeightPoint[]
-  } | null>(null)
+  const [stats, setStats] = useState<StatsData | null>(initialStats)
   const [loading, setLoading] = useState(initialBabies.length === 0)
   const [days, setDays] = useState(7)
+  const hasInitialStats = !!initialStats && selectedBabyId === initialStats.baby.id && days === 7
 
   const fetchBabies = useCallback(async () => {
     try {
@@ -83,17 +76,26 @@ export default function StatsComponent({ selectedBabyId, onSelectBaby, initialBa
 
   const fetchStats = useCallback(async () => {
     if (!selectedBabyId) return
+
+    if (hasInitialStats) {
+      setStats(initialStats)
+      return
+    }
     
     try {
-      const response = await fetch(`/api/stats?babyId=${selectedBabyId}&days=${days}`)
-      if (response.ok) {
-        const data = await response.json()
-        setStats(data)
-      }
+      const cacheKey = `stats:${selectedBabyId}:${days}`
+      const data = await dedupeRequest(cacheKey, async () => {
+        const response = await fetch(`/api/stats?babyId=${selectedBabyId}&days=${days}`)
+        if (!response.ok) {
+          throw new Error('获取统计数据失败')
+        }
+        return response.json()
+      })
+      setStats(data)
     } catch (error) {
       console.error('获取统计数据失败:', error)
     }
-  }, [selectedBabyId, days])
+  }, [selectedBabyId, days, hasInitialStats, initialStats])
 
   useEffect(() => {
     if (initialBabies.length > 0) {
@@ -141,7 +143,6 @@ export default function StatsComponent({ selectedBabyId, onSelectBaby, initialBa
     }
   }) || []
 
-  // 使用 API 返回的完整体重趋势数据
   const weightData = (stats?.weightTrend || []).map(p => {
     const parts = p.date.split('-')
     return {
@@ -162,7 +163,6 @@ export default function StatsComponent({ selectedBabyId, onSelectBaby, initialBa
 
   return (
     <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 space-y-4">
-      {/* 宝宝选择器 */}
       {babies.length > 1 && (
         <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
           {babies.map(baby => (
@@ -181,7 +181,6 @@ export default function StatsComponent({ selectedBabyId, onSelectBaby, initialBa
         </div>
       )}
 
-      {/* 时间范围选择 */}
       <div className="bg-white rounded-2xl p-3 shadow-sm">
         <h3 className="text-xs font-medium text-gray-500 mb-2">趋势图时间范围</h3>
         <div className="flex gap-2">
@@ -201,7 +200,6 @@ export default function StatsComponent({ selectedBabyId, onSelectBaby, initialBa
         </div>
       </div>
 
-      {/* 母乳喂养趋势图 */}
       {stats && (
         <div className="bg-white rounded-2xl p-4 shadow-sm">
           <h3 className="text-base font-bold text-gray-900 mb-3">母乳喂养趋势</h3>
@@ -230,7 +228,6 @@ export default function StatsComponent({ selectedBabyId, onSelectBaby, initialBa
         </div>
       )}
 
-      {/* 奶粉喂养趋势图 */}
       {stats && (
         <div className="bg-white rounded-2xl p-4 shadow-sm">
           <h3 className="text-base font-bold text-gray-900 mb-3">奶粉喂养趋势</h3>
@@ -251,7 +248,6 @@ export default function StatsComponent({ selectedBabyId, onSelectBaby, initialBa
         </div>
       )}
 
-      {/* 体重趋势图 — 使用全量体重记录 */}
       <div className="bg-white rounded-2xl p-4 shadow-sm">
         <div className="flex items-center gap-2 mb-3">
           <Scale size={18} className="text-green-500" />
@@ -300,7 +296,6 @@ export default function StatsComponent({ selectedBabyId, onSelectBaby, initialBa
         )}
       </div>
 
-      {/* 体温趋势图 */}
       {tempData.length > 0 && (
         <div className="bg-white rounded-2xl p-4 shadow-sm">
           <h3 className="text-base font-bold text-gray-900 mb-3">体温趋势</h3>
@@ -324,7 +319,6 @@ export default function StatsComponent({ selectedBabyId, onSelectBaby, initialBa
         </div>
       )}
 
-      {/* AD服用记录 */}
       {stats && (
         <div className="bg-white rounded-2xl p-4 shadow-sm">
           <h3 className="text-base font-bold text-gray-900 mb-3">AD服用记录</h3>

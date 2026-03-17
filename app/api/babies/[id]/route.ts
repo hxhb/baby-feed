@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { validateBabyInput, validateId, safeParseBody, GENDERS, validateSameOrigin } from '@/lib/validation'
+import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
 
 const noStoreHeaders = {
   'Cache-Control': 'no-store, max-age=0',
@@ -17,6 +18,21 @@ export async function GET(
     const session = await auth(request)
     if (!session?.user) {
       return NextResponse.json({ error: '未授权' }, { status: 401, headers: noStoreHeaders })
+    }
+
+    const readRateLimit = enforceRateLimit({
+      key: buildUserActionKey('baby-detail-read', session.user.id, request),
+      limit: 120,
+      windowMs: 60 * 1000,
+    })
+    if (!readRateLimit.allowed) {
+      return NextResponse.json({ error: '请求过于频繁，请稍后再试' }, {
+        status: 429,
+        headers: {
+          ...noStoreHeaders,
+          'Retry-After': String(readRateLimit.retryAfterSeconds),
+        },
+      })
     }
 
     const idCheck = validateId(id, '婴儿ID')
@@ -53,6 +69,21 @@ export async function PUT(
       return NextResponse.json({ error: '未授权' }, { status: 401, headers: noStoreHeaders })
     }
 
+    const updateRateLimit = enforceRateLimit({
+      key: buildUserActionKey('baby-update', session.user.id, request),
+      limit: 20,
+      windowMs: 10 * 60 * 1000,
+    })
+    if (!updateRateLimit.allowed) {
+      return NextResponse.json({ error: '操作过于频繁，请稍后再试' }, {
+        status: 429,
+        headers: {
+          ...noStoreHeaders,
+          'Retry-After': String(updateRateLimit.retryAfterSeconds),
+        },
+      })
+    }
+
     const originCheck = validateSameOrigin(request)
     if (!originCheck.valid) {
       return NextResponse.json({ error: originCheck.error }, { status: 403, headers: noStoreHeaders })
@@ -76,7 +107,6 @@ export async function PUT(
       gender?: (typeof GENDERS)[number]
     } = {}
 
-    // 验证输入
     const validation = validateBabyInput(body)
     if (!validation.valid) {
       return NextResponse.json({ error: validation.error }, { status: 400, headers: noStoreHeaders })
@@ -139,6 +169,21 @@ export async function DELETE(
     const session = await auth(request)
     if (!session?.user) {
       return NextResponse.json({ error: '未授权' }, { status: 401, headers: noStoreHeaders })
+    }
+
+    const deleteRateLimit = enforceRateLimit({
+      key: buildUserActionKey('baby-delete', session.user.id, request),
+      limit: 10,
+      windowMs: 15 * 60 * 1000,
+    })
+    if (!deleteRateLimit.allowed) {
+      return NextResponse.json({ error: '操作过于频繁，请稍后再试' }, {
+        status: 429,
+        headers: {
+          ...noStoreHeaders,
+          'Retry-After': String(deleteRateLimit.retryAfterSeconds),
+        },
+      })
     }
 
     const originCheck = validateSameOrigin(request)
