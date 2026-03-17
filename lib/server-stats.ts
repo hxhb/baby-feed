@@ -61,6 +61,21 @@ function getBeijingToday(): string {
   return getBeijingDateStr(new Date())
 }
 
+function createEmptyStatsDay(date: string): PreloadedStatsDay {
+  return {
+    date,
+    breastFeedingCount: 0,
+    totalBreastDuration: 0,
+    breastBottleCount: 0,
+    totalBreastMilkAmount: 0,
+    formulaCount: 0,
+    totalFormulaAmount: 0,
+    adGiven: false,
+    weight: undefined,
+    temperature: undefined,
+  }
+}
+
 function getBeijingDaysAgo(daysAgo: number): string {
   const d = new Date()
   d.setDate(d.getDate() - daysAgo)
@@ -127,18 +142,7 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
 
   for (let i = 0; i < days; i++) {
     const date = getBeijingDaysAgo(i)
-    statsMap.set(date, {
-      date,
-      breastFeedingCount: 0,
-      totalBreastDuration: 0,
-      breastBottleCount: 0,
-      totalBreastMilkAmount: 0,
-      formulaCount: 0,
-      totalFormulaAmount: 0,
-      adGiven: false,
-      weight: undefined,
-      temperature: undefined,
-    })
+    statsMap.set(date, createEmptyStatsDay(date))
   }
 
   feedingRecords.forEach((record) => {
@@ -178,9 +182,14 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
     }
   })
 
+  const todayStats =
+    statsMap.get(todayStr) ??
+    Array.from(statsMap.values())[0] ??
+    createEmptyStatsDay(todayStr)
+
   return {
     baby,
-    todayStats: statsMap.get(todayStr) || statsMap.values().next().value,
+    todayStats,
     lastDays: Array.from(statsMap.values()).reverse(),
     totalStats: {
       totalFeedings: feedingRecords.length,
