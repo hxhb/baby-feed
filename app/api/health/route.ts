@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { validateHealthInput, validateId, HEALTH_TYPES, safeParseBody, validateDateOnlyString, validateEnum, validateSameOrigin } from '@/lib/validation'
 import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
-
 const noStoreHeaders = {
   'Cache-Control': 'no-store, max-age=0',
   'Pragma': 'no-cache',
@@ -208,6 +208,11 @@ export async function POST(request: NextRequest) {
       },
       include: { baby: true }
     })
+
+    revalidatePath('/')
+    revalidatePath('/stats')
+    revalidatePath('/timeline')
+    revalidatePath('/add')
 
     return NextResponse.json(record, { status: 201, headers: noStoreHeaders })
   } catch (error) {

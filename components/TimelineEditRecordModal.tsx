@@ -131,11 +131,15 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50">
-      <div className="bg-white rounded-t-2xl sm:rounded-2xl p-5 w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-xl">
-        <div className="flex items-center justify-between mb-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={onCancel}>
+      <div
+        className="mobile-sheet w-full max-w-lg overflow-y-auto bg-white px-4 pt-3 shadow-xl sm:rounded-2xl sm:px-5 sm:pt-5"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-gray-200 sm:hidden" />
+        <div className="sticky top-0 z-10 -mx-4 flex items-center justify-between bg-white/95 px-4 pb-3 backdrop-blur sm:static sm:mx-0 sm:bg-transparent sm:px-0 sm:pb-4">
           <h3 className="text-lg font-bold text-gray-900">编辑{getTypeLabel()}</h3>
-          <button onClick={onCancel} className="p-1 text-gray-400 hover:text-gray-600">
+          <button type="button" onClick={onCancel} className="mobile-touch-target inline-flex items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-600">
             <X size={22} />
           </button>
         </div>
@@ -150,7 +154,7 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
               type="datetime-local"
               value={editTime}
               onChange={(e) => setEditTime(e.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
+              className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
@@ -158,11 +162,11 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">左侧（分钟）</label>
-                <input type="number" value={leftDuration} onChange={(e) => setLeftDuration(e.target.value)} min="0" className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm" />
+                <input type="number" value={leftDuration} onChange={(e) => setLeftDuration(e.target.value)} min="0" className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">右侧（分钟）</label>
-                <input type="number" value={rightDuration} onChange={(e) => setRightDuration(e.target.value)} min="0" className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm" />
+                <input type="number" value={rightDuration} onChange={(e) => setRightDuration(e.target.value)} min="0" className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500" />
               </div>
             </div>
           )}
@@ -170,35 +174,35 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
           {record.type === 'BREAST_MILK_BOTTLE' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">母乳量（ml）</label>
-              <input type="number" value={breastMilkAmt} onChange={(e) => setBreastMilkAmt(e.target.value)} min="0" step="5" className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm" />
+              <input type="number" value={breastMilkAmt} onChange={(e) => setBreastMilkAmt(e.target.value)} min="0" step="5" className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500" />
             </div>
           )}
 
           {record.type === 'FORMULA' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">奶粉量（ml）</label>
-              <input type="number" value={formulaAmt} onChange={(e) => setFormulaAmt(e.target.value)} min="0" step="5" className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm" />
+              <input type="number" value={formulaAmt} onChange={(e) => setFormulaAmt(e.target.value)} min="0" step="5" className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500" />
             </div>
           )}
 
           {record.type === 'WEIGHT' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">体重（kg）</label>
-              <input type="number" value={weight} onChange={(e) => setWeight(e.target.value)} min="0" step="0.01" className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm" />
+              <input type="number" value={weight} onChange={(e) => setWeight(e.target.value)} min="0" step="0.01" className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500" />
             </div>
           )}
 
           {record.type === 'HEIGHT' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">身高（cm）</label>
-              <input type="number" value={height} onChange={(e) => setHeight(e.target.value)} min="0" step="0.1" className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm" />
+              <input type="number" value={height} onChange={(e) => setHeight(e.target.value)} min="0" step="0.1" className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500" />
             </div>
           )}
 
           {record.type === 'TEMPERATURE' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">体温（°C）</label>
-              <input type="number" value={temperature} onChange={(e) => setTemperature(e.target.value)} min="35" max="42" step="0.1" className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm" />
+              <input type="number" value={temperature} onChange={(e) => setTemperature(e.target.value)} min="35" max="42" step="0.1" className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500" />
             </div>
           )}
 
@@ -206,11 +210,11 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
             <div className="space-y-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">药物名称</label>
-                <input type="text" value={medicationName} onChange={(e) => setMedicationName(e.target.value)} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm" />
+                <input type="text" value={medicationName} onChange={(e) => setMedicationName(e.target.value)} className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">剂量</label>
-                <input type="text" value={medicationDose} onChange={(e) => setMedicationDose(e.target.value)} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm" />
+                <input type="text" value={medicationDose} onChange={(e) => setMedicationDose(e.target.value)} className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500" />
               </div>
             </div>
           )}
@@ -218,7 +222,7 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
           {record.type === 'VACCINE' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">疫苗名称</label>
-              <input type="text" value={vaccineName} onChange={(e) => setVaccineName(e.target.value)} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm" />
+              <input type="text" value={vaccineName} onChange={(e) => setVaccineName(e.target.value)} className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500" />
             </div>
           )}
 
@@ -236,7 +240,7 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
                       key={opt.value}
                       type="button"
                       onClick={() => setDiaperType(opt.value)}
-                      className={`py-2 rounded-lg border-2 text-sm font-medium transition ${
+                      className={`mobile-touch-target rounded-xl border-2 px-2 py-3 text-sm font-medium transition ${
                         diaperType === opt.value
                           ? 'border-amber-500 bg-amber-50 text-amber-700'
                           : 'border-gray-200 text-gray-600 hover:border-gray-300'
@@ -249,26 +253,26 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">状态（可选）</label>
-                <input type="text" value={diaperStatus} onChange={(e) => setDiaperStatus(e.target.value)} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm" placeholder="例如：正常、稀便等" />
+                <input type="text" value={diaperStatus} onChange={(e) => setDiaperStatus(e.target.value)} className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500" placeholder="例如：正常、稀便等" />
               </div>
             </div>
           )}
 
           {record.type === 'AD_VITAMIN' && (
-            <label className="flex items-center space-x-3">
-              <input type="checkbox" checked={adGiven} onChange={(e) => setAdGiven(e.target.checked)} className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+            <label className="flex items-center space-x-3 rounded-xl bg-gray-50 px-3 py-3">
+              <input type="checkbox" checked={adGiven} onChange={(e) => setAdGiven(e.target.checked)} className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
               <span className="text-sm font-medium text-gray-700">已服用AD滴剂</span>
             </label>
           )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">备注</label>
-            <textarea value={editNotes} onChange={(e) => setEditNotes(e.target.value)} rows={2} className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none text-sm" placeholder="添加备注..." />
+            <textarea value={editNotes} onChange={(e) => setEditNotes(e.target.value)} rows={3} className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 resize-none" placeholder="添加备注..." />
           </div>
 
-          <div className="flex gap-3 pt-1">
-            <button onClick={onCancel} className="flex-1 py-2.5 px-4 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition text-sm">取消</button>
-            <button onClick={handleSave} disabled={saving} className="flex-1 py-2.5 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition disabled:opacity-50 text-sm flex items-center justify-center gap-1">
+          <div className="sticky bottom-0 -mx-4 flex gap-3 border-t border-gray-100 bg-white/95 px-4 pt-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0">
+            <button type="button" onClick={onCancel} className="mobile-touch-target flex-1 rounded-xl bg-gray-100 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-200">取消</button>
+            <button type="button" onClick={handleSave} disabled={saving} className="mobile-touch-target flex flex-1 items-center justify-center gap-1 rounded-xl bg-blue-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-50">
               {saving ? '保存中...' : (<><Check size={16} />保存</>)}
             </button>
           </div>

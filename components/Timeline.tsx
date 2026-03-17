@@ -1,7 +1,7 @@
 'use client'
 
-import dynamic from 'next/dynamic'
 import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react'
+import TimelineEditRecordModal from '@/components/TimelineEditRecordModal'
 import { format, isToday, isYesterday } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
 import { formatBeijingTime, getBeijingHour } from '@/lib/time'
@@ -22,8 +22,6 @@ import {
   Baby as BabyIcon,
   Pencil
 } from 'lucide-react'
-
-const TimelineEditRecordModal = dynamic(() => import('@/components/TimelineEditRecordModal'))
 
 interface Baby {
   id: string
@@ -206,12 +204,14 @@ function DeleteConfirmDialog({
         <p className="text-gray-600 mb-6">确定要删除这条记录吗？此操作不可恢复。</p>
         <div className="flex gap-3">
           <button
+            type="button"
             onClick={onCancel}
             className="flex-1 py-2.5 px-4 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition"
           >
             取消
           </button>
           <button
+            type="button"
             onClick={onConfirm}
             className="flex-1 py-2.5 px-4 bg-red-500 text-white font-medium rounded-lg hover:bg-red-600 transition"
           >
@@ -250,10 +250,10 @@ const TimelineRecordItem = memo(function TimelineRecordItem({
         </div>
       </div>
       <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-        <button onClick={() => onEdit(record)} className="p-2 text-gray-400 hover:text-blue-500 transition" title="编辑">
+        <button type="button" onClick={() => onEdit(record)} className="p-2 text-gray-400 hover:text-blue-500 transition" title="编辑">
           <Pencil size={15} />
         </button>
-        <button onClick={() => onDelete(record.id, isFeeding ? 'feeding' : 'health')} className="p-2 text-gray-400 hover:text-red-500 transition" title="删除">
+        <button type="button" onClick={() => onDelete(record.id, isFeeding ? 'feeding' : 'health')} className="p-2 text-gray-400 hover:text-red-500 transition" title="删除">
           <Trash2 size={15} />
         </button>
       </div>
@@ -612,7 +612,7 @@ export default function TimelineComponent({
   return (
     <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 space-y-4">
       {babies.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
+        <div className="mobile-scroll-row flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
           {babies.map(baby => (
             <button
               key={baby.id}
@@ -620,7 +620,7 @@ export default function TimelineComponent({
               onMouseEnter={() => handleBabyHover(baby.id)}
               onFocus={() => handleBabyHover(baby.id)}
               onTouchStart={() => handleBabyHover(baby.id)}
-              className={`px-4 py-2 rounded-full whitespace-nowrap transition text-sm ${
+              className={`mobile-touch-target rounded-full whitespace-nowrap px-4 py-2.5 text-sm transition ${
                 baby.id === selectedBabyId
                   ? 'bg-blue-600 text-white'
                   : 'bg-white text-gray-700 hover:bg-gray-50'
@@ -633,7 +633,7 @@ export default function TimelineComponent({
       )}
 
       <div className="bg-white rounded-2xl p-3 shadow-sm">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <button
             onClick={goToPreviousDay}
             onMouseEnter={() => {
@@ -648,11 +648,11 @@ export default function TimelineComponent({
               if (!selectedBabyId) return
               prefetchDate(selectedBabyId, shiftDateString(currentDateStr, -1))
             }}
-            className="p-2 hover:bg-gray-100 rounded-lg transition"
+            className="mobile-touch-target inline-flex flex-shrink-0 items-center justify-center rounded-xl bg-gray-50 text-gray-700 transition hover:bg-gray-100"
           >
             <ChevronLeft size={22} />
           </button>
-          <div className="text-center">
+          <div className="min-w-0 flex-1 text-center">
             <h2 className="text-base font-bold text-gray-900">{formatDateLabel(currentDate)}</h2>
             <p className="text-xs text-gray-500">{format(currentDate, 'yyyy年MM月dd日')}</p>
           </div>
@@ -671,10 +671,10 @@ export default function TimelineComponent({
               prefetchDate(selectedBabyId, shiftDateString(currentDateStr, 1))
             }}
             disabled={isToday(currentDate)}
-            className={`p-2 rounded-lg transition ${
+            className={`mobile-touch-target inline-flex flex-shrink-0 items-center justify-center rounded-xl transition ${
               isToday(currentDate)
-                ? 'text-gray-300 cursor-not-allowed'
-                : 'hover:bg-gray-100'
+                ? 'cursor-not-allowed bg-gray-50 text-gray-300'
+                : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
             }`}
           >
             <ChevronRight size={22} />

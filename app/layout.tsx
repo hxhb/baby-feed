@@ -1,7 +1,10 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from 'next/headers'
+import { NextRequest } from 'next/server'
 import localFont from "next/font/local";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
+import { auth } from '@/lib/auth'
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -18,8 +21,8 @@ export const viewport: Viewport = {
   themeColor: "#3b82f6",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  maximumScale: 5,
+  userScalable: true,
   viewportFit: "cover",
 };
 
@@ -46,11 +49,21 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+async function getServerSession() {
+  const headerStore = await headers()
+  const protocol = headerStore.get('x-forwarded-proto') ?? 'http'
+  const host = headerStore.get('x-forwarded-host') ?? headerStore.get('host') ?? 'localhost:3000'
+
+  return auth(new NextRequest(`${protocol}://${host}`, { headers: headerStore }))
+}
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await getServerSession()
+
   return (
     <html lang="zh-CN" style={{ colorScheme: 'light' }}>
       <head>
@@ -59,7 +72,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Providers>
+        <Providers session={session}>
           {children}
         </Providers>
         <script

@@ -273,12 +273,12 @@ export default function Dashboard({
   return (
     <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 space-y-4">
       {babies.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
+        <div className="mobile-scroll-row flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
           {babies.map(baby => (
             <button
               key={baby.id}
               onClick={() => handleSelectBaby(baby.id)}
-              className={`px-4 py-2 rounded-full whitespace-nowrap transition text-sm ${
+              className={`mobile-touch-target rounded-full whitespace-nowrap px-4 py-2.5 text-sm transition ${
                 baby.id === resolvedSelectedBabyId
                   ? 'bg-blue-600 text-white'
                   : 'bg-white text-gray-700 hover:bg-gray-50'

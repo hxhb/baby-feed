@@ -17,11 +17,21 @@
   }
 }
 
+html {
+  background: var(--background);
+  scroll-behavior: smooth;
+}
+
 body {
+  min-height: 100vh;
+  min-height: 100dvh;
   color: var(--foreground);
   background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
   -webkit-text-size-adjust: 100%;
+  overflow-x: hidden;
+  touch-action: manipulation;
+  overscroll-behavior-y: none;
 }
 
 /* 强制所有表单元素使用亮色样式，防止 iOS/Android 夜间模式覆盖 */
@@ -31,6 +41,12 @@ textarea,
 button {
   color: #111827;
   background-color: #ffffff;
+}
+
+input,
+select,
+textarea {
+  font-size: 16px;
 }
 
 input::placeholder,
@@ -75,6 +91,15 @@ input[type="datetime-local"]::-webkit-date-and-time-value {
   -webkit-tap-highlight-color: transparent;
 }
 
+a,
+button,
+[role="button"],
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+
 /* 去除 Recharts 图表点击时的黑色边框/焦点框 */
 .recharts-wrapper,
 .recharts-wrapper svg,
@@ -95,6 +120,34 @@ input[type="datetime-local"]::-webkit-date-and-time-value {
 /* 优化安全区域（刘海屏等） */
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.pb-safe-tabbar {
+  padding-bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
+}
+
+.mobile-scroll-row {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.mobile-scroll-row::-webkit-scrollbar {
+  display: none;
+}
+
+.mobile-touch-target {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.mobile-sheet {
+  border-top-left-radius: 1.5rem;
+  border-top-right-radius: 1.5rem;
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  max-height: 92dvh;
+  overscroll-behavior: contain;
 }
 
 @layer utilities {

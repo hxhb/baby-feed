@@ -152,23 +152,23 @@ export default function ApiKeyManager({ onBack }: Props) {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-3 sm:px-4 py-4 space-y-4">
+    <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 space-y-4 sm:space-y-5">
       {/* 顶部导航 */}
       <div className="flex items-center space-x-3">
         <button
           onClick={onBack}
-          className="p-2 hover:bg-gray-100 rounded-lg transition"
+          className="mobile-touch-target rounded-xl p-2 transition hover:bg-gray-100"
         >
           <ArrowLeft size={20} />
         </button>
-        <div className="flex items-center space-x-2">
-          <Key size={22} className="text-blue-600" />
-          <h1 className="text-xl font-bold text-gray-900">API Key 管理</h1>
+        <div className="flex items-center space-x-2 min-w-0">
+          <Key size={22} className="text-blue-600 flex-shrink-0" />
+          <h1 className="text-xl font-bold text-gray-900 truncate">API Key 管理</h1>
         </div>
       </div>
 
       {/* 说明卡片 */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 sm:p-5">
         <div className="flex items-start space-x-3">
           <Shield size={18} className="text-blue-500 mt-0.5 flex-shrink-0" />
           <div className="text-sm text-blue-700">
@@ -183,8 +183,8 @@ export default function ApiKeyManager({ onBack }: Props) {
       </div>
 
       {/* Key 列表 */}
-      <div className="bg-white rounded-2xl p-5 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-white rounded-2xl p-4 shadow-sm sm:p-5 lg:p-6">
+        <div className="flex items-center justify-between gap-3 mb-4">
           <h2 className="text-lg font-bold text-gray-900">
             我的 Key
             <span className="text-sm font-normal text-gray-400 ml-2">({keys.length}/10)</span>
@@ -196,7 +196,7 @@ export default function ApiKeyManager({ onBack }: Props) {
               setShowCreateModal(true)
             }}
             disabled={keys.length >= 10}
-            className="flex items-center text-blue-600 hover:text-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="mobile-touch-target inline-flex items-center rounded-xl px-2 py-2 text-blue-600 transition disabled:cursor-not-allowed disabled:opacity-50 hover:text-blue-700"
           >
             <Plus size={20} className="mr-1" />
             创建
@@ -216,26 +216,26 @@ export default function ApiKeyManager({ onBack }: Props) {
               return (
                 <div
                   key={apiKey.id}
-                  className={`p-4 rounded-xl border transition ${
+                  className={`rounded-xl border p-4 transition ${
                     expired
                       ? 'border-red-200 bg-red-50/50'
                       : 'border-gray-100 bg-gray-50'
                   }`}
                 >
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-2">
-                        <p className="font-medium text-gray-900 truncate">{apiKey.name}</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-medium text-gray-900 break-all sm:truncate">{apiKey.name}</p>
                         {expired && (
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
                             已过期
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-gray-500 mt-1 font-mono">
+                      <p className="text-sm text-gray-500 mt-1 font-mono break-all">
                         {apiKey.prefix}••••••••
                       </p>
-                      <div className="flex flex-wrap items-center gap-x-3 mt-1.5 text-xs text-gray-400">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs text-gray-400">
                         <span>
                           创建于 {format(new Date(apiKey.createdAt), 'yyyy-MM-dd HH:mm', { locale: zhCN })}
                         </span>
@@ -263,7 +263,7 @@ export default function ApiKeyManager({ onBack }: Props) {
                       onClick={() => handleDelete(apiKey.id, apiKey.name)}
                       disabled={deleteLoading === apiKey.id}
                       title="删除 API Key"
-                      className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition disabled:opacity-50 ml-2 flex-shrink-0"
+                      className="mobile-touch-target ml-2 flex-shrink-0 rounded-xl p-2 text-gray-400 transition hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
                     >
                       <Trash2 size={16} />
                     </button>
@@ -276,7 +276,7 @@ export default function ApiKeyManager({ onBack }: Props) {
       </div>
 
       {/* 使用示例 */}
-      <div className="bg-white rounded-2xl p-5 shadow-sm">
+      <div className="bg-white rounded-2xl p-4 shadow-sm sm:p-5 lg:p-6">
         <h2 className="text-lg font-bold text-gray-900 mb-3">使用示例</h2>
         <div className="space-y-3">
           <div>

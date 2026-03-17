@@ -92,6 +92,17 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
       .catch(() => {})
   }, [initialBabies])
 
+  useEffect(() => {
+    if (!activeModal) return
+
+    const { overflow } = document.body.style
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      document.body.style.overflow = overflow
+    }
+  }, [activeModal])
+
   const fetchBabies = async () => {
     try {
       const response = await fetch('/api/babies')
@@ -352,9 +363,9 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-3 sm:px-4 py-4 space-y-4">
+    <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 space-y-4 sm:space-y-5">
       {/* 用户信息卡片 */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm">
+      <div className="bg-white rounded-2xl p-5 shadow-sm sm:p-6 lg:p-7">
         <h2 className="text-lg font-bold text-gray-900 mb-4">账户信息</h2>
         <div className="flex items-center space-x-4 mb-4">
           <div className="w-14 h-14 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white text-xl font-bold">
@@ -372,7 +383,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
               setNewName(displayName)
               setActiveModal('editName')
             }}
-            className="w-full flex items-center justify-between py-3 px-1 text-left hover:bg-gray-50 rounded-lg transition group"
+            className="mobile-touch-target w-full flex items-center justify-between rounded-xl px-2 py-3 text-left transition group hover:bg-gray-50"
           >
             <div className="flex items-center space-x-3">
               <UserPen size={18} className="text-gray-400 group-hover:text-blue-500 transition" />
@@ -383,7 +394,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
 
           <button
             onClick={() => setActiveModal('changePassword')}
-            className="w-full flex items-center justify-between py-3 px-1 text-left hover:bg-gray-50 rounded-lg transition group"
+            className="mobile-touch-target w-full flex items-center justify-between rounded-xl px-2 py-3 text-left transition group hover:bg-gray-50"
           >
             <div className="flex items-center space-x-3">
               <KeyRound size={18} className="text-gray-400 group-hover:text-blue-500 transition" />
@@ -394,7 +405,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
 
           <button
             onClick={() => router.push('/settings/api-keys')}
-            className="w-full flex items-center justify-between py-3 px-1 text-left hover:bg-gray-50 rounded-lg transition group"
+            className="mobile-touch-target w-full flex items-center justify-between rounded-xl px-2 py-3 text-left transition group hover:bg-gray-50"
           >
             <div className="flex items-center space-x-3">
               <Key size={18} className="text-gray-400 group-hover:text-blue-500 transition" />
@@ -405,7 +416,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
 
           <button
             onClick={() => signOut({ callbackUrl: '/login' })}
-            className="w-full flex items-center justify-between py-3 px-1 text-left hover:bg-gray-50 rounded-lg transition group"
+            className="mobile-touch-target w-full flex items-center justify-between rounded-xl px-2 py-3 text-left transition group hover:bg-gray-50"
           >
             <div className="flex items-center space-x-3">
               <LogOut size={18} className="text-gray-400 group-hover:text-orange-500 transition" />
@@ -417,7 +428,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
           {isAdmin && (
             <button
               onClick={() => router.push('/admin')}
-              className="w-full flex items-center justify-between py-3 px-1 text-left hover:bg-gray-50 rounded-lg transition group"
+              className="mobile-touch-target w-full flex items-center justify-between rounded-xl px-2 py-3 text-left transition group hover:bg-gray-50"
             >
               <div className="flex items-center space-x-3">
                 <UserCog size={18} className="text-gray-400 group-hover:text-purple-500 transition" />
@@ -430,8 +441,8 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
       </div>
 
       {/* 宝宝管理 */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-white rounded-2xl p-5 shadow-sm sm:p-6 lg:p-7">
+        <div className="flex items-center justify-between gap-3 mb-4">
           <h2 className="text-lg font-bold text-gray-900">宝宝管理</h2>
           <button
             onClick={() => {
@@ -440,7 +451,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
               setGender('MALE')
               setActiveModal('addBaby')
             }}
-            className="flex items-center text-blue-600 hover:text-blue-700 transition"
+            className="mobile-touch-target inline-flex items-center rounded-xl px-2 py-2 text-blue-600 transition hover:text-blue-700"
           >
             <PlusCircle size={20} className="mr-1" />
             添加宝宝
@@ -457,30 +468,30 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
             {babies.map(baby => (
               <div
                 key={baby.id}
-                className="flex items-center justify-between p-4 bg-gray-50 rounded-xl"
+                className="flex flex-col gap-3 rounded-xl bg-gray-50 p-4 sm:flex-row sm:items-center sm:justify-between"
               >
-                <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-pink-100 to-blue-100 rounded-full flex items-center justify-center">
+                <div className="flex items-center space-x-4 min-w-0">
+                  <div className="w-12 h-12 bg-gradient-to-br from-pink-100 to-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
                     <Baby size={24} className="text-blue-600" />
                   </div>
-                  <div>
-                    <p className="font-medium text-gray-900">{baby.name}</p>
-                    <p className="text-sm text-gray-500">
+                  <div className="min-w-0">
+                    <p className="font-medium text-gray-900 truncate">{baby.name}</p>
+                    <p className="text-sm text-gray-500 break-words">
                       {baby.gender === 'MALE' ? '👦 男宝' : '👧 女宝'} · 
                       {format(parseDateAsBeijing(baby.birthDate), 'yyyy年MM月dd日出生', { locale: zhCN })}
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center justify-end space-x-2 sm:justify-start">
                   <button
                     onClick={() => openEditBabyModal(baby)}
-                    className="p-2 text-gray-400 hover:text-blue-600 transition"
+                    className="mobile-touch-target rounded-xl p-2 text-gray-400 transition hover:text-blue-600"
                   >
                     <Edit2 size={18} />
                   </button>
                   <button
                     onClick={() => handleDeleteBaby(baby.id)}
-                    className="p-2 text-gray-400 hover:text-red-500 transition"
+                    className="mobile-touch-target rounded-xl p-2 text-gray-400 transition hover:text-red-500"
                   >
                     <Trash2 size={18} />
                   </button>
@@ -492,14 +503,14 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
       </div>
 
       {/* 危险区域 */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-red-100">
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-red-100 sm:p-6 lg:p-7">
         <h2 className="text-lg font-bold text-red-600 mb-2">危险操作</h2>
         <p className="text-sm text-gray-500 mb-4">
           注销账户后，所有数据将被永久删除且无法恢复。
         </p>
         <button
           onClick={() => setActiveModal('deleteAccount')}
-          className="flex items-center space-x-2 px-4 py-2.5 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition text-sm font-medium"
+          className="mobile-touch-target inline-flex items-center space-x-2 rounded-xl border border-red-300 px-4 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50"
         >
           <AlertTriangle size={16} />
           <span>注销账户</span>
@@ -510,15 +521,19 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
 
       {/* 添加/编辑宝宝弹窗 */}
       {(activeModal === 'addBaby' || activeModal === 'editBaby') && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={closeModal}>
+          <div
+            className="w-full max-w-md rounded-t-3xl bg-white p-5 pb-safe shadow-2xl sm:rounded-2xl sm:p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-gray-200 sm:hidden" />
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-bold text-gray-900">
                 {activeModal === 'editBaby' ? '编辑宝宝' : '添加宝宝'}
               </h3>
               <button
                 onClick={closeModal}
-                className="p-2 hover:bg-gray-100 rounded-lg transition"
+                className="mobile-touch-target inline-flex items-center justify-center rounded-full p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
               >
                 <X size={20} />
               </button>
@@ -560,7 +575,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
                   <button
                     type="button"
                     onClick={() => setGender('MALE')}
-                    className={`flex items-center justify-center p-3 rounded-lg border-2 transition ${
+                    className={`mobile-touch-target flex items-center justify-center p-3 rounded-xl border-2 transition ${
                       gender === 'MALE'
                         ? 'border-blue-500 bg-blue-50 text-blue-700'
                         : 'border-gray-200 hover:border-gray-300'
@@ -571,7 +586,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
                   <button
                     type="button"
                     onClick={() => setGender('FEMALE')}
-                    className={`flex items-center justify-center p-3 rounded-lg border-2 transition ${
+                    className={`mobile-touch-target flex items-center justify-center p-3 rounded-xl border-2 transition ${
                       gender === 'FEMALE'
                         ? 'border-pink-500 bg-pink-50 text-pink-700'
                         : 'border-gray-200 hover:border-gray-300'
@@ -584,7 +599,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
 
               <button
                 type="submit"
-                className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition"
+                className="mobile-touch-target w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition"
               >
                 {activeModal === 'editBaby' ? '保存修改' : '添加宝宝'}
               </button>
@@ -595,11 +610,15 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
 
       {/* 修改用户名弹窗 */}
       {activeModal === 'editName' && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={closeModal}>
+          <div
+            className="w-full max-w-md rounded-t-3xl bg-white p-5 pb-safe shadow-2xl sm:rounded-2xl sm:p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-gray-200 sm:hidden" />
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-bold text-gray-900">修改用户名</h3>
-              <button onClick={closeModal} className="p-2 hover:bg-gray-100 rounded-lg transition">
+              <button onClick={closeModal} className="mobile-touch-target inline-flex items-center justify-center rounded-full p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600">
                 <X size={20} />
               </button>
             </div>
@@ -635,7 +654,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
                 <button
                   type="submit"
                   disabled={nameLoading}
-                  className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium rounded-lg transition"
+                  className="mobile-touch-target w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium rounded-xl transition"
                 >
                   {nameLoading ? '保存中...' : '保存'}
                 </button>
@@ -647,11 +666,15 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
 
       {/* 修改密码弹窗 */}
       {activeModal === 'changePassword' && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={closeModal}>
+          <div
+            className="w-full max-w-md rounded-t-3xl bg-white p-5 pb-safe shadow-2xl sm:rounded-2xl sm:p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-gray-200 sm:hidden" />
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-bold text-gray-900">修改密码</h3>
-              <button onClick={closeModal} className="p-2 hover:bg-gray-100 rounded-lg transition">
+              <button onClick={closeModal} className="mobile-touch-target inline-flex items-center justify-center rounded-full p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600">
                 <X size={20} />
               </button>
             </div>
@@ -681,7 +704,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
                     <button
                       type="button"
                       onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      className="mobile-touch-target absolute right-2 top-1/2 inline-flex -translate-y-1/2 items-center justify-center rounded-full p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
                     >
                       {showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
@@ -705,7 +728,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
                     <button
                       type="button"
                       onClick={() => setShowNewPassword(!showNewPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      className="mobile-touch-target absolute right-2 top-1/2 inline-flex -translate-y-1/2 items-center justify-center rounded-full p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
                     >
                       {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
@@ -734,7 +757,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
                 <button
                   type="submit"
                   disabled={passwordLoading}
-                  className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium rounded-lg transition"
+                  className="mobile-touch-target w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium rounded-xl transition"
                 >
                   {passwordLoading ? '修改中...' : '修改密码'}
                 </button>
@@ -746,16 +769,20 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
 
       {/* 注销账户弹窗 */}
       {activeModal === 'deleteAccount' && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={closeModal}>
+          <div
+            className="w-full max-w-md rounded-t-3xl bg-white p-5 pb-safe shadow-2xl sm:rounded-2xl sm:p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-gray-200 sm:hidden" />
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-bold text-red-600">注销账户</h3>
-              <button onClick={closeModal} className="p-2 hover:bg-gray-100 rounded-lg transition">
+              <button onClick={closeModal} className="mobile-touch-target inline-flex items-center justify-center rounded-full p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600">
                 <X size={20} />
               </button>
             </div>
 
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
               <div className="flex items-start space-x-3">
                 <AlertTriangle size={20} className="text-red-500 mt-0.5 flex-shrink-0" />
                 <div className="text-sm text-red-700">
@@ -807,7 +834,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
               <button
                 type="submit"
                 disabled={deleteLoading || deleteConfirmText !== '确认注销'}
-                className="w-full py-3 px-4 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 disabled:text-gray-500 text-white font-medium rounded-lg transition"
+                className="mobile-touch-target w-full py-3 px-4 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 disabled:text-gray-500 text-white font-medium rounded-xl transition"
               >
                 {deleteLoading ? '正在注销...' : '确认注销账户'}
               </button>

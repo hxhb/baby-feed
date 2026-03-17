@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -14,7 +14,37 @@ export default function LoginClient({ allowRegistration }: LoginClientProps) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [isRegistrationAllowed, setIsRegistrationAllowed] = useState(allowRegistration)
   const router = useRouter()
+
+  useEffect(() => {
+    let isMounted = true
+
+    const syncRegistrationStatus = async () => {
+      try {
+        const response = await fetch('/api/site/registration-status', {
+          cache: 'no-store',
+        })
+
+        if (!response.ok) {
+          return
+        }
+
+        const data = await response.json()
+        if (isMounted && typeof data.allowRegistration === 'boolean') {
+          setIsRegistrationAllowed(data.allowRegistration)
+        }
+      } catch (err) {
+        console.error('sync registration status error:', err)
+      }
+    }
+
+    syncRegistrationStatus()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -104,7 +134,7 @@ export default function LoginClient({ allowRegistration }: LoginClientProps) {
             {loading ? '登录中...' : '登录'}
           </button>
 
-          {allowRegistration && (
+          {isRegistrationAllowed && (
             <div className="text-center text-sm">
               <span className="text-gray-600">还没有账号？</span>
               <Link href="/register" className="text-blue-600 hover:text-blue-700 font-medium ml-1">

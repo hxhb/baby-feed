@@ -1,15 +1,15 @@
 'use client'
 
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useState } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { 
-  Home, 
-  Calendar, 
-  PlusCircle, 
-  BarChart2, 
-  Settings, 
+import {
+  Home,
+  Calendar,
+  PlusCircle,
+  BarChart2,
+  Settings,
   LogOut
 } from 'lucide-react'
 
@@ -21,10 +21,15 @@ const navItems = [
   { href: '/settings', label: '设置', icon: Settings },
 ]
 
+const authRoutes = new Set(['/login', '/register'])
+
 export default function Navbar() {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
+  const [isSigningOut, setIsSigningOut] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
+  const isAuthPage = authRoutes.has(pathname)
+  const shouldShowNavbar = status === 'authenticated' && !!session && !isAuthPage && !isSigningOut
 
   const prefetchRoute = useCallback((href: string) => {
     if (href === pathname) {
@@ -35,7 +40,13 @@ export default function Navbar() {
   }, [pathname, router])
 
   useEffect(() => {
-    if (!session) {
+    if (status !== 'authenticated') {
+      setIsSigningOut(false)
+    }
+  }, [status])
+
+  useEffect(() => {
+    if (!shouldShowNavbar) {
       return
     }
 
@@ -50,14 +61,23 @@ export default function Navbar() {
     return () => {
       window.clearTimeout(timeoutId)
     }
-  }, [prefetchRoute, session])
+  }, [prefetchRoute, shouldShowNavbar])
 
-  if (!session) return null
+  const handleSignOut = async () => {
+    try {
+      setIsSigningOut(true)
+      await signOut({ callbackUrl: '/login' })
+    } catch (error) {
+      console.error('Sign out failed:', error)
+      setIsSigningOut(false)
+    }
+  }
+
+  if (!shouldShowNavbar) return null
 
   return (
     <>
-      {/* Desktop Top Navigation */}
-      <nav className="hidden md:block bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
+      <nav className="hidden md:block sticky top-0 z-50 border-b border-gray-200 bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex justify-between h-14">
             <div className="flex items-center">
@@ -90,7 +110,8 @@ export default function Navbar() {
                 )
               })}
               <button
-                onClick={() => signOut({ callbackUrl: '/login' })}
+                type="button"
+                onClick={handleSignOut}
                 className="flex items-center space-x-1 px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-50 transition"
               >
                 <LogOut size={18} />
@@ -101,9 +122,8 @@ export default function Navbar() {
         </div>
       </nav>
 
-      {/* Mobile Bottom Tab Bar */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 pb-safe">
-        <div className="flex items-center justify-around h-14">
+      <nav className="md:hidden fixed inset-x-0 bottom-0 z-50 border-t border-gray-200/80 bg-white/98 backdrop-blur-xl supports-[backdrop-filter]:bg-white/92">
+        <div className="mx-auto flex max-w-md items-end justify-between gap-1 px-2 pt-2 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]">
           {navItems.map((item) => {
             const Icon = item.icon
             const isActive = pathname === item.href
@@ -114,16 +134,20 @@ export default function Navbar() {
                 <Link
                   key={item.href}
                   href={item.href}
+                  aria-current={isActive ? 'page' : undefined}
                   onMouseEnter={() => prefetchRoute(item.href)}
                   onFocus={() => prefetchRoute(item.href)}
                   onTouchStart={() => prefetchRoute(item.href)}
-                  className="flex flex-col items-center justify-center -mt-4"
+                  className="flex min-w-[5rem] flex-col items-center justify-end self-start pt-0.5"
                 >
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg ${
+                  <div className={`mobile-touch-target -mt-5 flex h-14 w-14 items-center justify-center rounded-full shadow-lg ring-4 ring-gray-50 transition-transform active:scale-95 ${
                     isActive ? 'bg-blue-600' : 'bg-blue-500'
                   }`}>
-                    <Icon size={24} className="text-white" />
+                    <Icon size={26} className="text-white" />
                   </div>
+                  <span className={`mt-1 text-[11px] font-semibold ${isActive ? 'text-blue-600' : 'text-gray-500'}`}>
+                    {item.label}
+                  </span>
                 </Link>
               )
             }
@@ -132,17 +156,18 @@ export default function Navbar() {
               <Link
                 key={item.href}
                 href={item.href}
+                aria-current={isActive ? 'page' : undefined}
                 onMouseEnter={() => prefetchRoute(item.href)}
                 onFocus={() => prefetchRoute(item.href)}
                 onTouchStart={() => prefetchRoute(item.href)}
-                className={`flex flex-col items-center justify-center flex-1 py-1 transition ${
+                className={`mobile-touch-target flex min-h-[4.25rem] min-w-[4.5rem] flex-1 flex-col items-center justify-center rounded-2xl px-2 py-2 transition active:scale-95 ${
                   isActive
-                    ? 'text-blue-600'
+                    ? 'bg-blue-50 text-blue-600'
                     : 'text-gray-400'
                 }`}
               >
                 <Icon size={20} />
-                <span className="text-[10px] mt-0.5 font-medium">{item.label}</span>
+                <span className="mt-1 text-[11px] font-medium">{item.label}</span>
               </Link>
             )
           })}
