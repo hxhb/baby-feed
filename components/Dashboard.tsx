@@ -75,6 +75,19 @@ interface Props {
   initialTodayHealthRecords?: HealthRecord[]
 }
 
+function formatBreastFeedingDetails(record: FeedingRecord) {
+  const parts = [
+    record.leftBreastDuration ? `左${record.leftBreastDuration}` : null,
+    record.rightBreastDuration ? `右${record.rightBreastDuration}` : null,
+  ].filter((part): part is string => Boolean(part))
+
+  if (parts.length === 0) {
+    return '母乳亲喂'
+  }
+
+  return `${parts.join(' ')}分钟`
+}
+
 function buildDailyStats(feedingData: FeedingRecord[], healthData: HealthRecord[]): DailyStats {
   return {
     breastFeedingCount: feedingData.filter(r => r.type === 'BREAST_MILK').length,
@@ -454,7 +467,7 @@ export default function Dashboard({
                    
                     {record.type === 'BREAST_MILK' && feedingRecord && (
                       <span className="text-sm text-gray-600">
-                        {feedingRecord.leftBreastDuration || 0}+{feedingRecord.rightBreastDuration || 0}分钟
+                        {formatBreastFeedingDetails(feedingRecord)}
                       </span>
                     )}
                     {record.type === 'BREAST_MILK_BOTTLE' && feedingRecord && (
