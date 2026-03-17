@@ -2,7 +2,6 @@
 
 import dynamic from 'next/dynamic'
 import { useState } from 'react'
-import { Layout } from '@/components/Providers'
 import type { PreloadedBaby } from '@/lib/server-babies'
 import type { PreloadedTimelineRecord } from '@/lib/server-timeline'
 
@@ -79,15 +78,13 @@ export default function TimelinePageClient({
   const [selectedBabyId, setSelectedBabyId] = useState<string | null>(initialSelectedBabyId)
 
   return (
-    <Layout>
-      <Timeline
-        selectedBabyId={selectedBabyId}
-        onSelectBaby={setSelectedBabyId}
-        initialBabies={initialBabies}
-        initialSelectedBabyId={initialSelectedBabyId}
-        initialDate={initialDate}
-        initialRecords={initialRecords}
-      />
-    </Layout>
+    <Timeline
+      selectedBabyId={selectedBabyId}
+      onSelectBaby={setSelectedBabyId}
+      initialBabies={initialBabies}
+      initialSelectedBabyId={initialSelectedBabyId}
+      initialDate={initialDate}
+      initialRecords={initialRecords}
+    />
   )
 }

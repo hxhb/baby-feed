@@ -1,7 +1,6 @@
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { NextRequest } from 'next/server'
-import { Layout } from '@/components/Providers'
 import Settings from '@/components/Settings'
 import { auth } from '@/lib/auth'
 import { getPreloadedBabies } from '@/lib/server-babies'
@@ -25,12 +24,10 @@ export default async function SettingsPage() {
   }
 
   return (
-    <Layout>
-      <Settings
-        userName={session.user.name}
-        userEmail={session.user.email}
-        initialBabies={initialBabies}
-      />
-    </Layout>
+    <Settings
+      userName={session.user.name}
+      userEmail={session.user.email}
+      initialBabies={initialBabies}
+    />
   )
 }

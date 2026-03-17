@@ -1,5 +1,4 @@
 import Dashboard from '@/components/Dashboard'
-import { Layout } from '@/components/Providers'
 import { getPreloadedDashboardData } from '@/lib/server-dashboard'
 
 export default async function Home() {
@@ -11,13 +10,11 @@ export default async function Home() {
   } = await getPreloadedDashboardData()
 
   return (
-    <Layout>
-      <Dashboard
-        selectedBabyId={initialSelectedBabyId}
-        initialBabies={initialBabies}
-        initialTodayRecords={initialTodayRecords}
-        initialTodayHealthRecords={initialTodayHealthRecords}
-      />
-    </Layout>
+    <Dashboard
+      selectedBabyId={initialSelectedBabyId}
+      initialBabies={initialBabies}
+      initialTodayRecords={initialTodayRecords}
+      initialTodayHealthRecords={initialTodayHealthRecords}
+    />
   )
 }

@@ -2,7 +2,6 @@
 
 import dynamic from 'next/dynamic'
 import { useState } from 'react'
-import { Layout } from '@/components/Providers'
 import type { PreloadedBaby } from '@/lib/server-babies'
 import type { PreloadedStatsData } from '@/lib/server-stats'
 
@@ -60,13 +59,11 @@ export default function StatsPageClient({
   const [selectedBabyId, setSelectedBabyId] = useState<string | null>(initialSelectedBabyId)
 
   return (
-    <Layout>
-      <Stats
-        selectedBabyId={selectedBabyId}
-        onSelectBaby={setSelectedBabyId}
-        initialBabies={initialBabies}
-        initialStats={initialStats}
-      />
-    </Layout>
+    <Stats
+      selectedBabyId={selectedBabyId}
+      onSelectBaby={setSelectedBabyId}
+      initialBabies={initialBabies}
+      initialStats={initialStats}
+    />
   )
 }
