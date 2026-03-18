@@ -14,9 +14,10 @@ import {
   Legend,
   LabelList
 } from 'recharts'
-import { Scale } from 'lucide-react'
+import { Scale, Ruler, Syringe } from 'lucide-react'
 import { dedupeRequest } from '@/lib/client-request-cache'
 import type { PreloadedStatsData } from '@/lib/server-stats'
+import { formatBeijingTime } from '@/lib/time'
 
 interface Baby {
   id: string
@@ -143,6 +144,14 @@ export default function StatsComponent({
     return {
       date: `${parseInt(parts[1])}/${parseInt(parts[2])}`,
       体重: p.weight
+    }
+  })
+
+  const heightData = (stats?.heightTrend || []).map(p => {
+    const parts = p.date.split('-')
+    return {
+      date: `${parseInt(parts[1])}/${parseInt(parts[2])}`,
+      身高: p.height
     }
   })
 
@@ -291,6 +300,52 @@ export default function StatsComponent({
         )}
       </div>
 
+      <div className="bg-white rounded-2xl p-4 shadow-sm">
+        <div className="flex items-center gap-2 mb-3">
+          <Ruler size={18} className="text-blue-500" />
+          <h3 className="text-base font-bold text-gray-900">身高趋势</h3>
+        </div>
+        {heightData.length > 0 ? (
+          <div className="h-56 sm:h-64 -ml-2" style={{ outline: 'none' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={heightData} margin={{ top: 10, right: 15, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                <YAxis 
+                  domain={['dataMin - 1', 'dataMax + 1']} 
+                  tick={{ fontSize: 11 }}
+                  tickFormatter={(v) => `${v}cm`}
+                />
+                <Tooltip formatter={(value) => [`${value} cm`, '身高']} />
+                <Line 
+                  type="monotone" 
+                  dataKey="身高" 
+                  stroke="#3b82f6" 
+                  strokeWidth={2.5} 
+                  dot={{ fill: '#3b82f6', r: 4 }}
+                  activeDot={{ r: 6 }}
+                >
+                  <LabelList 
+                    dataKey="身高" 
+                    position="top" 
+                    fill="#2563eb" 
+                    fontSize={11} 
+                    fontWeight={600}
+                    formatter={(v) => `${v}cm`}
+                  />
+                </Line>
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <div className="text-center py-8 text-gray-400">
+            <Ruler size={32} className="mx-auto mb-2 opacity-50" />
+            <p className="text-sm">暂无身高记录</p>
+            <p className="text-xs mt-1">在添加记录中记录宝宝身高后，这里将展示身高变化趋势</p>
+          </div>
+        )}
+      </div>
+
       {tempData.length > 0 && (
         <div className="bg-white rounded-2xl p-4 shadow-sm">
           <h3 className="text-base font-bold text-gray-900 mb-3">体温趋势</h3>
@@ -313,6 +368,39 @@ export default function StatsComponent({
           </div>
         </div>
       )}
+
+      <div className="bg-white rounded-2xl p-4 shadow-sm">
+        <div className="flex items-center gap-2 mb-3">
+          <Syringe size={18} className="text-teal-500" />
+          <h3 className="text-base font-bold text-gray-900">疫苗记录</h3>
+        </div>
+        {stats && stats.vaccineRecords.length > 0 ? (
+          <div className="divide-y divide-gray-100">
+            {stats.vaccineRecords.map(record => (
+              <div key={record.id} className="py-3 first:pt-0 last:pb-0">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900 break-words">{record.vaccineName}</p>
+                    <p className="text-xs text-gray-500 mt-1">{formatBeijingTime(record.recordedAt)}</p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-teal-50 px-2.5 py-1 text-[11px] font-medium text-teal-700">
+                    {record.date.replace(/-/g, '.')}
+                  </span>
+                </div>
+                {record.notes && (
+                  <p className="mt-1.5 text-xs leading-5 text-gray-500 break-words">备注：{record.notes}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-gray-400">
+            <Syringe size={32} className="mx-auto mb-2 opacity-50" />
+            <p className="text-sm">暂无疫苗记录</p>
+            <p className="text-xs mt-1">添加疫苗记录后，这里会按最近时间优先展示</p>
+          </div>
+        )}
+      </div>
 
       {stats && (
         <div className="bg-white rounded-2xl p-4 shadow-sm">

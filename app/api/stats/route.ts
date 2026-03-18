@@ -98,29 +98,30 @@ export async function GET(request: NextRequest) {
     const { start: rangeStart } = getBeijingDayRange(startDateStr)
     const { end: rangeEnd } = getBeijingDayRange(todayStr)
 
-    const feedingRecords = await prisma.feedingRecord.findMany({
-      where: {
-        babyId,
-        createdBy: session.user.id,
-        startTime: {
-          gte: rangeStart,
-          lte: rangeEnd
-        }
-      },
-      orderBy: { startTime: 'asc' }
-    })
-
-    const healthRecords = await prisma.healthRecord.findMany({
-      where: {
-        babyId,
-        createdBy: session.user.id,
-        recordedAt: {
-          gte: rangeStart,
-          lte: rangeEnd
-        }
-      },
-      orderBy: { recordedAt: 'asc' }
-    })
+    const [feedingRecords, healthRecords] = await Promise.all([
+      prisma.feedingRecord.findMany({
+        where: {
+          babyId,
+          createdBy: session.user.id,
+          startTime: {
+            gte: rangeStart,
+            lte: rangeEnd
+          }
+        },
+        orderBy: { startTime: 'asc' }
+      }),
+      prisma.healthRecord.findMany({
+        where: {
+          babyId,
+          createdBy: session.user.id,
+          recordedAt: {
+            gte: rangeStart,
+            lte: rangeEnd
+          }
+        },
+        orderBy: { recordedAt: 'asc' }
+      })
+    ])
 
     const statsMap = new Map()
 
@@ -188,28 +189,86 @@ export async function GET(request: NextRequest) {
 
     const todayStats = statsMap.get(todayStr)
 
-    const allWeightRecords = await prisma.healthRecord.findMany({
-      where: {
-        babyId,
-        createdBy: session.user.id,
-        type: 'WEIGHT',
-        weight: { not: null }
-      },
-      orderBy: { recordedAt: 'asc' },
-      select: { weight: true, recordedAt: true }
+    const [allWeightRecords, allHeightRecords, vaccineRecords] = await Promise.all([
+      prisma.healthRecord.findMany({
+        where: {
+          babyId,
+          createdBy: session.user.id,
+          type: 'WEIGHT',
+          weight: { not: null }
+        },
+        orderBy: { recordedAt: 'asc' },
+        select: { weight: true, recordedAt: true }
+      }),
+      prisma.healthRecord.findMany({
+        where: {
+          babyId,
+          createdBy: session.user.id,
+          type: 'HEIGHT',
+          height: { not: null }
+        },
+        orderBy: { recordedAt: 'asc' },
+        select: { height: true, recordedAt: true }
+      }),
+      prisma.healthRecord.findMany({
+        where: {
+          babyId,
+          createdBy: session.user.id,
+          type: 'VACCINE',
+          vaccineName: { not: null }
+        },
+        orderBy: { recordedAt: 'desc' },
+        select: {
+          id: true,
+          vaccineName: true,
+          recordedAt: true,
+          notes: true
+        }
+      })
+    ])
+
+    const weightTrend = allWeightRecords.flatMap(r => {
+      if (r.weight == null) {
+        return []
+      }
+
+      return {
+        date: getBeijingDateStr(new Date(r.recordedAt)),
+        weight: r.weight
+      }
     })
 
-    const weightTrend = allWeightRecords.map(r => ({
-      date: getBeijingDateStr(new Date(r.recordedAt)),
-      weight: r.weight
-    }))
+    const heightTrend = allHeightRecords.flatMap(r => {
+      if (r.height == null) {
+        return []
+      }
+
+      return {
+        date: getBeijingDateStr(new Date(r.recordedAt)),
+        height: r.height
+      }
+    })
 
     return NextResponse.json({
       baby,
       todayStats: todayStats || statsMap.values().next().value,
       lastDays: Array.from(statsMap.values()).reverse(),
       totalStats,
-      weightTrend
+      weightTrend,
+      heightTrend,
+      vaccineRecords: vaccineRecords.flatMap(record => {
+        if (!record.vaccineName) {
+          return []
+        }
+
+        return {
+          id: record.id,
+          vaccineName: record.vaccineName,
+          date: getBeijingDateStr(new Date(record.recordedAt)),
+          recordedAt: record.recordedAt,
+          notes: record.notes
+        }
+      })
     }, { headers: noStoreHeaders })
   } catch (error) {
     console.error('获取统计数据失败:', error)

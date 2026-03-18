@@ -17,6 +17,7 @@ export interface PreloadedStatsDay {
   totalFormulaAmount: number
   adGiven: boolean
   weight?: number
+  height?: number
   temperature?: number
 }
 
@@ -33,6 +34,17 @@ export interface PreloadedStatsData {
   weightTrend: {
     date: string
     weight: number
+  }[]
+  heightTrend: {
+    date: string
+    height: number
+  }[]
+  vaccineRecords: {
+    id: string
+    vaccineName: string
+    date: string
+    recordedAt: string
+    notes: string | null
   }[]
 }
 
@@ -72,6 +84,7 @@ function createEmptyStatsDay(date: string): PreloadedStatsDay {
     totalFormulaAmount: 0,
     adGiven: false,
     weight: undefined,
+    height: undefined,
     temperature: undefined,
   }
 }
@@ -103,7 +116,7 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
   const { start: rangeStart } = getBeijingDayRange(startDateStr)
   const { end: rangeEnd } = getBeijingDayRange(todayStr)
 
-  const [feedingRecords, healthRecords, allWeightRecords] = await Promise.all([
+  const [feedingRecords, healthRecords, allWeightRecords, allHeightRecords, vaccineRecords] = await Promise.all([
     prisma.feedingRecord.findMany({
       where: {
         babyId,
@@ -135,6 +148,31 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
       },
       orderBy: { recordedAt: 'asc' },
       select: { weight: true, recordedAt: true },
+    }),
+    prisma.healthRecord.findMany({
+      where: {
+        babyId,
+        createdBy: userId,
+        type: 'HEIGHT',
+        height: { not: null },
+      },
+      orderBy: { recordedAt: 'asc' },
+      select: { height: true, recordedAt: true },
+    }),
+    prisma.healthRecord.findMany({
+      where: {
+        babyId,
+        createdBy: userId,
+        type: 'VACCINE',
+        vaccineName: { not: null },
+      },
+      orderBy: { recordedAt: 'desc' },
+      select: {
+        id: true,
+        vaccineName: true,
+        recordedAt: true,
+        notes: true,
+      },
     }),
   ])
 
@@ -175,6 +213,8 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
 
     if (record.type === 'WEIGHT' && record.weight) {
       dayStats.weight = record.weight
+    } else if (record.type === 'HEIGHT' && record.height) {
+      dayStats.height = record.height
     } else if (record.type === 'TEMPERATURE' && record.temperature) {
       dayStats.temperature = record.temperature
     } else if (record.type === 'AD_VITAMIN' && record.adGiven) {
@@ -211,6 +251,29 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
       return {
         date: getBeijingDateStr(new Date(record.recordedAt)),
         weight: record.weight,
+      }
+    }),
+    heightTrend: allHeightRecords.flatMap((record) => {
+      if (record.height == null) {
+        return []
+      }
+
+      return {
+        date: getBeijingDateStr(new Date(record.recordedAt)),
+        height: record.height,
+      }
+    }),
+    vaccineRecords: vaccineRecords.flatMap((record) => {
+      if (!record.vaccineName) {
+        return []
+      }
+
+      return {
+        id: record.id,
+        vaccineName: record.vaccineName,
+        date: getBeijingDateStr(new Date(record.recordedAt)),
+        recordedAt: record.recordedAt.toISOString(),
+        notes: record.notes,
       }
     }),
   }
