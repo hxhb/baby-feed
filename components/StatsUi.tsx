@@ -83,7 +83,7 @@ export function StatsSegmentedTabs({
   className = '',
 }: StatsSegmentedTabsProps) {
   return (
-    <div className={`flex gap-2 overflow-x-auto rounded-2xl bg-gray-50 p-1 ${className}`.trim()}>
+    <div className={`flex flex-wrap gap-2 rounded-2xl bg-gray-50 p-1 ${className}`.trim()}>
       {items.map(item => {
         const active = item.key === value
 
@@ -93,7 +93,7 @@ export function StatsSegmentedTabs({
             type="button"
             onClick={() => !item.disabled && onChange(item.key)}
             disabled={item.disabled}
-            className={`min-w-fit rounded-xl px-4 py-2 text-sm font-medium whitespace-nowrap transition ${
+            className={`min-w-0 flex-1 rounded-xl px-3 py-2 text-sm font-medium transition sm:flex-none sm:px-4 ${
               active
                 ? 'bg-white text-gray-900 shadow-sm'
                 : item.disabled

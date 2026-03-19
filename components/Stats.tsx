@@ -432,21 +432,21 @@ export default function StatsComponent({
 
       {stats && (
         <>
-          <StatsPanel className="overflow-x-auto p-2 sm:p-3">
-            <div className="flex min-w-max items-center gap-2 sm:gap-3">
+          <StatsPanel className="p-2 sm:p-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
               <StatsSegmentedTabs
                 items={subpageTabs}
                 value={activeSubpage}
                 onChange={(value) => setActiveSubpage(value as 'dashboard' | 'insights')}
-                className="flex-1"
+                className="w-full sm:flex-1"
               />
-              <div className="ml-auto shrink-0">
+              <div className="w-full sm:ml-auto sm:w-auto sm:shrink-0">
                 <div className="grid grid-cols-3 gap-2 rounded-2xl bg-gray-100 p-1">
                   {[7, 14, 30].map(d => (
                     <button
                       key={d}
                       onClick={() => setDays(d)}
-                      className={`rounded-2xl px-4 py-2 text-sm font-medium transition ${
+                      className={`rounded-2xl px-2 py-2 text-sm font-medium transition sm:px-4 ${
                         days === d
                           ? 'bg-white text-blue-700 shadow-sm'
                           : 'text-gray-600 hover:bg-white/80'
