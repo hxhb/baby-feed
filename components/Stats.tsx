@@ -303,12 +303,12 @@ export default function StatsComponent({
   const subpageTabs = [
     {
       key: 'dashboard',
-      label: '趋势',
+      label: '趋势与疫苗',
       description: '查看趋势工作台与疫苗记录',
     },
     {
       key: 'insights',
-      label: '洞察',
+      label: '数据洞察',
       description: '查看喂养、成长与健康洞察',
     },
   ]
@@ -433,7 +433,7 @@ export default function StatsComponent({
       {stats && (
         <>
           <StatsPanel className="p-2 sm:p-3">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:gap-3">
               <StatsSegmentedTabs
                 items={subpageTabs}
                 value={activeSubpage}
