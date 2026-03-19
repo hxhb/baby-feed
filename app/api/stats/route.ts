@@ -222,7 +222,9 @@ export async function GET(request: NextRequest) {
           id: true,
           vaccineName: true,
           recordedAt: true,
-          notes: true
+          notes: true,
+          vaccineDoseNumber: true,
+          vaccineTotalDoses: true
         }
       })
     ])
@@ -234,6 +236,7 @@ export async function GET(request: NextRequest) {
 
       return {
         date: getBeijingDateStr(new Date(r.recordedAt)),
+        recordedAt: r.recordedAt,
         weight: r.weight
       }
     })
@@ -245,6 +248,7 @@ export async function GET(request: NextRequest) {
 
       return {
         date: getBeijingDateStr(new Date(r.recordedAt)),
+        recordedAt: r.recordedAt,
         height: r.height
       }
     })
@@ -266,7 +270,9 @@ export async function GET(request: NextRequest) {
           vaccineName: record.vaccineName,
           date: getBeijingDateStr(new Date(record.recordedAt)),
           recordedAt: record.recordedAt,
-          notes: record.notes
+          notes: record.notes,
+          vaccineDoseNumber: record.vaccineDoseNumber,
+          vaccineTotalDoses: record.vaccineTotalDoses
         }
       })
     }, { headers: noStoreHeaders })

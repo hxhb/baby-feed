@@ -72,23 +72,26 @@ model FeedingRecord {
 }
 
 model HealthRecord {
-  id              String    @id @default(cuid())
-  babyId          String
-  type            String
-  weight          Float?
-  height          Float?
-  temperature     Float?
-  medicationName  String?
-  medicationDose  String?
-  vaccineName     String?
-  diaperType      String?
-  diaperStatus    String?
-  adGiven         Boolean?
-  recordedAt      DateTime
-  notes           String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  createdBy       String
-  baby            Baby      @relation(fields: [babyId], references: [id], onDelete: Cascade)
-  user            User      @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  id                String    @id @default(cuid())
+  babyId            String
+  type              String
+  weight            Float?
+  height            Float?
+  temperature       Float?
+  medicationName    String?
+  medicationDose    String?
+  vaccineName       String?
+  vaccineManufacturer String?
+  vaccineDoseNumber Int?
+  vaccineTotalDoses Int?
+  diaperType        String?
+  diaperStatus      String?
+  adGiven           Boolean?
+  recordedAt        DateTime
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  createdBy         String
+  baby              Baby      @relation(fields: [babyId], references: [id], onDelete: Cascade)
+  user              User      @relation(fields: [createdBy], references: [id], onDelete: Cascade)
 }

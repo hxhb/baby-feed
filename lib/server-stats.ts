@@ -33,10 +33,12 @@ export interface PreloadedStatsData {
   }
   weightTrend: {
     date: string
+    recordedAt: string
     weight: number
   }[]
   heightTrend: {
     date: string
+    recordedAt: string
     height: number
   }[]
   vaccineRecords: {
@@ -45,6 +47,8 @@ export interface PreloadedStatsData {
     date: string
     recordedAt: string
     notes: string | null
+    vaccineDoseNumber: number | null
+    vaccineTotalDoses: number | null
   }[]
 }
 
@@ -172,6 +176,8 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
         vaccineName: true,
         recordedAt: true,
         notes: true,
+        vaccineDoseNumber: true,
+        vaccineTotalDoses: true,
       },
     }),
   ])
@@ -250,6 +256,7 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
 
       return {
         date: getBeijingDateStr(new Date(record.recordedAt)),
+        recordedAt: record.recordedAt.toISOString(),
         weight: record.weight,
       }
     }),
@@ -260,6 +267,7 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
 
       return {
         date: getBeijingDateStr(new Date(record.recordedAt)),
+        recordedAt: record.recordedAt.toISOString(),
         height: record.height,
       }
     }),
@@ -274,6 +282,8 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
         date: getBeijingDateStr(new Date(record.recordedAt)),
         recordedAt: record.recordedAt.toISOString(),
         notes: record.notes,
+        vaccineDoseNumber: record.vaccineDoseNumber,
+        vaccineTotalDoses: record.vaccineTotalDoses,
       }
     }),
   }

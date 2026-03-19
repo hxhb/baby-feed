@@ -19,6 +19,7 @@ export interface PreloadedTimelineFeedingRecord {
   formulaAmount?: number | null
   adGiven?: boolean | null
   notes?: string | null
+  babyId: string
   baby?: PreloadedTimelineBaby
   recordType: 'feeding'
 }
@@ -33,10 +34,14 @@ export interface PreloadedTimelineHealthRecord {
   medicationName?: string | null
   medicationDose?: string | null
   vaccineName?: string | null
+  vaccineManufacturer?: string | null
+  vaccineDoseNumber?: number | null
+  vaccineTotalDoses?: number | null
   diaperType?: string | null
   diaperStatus?: string | null
   adGiven?: boolean | null
   notes?: string | null
+  babyId: string
   baby?: PreloadedTimelineBaby
   recordType: 'health'
 }
@@ -48,6 +53,16 @@ export interface PreloadedTimelinePageData {
   initialSelectedBabyId: string | null
   initialDate: string
   initialRecords: PreloadedTimelineRecord[]
+  initialValidDates: string[]
+}
+
+function getBeijingDateStr(date: Date): string {
+  const utcMs = date.getTime()
+  const bj = new Date(utcMs + 8 * 60 * 60 * 1000)
+  const y = bj.getUTCFullYear()
+  const m = String(bj.getUTCMonth() + 1).padStart(2, '0')
+  const d = String(bj.getUTCDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }
 
 function getBeijingDayRange(dateStr: string) {
@@ -55,6 +70,43 @@ function getBeijingDayRange(dateStr: string) {
     start: new Date(`${dateStr}T00:00:00+08:00`),
     end: new Date(`${dateStr}T23:59:59.999+08:00`),
   }
+}
+
+export async function getTimelineValidDates(userId: string, babyId: string): Promise<string[]> {
+  const [feedingDates, healthDates] = await Promise.all([
+    prisma.feedingRecord.findMany({
+      where: {
+        babyId,
+        createdBy: userId,
+      },
+      select: {
+        startTime: true,
+      },
+      orderBy: { startTime: 'desc' },
+    }),
+    prisma.healthRecord.findMany({
+      where: {
+        babyId,
+        createdBy: userId,
+      },
+      select: {
+        recordedAt: true,
+      },
+      orderBy: { recordedAt: 'desc' },
+    }),
+  ])
+
+  const validDates = new Set<string>()
+
+  feedingDates.forEach((record) => {
+    validDates.add(getBeijingDateStr(record.startTime))
+  })
+
+  healthDates.forEach((record) => {
+    validDates.add(getBeijingDateStr(record.recordedAt))
+  })
+
+  return Array.from(validDates).sort((a, b) => b.localeCompare(a))
 }
 
 async function getPreloadedTimelineRecords(userId: string, babyId: string, dateStr: string): Promise<PreloadedTimelineRecord[]> {
@@ -79,6 +131,7 @@ async function getPreloadedTimelineRecords(userId: string, babyId: string, dateS
         formulaAmount: true,
         adGiven: true,
         notes: true,
+        babyId: true,
       },
     }),
     prisma.healthRecord.findMany({
@@ -98,10 +151,14 @@ async function getPreloadedTimelineRecords(userId: string, babyId: string, dateS
         medicationName: true,
         medicationDose: true,
         vaccineName: true,
+        vaccineManufacturer: true,
+        vaccineDoseNumber: true,
+        vaccineTotalDoses: true,
         diaperType: true,
         diaperStatus: true,
         adGiven: true,
         notes: true,
+        babyId: true,
       },
     }),
   ])
@@ -135,6 +192,7 @@ export async function getPreloadedTimelinePageData(): Promise<PreloadedTimelineP
       initialSelectedBabyId: null,
       initialDate,
       initialRecords: [],
+      initialValidDates: [],
     }
   }
 
@@ -147,15 +205,20 @@ export async function getPreloadedTimelinePageData(): Promise<PreloadedTimelineP
       initialSelectedBabyId: null,
       initialDate,
       initialRecords: [],
+      initialValidDates: [],
     }
   }
 
-  const initialRecords = await getPreloadedTimelineRecords(session.user.id, initialSelectedBabyId, initialDate)
+  const [initialRecords, initialValidDates] = await Promise.all([
+    getPreloadedTimelineRecords(session.user.id, initialSelectedBabyId, initialDate),
+    getTimelineValidDates(session.user.id, initialSelectedBabyId),
+  ])
 
   return {
     initialBabies,
     initialSelectedBabyId,
     initialDate,
     initialRecords,
+    initialValidDates,
   }
 }

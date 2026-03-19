@@ -7,6 +7,7 @@ export default async function TimelinePage() {
     initialSelectedBabyId,
     initialDate,
     initialRecords,
+    initialValidDates,
   } = await getPreloadedTimelinePageData()
 
   return (
@@ -15,6 +16,7 @@ export default async function TimelinePage() {
       initialSelectedBabyId={initialSelectedBabyId}
       initialDate={initialDate}
       initialRecords={initialRecords}
+      initialValidDates={initialValidDates}
     />
   )
 }

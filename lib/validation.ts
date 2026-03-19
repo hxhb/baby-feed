@@ -185,7 +185,7 @@ export function validateFeedingInput(body: Record<string, unknown>) {
 
 // 验证健康记录输入
 export function validateHealthInput(body: Record<string, unknown>) {
-  return validateAll(
+  const baseValidation = validateAll(
     validateEnum(body.type, HEALTH_TYPES, '健康记录类型'),
     validateNumber(body.weight, '体重', 0, 100),        // 0-100 kg
     validateNumber(body.height, '身高', 0, 200),         // 0-200 cm
@@ -193,12 +193,38 @@ export function validateHealthInput(body: Record<string, unknown>) {
     validateString(body.medicationName, '药品名称', 200),
     validateString(body.medicationDose, '药品剂量', 200),
     validateString(body.vaccineName, '疫苗名称', 200),
+    validateString(body.vaccineManufacturer, '疫苗生产厂商', 200),
+    validateInt(body.vaccineDoseNumber, '当前针次', 1, 20),
+    validateInt(body.vaccineTotalDoses, '总针数', 1, 20),
     validateEnum(body.diaperType, DIAPER_TYPES, '尿布类型'),
     validateString(body.diaperStatus, '尿布状态', 200),
     validateBoolean(body.adGiven, 'AD补充'),
     validateDateString(body.recordedAt, '记录时间'),
     validateString(body.notes, '备注', 1000)
   )
+
+  if (!baseValidation.valid) {
+    return baseValidation
+  }
+
+  const hasVaccineDoseNumber = body.vaccineDoseNumber !== undefined && body.vaccineDoseNumber !== null
+  const hasVaccineTotalDoses = body.vaccineTotalDoses !== undefined && body.vaccineTotalDoses !== null
+
+  if (hasVaccineDoseNumber !== hasVaccineTotalDoses) {
+    return { valid: false, error: '请同时填写当前针次和总针数' }
+  }
+
+  if (
+    hasVaccineDoseNumber &&
+    hasVaccineTotalDoses &&
+    typeof body.vaccineDoseNumber === 'number' &&
+    typeof body.vaccineTotalDoses === 'number' &&
+    body.vaccineDoseNumber > body.vaccineTotalDoses
+  ) {
+    return { valid: false, error: '当前针次不能大于总针数' }
+  }
+
+  return { valid: true }
 }
 
 // 验证婴儿信息输入

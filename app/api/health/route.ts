@@ -137,6 +137,9 @@ export async function POST(request: NextRequest) {
       medicationName,
       medicationDose,
       vaccineName,
+      vaccineManufacturer,
+      vaccineDoseNumber,
+      vaccineTotalDoses,
       diaperType,
       diaperStatus,
       adGiven,
@@ -173,10 +176,23 @@ export async function POST(request: NextRequest) {
     const typedMedicationName = typeof medicationName === 'string' ? medicationName : undefined
     const typedMedicationDose = typeof medicationDose === 'string' ? medicationDose : undefined
     const typedVaccineName = typeof vaccineName === 'string' ? vaccineName : undefined
+    const typedVaccineManufacturer = typeof vaccineManufacturer === 'string' ? vaccineManufacturer : undefined
+    const typedVaccineDoseNumber = typeof vaccineDoseNumber === 'number' ? vaccineDoseNumber : undefined
+    const typedVaccineTotalDoses = typeof vaccineTotalDoses === 'number' ? vaccineTotalDoses : undefined
     const typedDiaperType = typeof diaperType === 'string' ? diaperType : undefined
     const typedDiaperStatus = typeof diaperStatus === 'string' ? diaperStatus : undefined
     const typedAdGiven = typeof adGiven === 'boolean' ? adGiven : undefined
     const typedNotes = typeof notes === 'string' ? notes : undefined
+
+    if (typedType === 'VACCINE') {
+      if (!typedVaccineName?.trim()) {
+        return NextResponse.json({ error: '请填写疫苗名称' }, { status: 400, headers: noStoreHeaders })
+      }
+
+      if (typedVaccineDoseNumber == null || typedVaccineTotalDoses == null) {
+        return NextResponse.json({ error: '请填写当前针次和总针数' }, { status: 400, headers: noStoreHeaders })
+      }
+    }
 
     const baby = await prisma.baby.findFirst({
       where: {
@@ -199,6 +215,9 @@ export async function POST(request: NextRequest) {
         medicationName: typedMedicationName,
         medicationDose: typedMedicationDose,
         vaccineName: typedVaccineName,
+        vaccineManufacturer: typedVaccineManufacturer,
+        vaccineDoseNumber: typedVaccineDoseNumber,
+        vaccineTotalDoses: typedVaccineTotalDoses,
         diaperType: typedDiaperType,
         diaperStatus: typedDiaperStatus,
         adGiven: typedAdGiven,

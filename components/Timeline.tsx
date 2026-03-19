@@ -39,6 +39,7 @@ interface FeedingRecord {
   formulaAmount?: number | null
   adGiven?: boolean | null
   notes?: string | null
+  babyId: string
   baby?: Baby
   recordType: 'feeding'
 }
@@ -53,10 +54,14 @@ interface HealthRecord {
   medicationName?: string | null
   medicationDose?: string | null
   vaccineName?: string | null
+  vaccineManufacturer?: string | null
+  vaccineDoseNumber?: number | null
+  vaccineTotalDoses?: number | null
   diaperType?: string | null
   diaperStatus?: string | null
   adGiven?: boolean | null
   notes?: string | null
+  babyId: string
   baby?: Baby
   recordType: 'health'
 }
@@ -70,16 +75,25 @@ interface Props {
   initialSelectedBabyId?: string | null
   initialDate?: string
   initialRecords?: PreloadedTimelineRecord[]
+  initialValidDates?: string[]
 }
 
 function buildTimelineCacheKey(babyId: string, dateStr: string) {
   return `timeline:${babyId}:${dateStr}`
 }
 
+function buildTimelineDatesCacheKey(babyId: string) {
+  return `timeline-dates:${babyId}`
+}
+
 function shiftDateString(dateStr: string, dayOffset: number) {
   const date = new Date(`${dateStr}T12:00:00+08:00`)
   date.setDate(date.getDate() + dayOffset)
   return format(date, 'yyyy-MM-dd')
+}
+
+function dateStringToBeijingDate(dateStr: string) {
+  return new Date(`${dateStr}T12:00:00+08:00`)
 }
 
 async function fetchTimelineRecords(babyId: string, dateStr: string) {
@@ -101,6 +115,30 @@ async function fetchTimelineRecords(babyId: string, dateStr: string) {
     const timeB = new Date(b.recordType === 'feeding' ? b.startTime : b.recordedAt).getTime()
     return timeB - timeA
   })
+}
+
+async function fetchTimelineValidDates(babyId: string) {
+  const response = await fetch(`/api/timeline-dates?babyId=${babyId}`)
+  if (!response.ok) {
+    throw new Error('获取有效日期失败')
+  }
+
+  const data = await response.json()
+  return Array.isArray(data) ? data.filter((item): item is string => typeof item === 'string') : []
+}
+
+function findAdjacentValidDate(validDates: string[], currentDateStr: string, direction: 'prev' | 'next') {
+  const currentTs = dateStringToBeijingDate(currentDateStr).getTime()
+
+  if (direction === 'prev') {
+    const olderDates = validDates.filter((dateStr) => dateStringToBeijingDate(dateStr).getTime() < currentTs)
+    return olderDates[0] ?? null
+  }
+
+  const newerDates = [...validDates]
+    .filter((dateStr) => dateStringToBeijingDate(dateStr).getTime() > currentTs)
+    .sort((a, b) => a.localeCompare(b))
+  return newerDates[0] ?? null
 }
 
 function formatBreastFeedingDetails(record: FeedingRecord) {
@@ -297,18 +335,25 @@ export default function TimelineComponent({
   initialSelectedBabyId = null,
   initialDate,
   initialRecords = [],
+  initialValidDates = [],
 }: Props) {
   const [babies, setBabies] = useState<Baby[]>(initialBabies)
   const [records, setRecords] = useState<TimelineRecord[]>(initialRecords)
+  const [validDates, setValidDates] = useState<string[]>(initialValidDates)
   const [loading, setLoading] = useState(initialBabies.length === 0)
   const [isFetchingRecords, setIsFetchingRecords] = useState(false)
-  const [currentDate, setCurrentDate] = useState(initialDate ? new Date(`${initialDate}T12:00:00+08:00`) : new Date())
+  const [currentDate, setCurrentDate] = useState(() => (
+    initialDate ? new Date(`${initialDate}T12:00:00+08:00`) : new Date()
+  ))
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; type: 'feeding' | 'health' } | null>(null)
   const [editingRecord, setEditingRecord] = useState<TimelineRecord | null>(null)
   const [saving, setSaving] = useState(false)
   const latestRequestKeyRef = useRef<string | null>(null)
+  const datePickerWrapperRef = useRef<HTMLDivElement | null>(null)
   const currentDateStr = format(currentDate, 'yyyy-MM-dd')
   const hasInitialRecords = !!initialDate && selectedBabyId === initialSelectedBabyId && currentDateStr === initialDate
+  const hasInitialValidDates = selectedBabyId === initialSelectedBabyId
 
   const fetchBabies = useCallback(async () => {
     try {
@@ -366,21 +411,58 @@ export default function TimelineComponent({
     }
   }, [])
 
+  const fetchValidDates = useCallback(async (babyId: string) => {
+    try {
+      const cacheKey = buildTimelineDatesCacheKey(babyId)
+      const data = await dedupeRequest(cacheKey, () => fetchTimelineValidDates(babyId))
+      setValidDates(data)
+      return data
+    } catch (error) {
+      console.error('获取有效日期失败:', error)
+      setValidDates([])
+      return []
+    }
+  }, [])
+
+  const syncDateToNearestValid = useCallback(async (babyId: string, nextValidDates?: string[]) => {
+    const availableDates = nextValidDates ?? validDates
+    if (availableDates.length === 0) {
+      setRecords([])
+      return
+    }
+
+    if (availableDates.includes(currentDateStr)) {
+      return
+    }
+
+    const newerDate = findAdjacentValidDate(availableDates, currentDateStr, 'next')
+    const olderDate = findAdjacentValidDate(availableDates, currentDateStr, 'prev')
+    const targetDateStr = newerDate ?? olderDate ?? availableDates[0]
+
+    if (!targetDateStr || targetDateStr === currentDateStr) {
+      return
+    }
+
+    setCurrentDate(dateStringToBeijingDate(targetDateStr))
+    await fetchRecordsForDate(babyId, targetDateStr)
+  }, [currentDateStr, fetchRecordsForDate, validDates])
+
   const prefetchDate = useCallback((babyId: string, dateStr: string) => {
     void fetchRecordsForDate(babyId, dateStr, { applyResult: false, background: true })
   }, [fetchRecordsForDate])
 
   const prefetchAdjacentDates = useCallback((babyId: string, centerDateStr: string) => {
-    const todayStr = format(new Date(), 'yyyy-MM-dd')
-    const previousDateStr = shiftDateString(centerDateStr, -1)
-    const nextDateStr = shiftDateString(centerDateStr, 1)
+    const previousDateStr = findAdjacentValidDate(validDates, centerDateStr, 'prev')
+    const nextDateStr = findAdjacentValidDate(validDates, centerDateStr, 'next')
 
-    prefetchDate(babyId, previousDateStr)
+    if (previousDateStr) {
+      prefetchDate(babyId, previousDateStr)
+    }
 
-    if (nextDateStr <= todayStr) {
+    if (nextDateStr) {
       prefetchDate(babyId, nextDateStr)
     }
-  }, [prefetchDate])
+  }, [prefetchDate, validDates])
 
   useEffect(() => {
     if (initialBabies.length > 0) {
@@ -394,6 +476,17 @@ export default function TimelineComponent({
 
     fetchBabies()
   }, [fetchBabies, initialBabies, onSelectBaby, selectedBabyId])
+
+  useEffect(() => {
+    if (!selectedBabyId) return
+
+    if (hasInitialValidDates) {
+      setValidDates(initialValidDates)
+      return
+    }
+
+    void fetchValidDates(selectedBabyId)
+  }, [fetchValidDates, hasInitialValidDates, initialValidDates, selectedBabyId])
 
   useEffect(() => {
     if (!selectedBabyId) return
@@ -412,6 +505,44 @@ export default function TimelineComponent({
     prefetchAdjacentDates(selectedBabyId, currentDateStr)
   }, [selectedBabyId, currentDateStr, isFetchingRecords, prefetchAdjacentDates])
 
+  useEffect(() => {
+    if (!selectedBabyId || isFetchingRecords) return
+    void syncDateToNearestValid(selectedBabyId)
+  }, [currentDateStr, isFetchingRecords, selectedBabyId, syncDateToNearestValid, validDates])
+
+  useEffect(() => {
+    if (!isCalendarOpen) {
+      return
+    }
+
+    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
+      if (!datePickerWrapperRef.current) {
+        return
+      }
+
+      const target = event.target
+      if (target instanceof Node && !datePickerWrapperRef.current.contains(target)) {
+        setIsCalendarOpen(false)
+      }
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsCalendarOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('touchstart', handlePointerDown)
+    document.addEventListener('keydown', handleEscape)
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('touchstart', handlePointerDown)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [isCalendarOpen])
+
   const handleDeleteClick = useCallback((id: string, type: 'feeding' | 'health') => {
     setDeleteTarget({ id, type })
   }, [])
@@ -426,8 +557,10 @@ export default function TimelineComponent({
       const response = await fetch(endpoint, { method: 'DELETE' })
       
       if (response.ok) {
-        invalidateRequestCache(buildTimelineCacheKey(selectedBabyId, currentDateStr))
-        await fetchRecordsForDate(selectedBabyId, currentDateStr)
+        invalidateRequestCache(`timeline:${selectedBabyId}:`)
+        invalidateRequestCache(buildTimelineDatesCacheKey(selectedBabyId))
+        const nextValidDates = await fetchValidDates(selectedBabyId)
+        await syncDateToNearestValid(selectedBabyId, nextValidDates)
       }
     } catch (error) {
       console.error('删除失败:', error)
@@ -462,8 +595,10 @@ export default function TimelineComponent({
 
       if (response.ok) {
         setEditingRecord(null)
-        invalidateRequestCache(buildTimelineCacheKey(selectedBabyId, currentDateStr))
-        await fetchRecordsForDate(selectedBabyId, currentDateStr)
+        invalidateRequestCache(`timeline:${selectedBabyId}:`)
+        invalidateRequestCache(buildTimelineDatesCacheKey(selectedBabyId))
+        const nextValidDates = await fetchValidDates(selectedBabyId)
+        await syncDateToNearestValid(selectedBabyId, nextValidDates)
       } else {
         const err = await response.json()
         alert(err.error || '保存失败')
@@ -481,20 +616,21 @@ export default function TimelineComponent({
   }, [currentDateStr, prefetchDate])
 
   const goToPreviousDay = useCallback(() => {
-    const previousDateStr = shiftDateString(currentDateStr, -1)
+    const previousDateStr = findAdjacentValidDate(validDates, currentDateStr, 'prev')
+    if (!previousDateStr) {
+      return
+    }
+
     if (selectedBabyId) {
       prefetchDate(selectedBabyId, previousDateStr)
     }
 
-    const prev = new Date(currentDate)
-    prev.setDate(prev.getDate() - 1)
-    setCurrentDate(prev)
-  }, [currentDate, currentDateStr, prefetchDate, selectedBabyId])
+    setCurrentDate(dateStringToBeijingDate(previousDateStr))
+  }, [currentDateStr, prefetchDate, selectedBabyId, validDates])
 
   const goToNextDay = useCallback(() => {
-    const nextDateStr = shiftDateString(currentDateStr, 1)
-    const todayStr = format(new Date(), 'yyyy-MM-dd')
-    if (nextDateStr > todayStr) {
+    const nextDateStr = findAdjacentValidDate(validDates, currentDateStr, 'next')
+    if (!nextDateStr) {
       return
     }
 
@@ -502,10 +638,22 @@ export default function TimelineComponent({
       prefetchDate(selectedBabyId, nextDateStr)
     }
 
-    const next = new Date(currentDate)
-    next.setDate(next.getDate() + 1)
-    setCurrentDate(next)
-  }, [currentDate, currentDateStr, prefetchDate, selectedBabyId])
+    setCurrentDate(dateStringToBeijingDate(nextDateStr))
+  }, [currentDateStr, prefetchDate, selectedBabyId, validDates])
+
+  const handleCalendarDateChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const nextDateStr = event.target.value
+    if (!nextDateStr || nextDateStr === currentDateStr || !validDates.includes(nextDateStr)) {
+      return
+    }
+
+    if (selectedBabyId) {
+      prefetchAdjacentDates(selectedBabyId, nextDateStr)
+    }
+
+    setCurrentDate(dateStringToBeijingDate(nextDateStr))
+    setIsCalendarOpen(false)
+  }, [currentDateStr, prefetchAdjacentDates, selectedBabyId, validDates])
 
   const formatDateLabel = (date: Date) => {
     if (isToday(date)) return '今天'
@@ -608,6 +756,8 @@ export default function TimelineComponent({
   }
 
   const { morning, afternoon } = groupedRecords
+  const previousValidDate = findAdjacentValidDate(validDates, currentDateStr, 'prev')
+  const nextValidDate = findAdjacentValidDate(validDates, currentDateStr, 'next')
 
   return (
     <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 space-y-4">
@@ -637,44 +787,108 @@ export default function TimelineComponent({
           <button
             onClick={goToPreviousDay}
             onMouseEnter={() => {
-              if (!selectedBabyId) return
-              prefetchDate(selectedBabyId, shiftDateString(currentDateStr, -1))
+              if (!selectedBabyId || !previousValidDate) return
+              prefetchDate(selectedBabyId, previousValidDate)
             }}
             onFocus={() => {
-              if (!selectedBabyId) return
-              prefetchDate(selectedBabyId, shiftDateString(currentDateStr, -1))
+              if (!selectedBabyId || !previousValidDate) return
+              prefetchDate(selectedBabyId, previousValidDate)
             }}
             onTouchStart={() => {
-              if (!selectedBabyId) return
-              prefetchDate(selectedBabyId, shiftDateString(currentDateStr, -1))
+              if (!selectedBabyId || !previousValidDate) return
+              prefetchDate(selectedBabyId, previousValidDate)
             }}
-            className="mobile-touch-target inline-flex flex-shrink-0 items-center justify-center rounded-xl bg-gray-50 text-gray-700 transition hover:bg-gray-100"
+            disabled={!previousValidDate}
+            className={`mobile-touch-target inline-flex flex-shrink-0 items-center justify-center rounded-xl transition ${
+              previousValidDate
+                ? 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                : 'cursor-not-allowed bg-gray-50 text-gray-300'
+            }`}
           >
             <ChevronLeft size={22} />
           </button>
-          <div className="min-w-0 flex-1 text-center">
-            <h2 className="text-base font-bold text-gray-900">{formatDateLabel(currentDate)}</h2>
-            <p className="text-xs text-gray-500">{format(currentDate, 'yyyy年MM月dd日')}</p>
+          <div ref={datePickerWrapperRef} className="relative min-w-0 flex-1 text-center">
+            <div className="px-2 py-1.5">
+              <h2 className="text-base font-bold text-gray-900">{formatDateLabel(currentDate)}</h2>
+              <button
+                type="button"
+                onClick={() => setIsCalendarOpen((open) => !open)}
+                className="mt-1 inline-flex rounded-lg px-2 py-1 text-xs text-gray-500 transition hover:bg-gray-50 hover:text-gray-700"
+                aria-expanded={isCalendarOpen}
+                aria-haspopup="dialog"
+              >
+                {format(currentDate, 'yyyy年MM月dd日')}
+              </button>
+            </div>
+
+            {isCalendarOpen && (
+              <div className="absolute left-1/2 top-full z-20 mt-2 w-full max-w-xs -translate-x-1/2 rounded-2xl border border-gray-100 bg-white p-3 text-left shadow-xl">
+                <div className="mb-2">
+                  <p className="text-sm font-semibold text-gray-900">快捷切换日期</p>
+                  <p className="mt-1 text-xs text-gray-500">只支持切换到已有记录的日期</p>
+                </div>
+                <input
+                  type="date"
+                  value={currentDateStr}
+                  min={validDates[validDates.length - 1] || currentDateStr}
+                  max={validDates[0] || currentDateStr}
+                  onChange={handleCalendarDateChange}
+                  list="timeline-valid-dates"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-700 outline-none transition focus:border-blue-500 focus:bg-white"
+                />
+                <datalist id="timeline-valid-dates">
+                  {validDates.map((dateStr) => (
+                    <option key={dateStr} value={dateStr} />
+                  ))}
+                </datalist>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {validDates.slice(0, 6).map((dateStr) => (
+                    <button
+                      key={dateStr}
+                      type="button"
+                      onClick={() => {
+                        if (dateStr === currentDateStr) {
+                          setIsCalendarOpen(false)
+                          return
+                        }
+                        if (selectedBabyId) {
+                          prefetchAdjacentDates(selectedBabyId, dateStr)
+                        }
+                        setCurrentDate(dateStringToBeijingDate(dateStr))
+                        setIsCalendarOpen(false)
+                      }}
+                      className={`rounded-full px-3 py-1.5 text-xs transition ${
+                        dateStr === currentDateStr
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {formatDateLabel(dateStringToBeijingDate(dateStr))}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           <button
             onClick={goToNextDay}
             onMouseEnter={() => {
-              if (!selectedBabyId || isToday(currentDate)) return
-              prefetchDate(selectedBabyId, shiftDateString(currentDateStr, 1))
+              if (!selectedBabyId || !nextValidDate) return
+              prefetchDate(selectedBabyId, nextValidDate)
             }}
             onFocus={() => {
-              if (!selectedBabyId || isToday(currentDate)) return
-              prefetchDate(selectedBabyId, shiftDateString(currentDateStr, 1))
+              if (!selectedBabyId || !nextValidDate) return
+              prefetchDate(selectedBabyId, nextValidDate)
             }}
             onTouchStart={() => {
-              if (!selectedBabyId || isToday(currentDate)) return
-              prefetchDate(selectedBabyId, shiftDateString(currentDateStr, 1))
+              if (!selectedBabyId || !nextValidDate) return
+              prefetchDate(selectedBabyId, nextValidDate)
             }}
-            disabled={isToday(currentDate)}
+            disabled={!nextValidDate}
             className={`mobile-touch-target inline-flex flex-shrink-0 items-center justify-center rounded-xl transition ${
-              isToday(currentDate)
-                ? 'cursor-not-allowed bg-gray-50 text-gray-300'
-                : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+              nextValidDate
+                ? 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                : 'cursor-not-allowed bg-gray-50 text-gray-300'
             }`}
           >
             <ChevronRight size={22} />

@@ -45,6 +45,7 @@ interface HealthRecord {
   temperature?: number
   medicationName?: string | null
   vaccineName?: string | null
+  vaccineManufacturer?: string | null
   diaperType?: string | null
   diaperStatus?: string | null
   adGiven?: boolean
@@ -455,7 +456,7 @@ export default function Dashboard({
                           {record.type === 'HEIGHT' && `身高 ${healthRecord?.height}cm`}
                           {record.type === 'TEMPERATURE' && `体温 ${healthRecord?.temperature}°C`}
                           {record.type === 'MEDICATION' && `服药 ${healthRecord?.medicationName}`}
-                          {record.type === 'VACCINE' && `疫苗 ${healthRecord?.vaccineName}`}
+                          {record.type === 'VACCINE' && `疫苗 ${healthRecord?.vaccineName}${healthRecord?.vaccineManufacturer ? `（${healthRecord.vaccineManufacturer}）` : ''}`}
                           {record.type === 'DIAPER' && `${healthRecord?.diaperType === 'PEE' ? '小便' : healthRecord?.diaperType === 'POOP' ? '大便' : '大小便'}`}
                           {record.notes && <span className="ml-1 text-gray-400">（{record.notes}）</span>}
                         </p>

@@ -63,6 +63,9 @@ export async function PUT(
       medicationName,
       medicationDose,
       vaccineName,
+      vaccineManufacturer,
+      vaccineDoseNumber,
+      vaccineTotalDoses,
       diaperType,
       diaperStatus,
       adGiven,
@@ -78,6 +81,9 @@ export async function PUT(
       medicationName?: string | null
       medicationDose?: string | null
       vaccineName?: string | null
+      vaccineManufacturer?: string | null
+      vaccineDoseNumber?: number | null
+      vaccineTotalDoses?: number | null
       diaperType?: string | null
       diaperStatus?: string | null
       adGiven?: boolean | null
@@ -132,6 +138,27 @@ export async function PUT(
         return NextResponse.json({ error: '疫苗名称字段无效' }, { status: 400, headers: noStoreHeaders })
       }
       updateData.vaccineName = vaccineName as string | null
+    }
+
+    if (vaccineManufacturer !== undefined) {
+      if (vaccineManufacturer !== null && typeof vaccineManufacturer !== 'string') {
+        return NextResponse.json({ error: '疫苗生产厂商字段无效' }, { status: 400, headers: noStoreHeaders })
+      }
+      updateData.vaccineManufacturer = vaccineManufacturer as string | null
+    }
+
+    if (vaccineDoseNumber !== undefined) {
+      if (vaccineDoseNumber !== null && typeof vaccineDoseNumber !== 'number') {
+        return NextResponse.json({ error: '当前针次字段无效' }, { status: 400, headers: noStoreHeaders })
+      }
+      updateData.vaccineDoseNumber = vaccineDoseNumber as number | null
+    }
+
+    if (vaccineTotalDoses !== undefined) {
+      if (vaccineTotalDoses !== null && typeof vaccineTotalDoses !== 'number') {
+        return NextResponse.json({ error: '总针数字段无效' }, { status: 400, headers: noStoreHeaders })
+      }
+      updateData.vaccineTotalDoses = vaccineTotalDoses as number | null
     }
 
     if (diaperType !== undefined) {

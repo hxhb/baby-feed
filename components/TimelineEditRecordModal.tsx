@@ -1,8 +1,14 @@
 'use client'
 
-import { useState } from 'react'
-import { X, Clock, Check } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { X } from 'lucide-react'
 import { toBeijingDatetimeLocal, toBeijingISO } from '@/lib/time'
+import { buildFeedingRecordPayload, getBreastModeFromType, getFeedingValidationMessage, type BreastMode, type FeedingFieldValues, type FeedingType } from '@/lib/feeding-records'
+import { buildHealthRecordPayload, buildVaccineSuggestions, findSelectedVaccineSuggestion, type HealthFieldValues, type HealthType, type VaccineSuggestion } from '@/lib/health-records'
+import FeedingRecordFields from '@/components/FeedingRecordFields'
+import HealthRecordFields, { getHealthFieldValidationMessage } from '@/components/HealthRecordFields'
+import RecordActionBar from '@/components/RecordActionBar'
+import { RecordNotesField, RecordTimeField } from '@/components/RecordMetaFields'
 
 interface FeedingRecord {
   id: string
@@ -15,6 +21,7 @@ interface FeedingRecord {
   formulaAmount?: number | null
   adGiven?: boolean | null
   notes?: string | null
+  babyId: string
   recordType: 'feeding'
 }
 
@@ -28,10 +35,14 @@ interface HealthRecord {
   medicationName?: string | null
   medicationDose?: string | null
   vaccineName?: string | null
+  vaccineManufacturer?: string | null
+  vaccineDoseNumber?: number | null
+  vaccineTotalDoses?: number | null
   diaperType?: string | null
   diaperStatus?: string | null
   adGiven?: boolean | null
   notes?: string | null
+  babyId: string
   recordType: 'health'
 }
 
@@ -48,6 +59,12 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
   const isFeeding = record.recordType === 'feeding'
   const feedingRecord = isFeeding ? (record as FeedingRecord) : null
   const healthRecord = !isFeeding ? (record as HealthRecord) : null
+  const [currentFeedingType, setCurrentFeedingType] = useState<FeedingType>(
+    feedingRecord ? (feedingRecord.type as FeedingType) : 'BREAST_MILK'
+  )
+  const [currentHealthType, setCurrentHealthType] = useState<HealthType>(
+    healthRecord ? (healthRecord.type as HealthType) : 'WEIGHT'
+  )
 
   const timeStr = isFeeding ? feedingRecord!.startTime : healthRecord!.recordedAt
   const [editTime, setEditTime] = useState(toBeijingDatetimeLocal(timeStr))
@@ -57,6 +74,7 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
   const [rightDuration, setRightDuration] = useState(String(feedingRecord?.rightBreastDuration || ''))
   const [breastMilkAmt, setBreastMilkAmt] = useState(String(feedingRecord?.breastMilkAmount || ''))
   const [formulaAmt, setFormulaAmt] = useState(String(feedingRecord?.formulaAmount || ''))
+  const [breastMode, setBreastMode] = useState<BreastMode>(feedingRecord ? getBreastModeFromType(feedingRecord.type as FeedingType) : 'direct')
 
   const [weight, setWeight] = useState(String(healthRecord?.weight || ''))
   const [height, setHeight] = useState(String(healthRecord?.height || ''))
@@ -64,47 +82,140 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
   const [medicationName, setMedicationName] = useState(healthRecord?.medicationName || '')
   const [medicationDose, setMedicationDose] = useState(healthRecord?.medicationDose || '')
   const [vaccineName, setVaccineName] = useState(healthRecord?.vaccineName || '')
+  const [vaccineManufacturer, setVaccineManufacturer] = useState(healthRecord?.vaccineManufacturer || '')
+  const [vaccineDoseNumber, setVaccineDoseNumber] = useState(String(healthRecord?.vaccineDoseNumber || ''))
+  const [vaccineTotalDoses, setVaccineTotalDoses] = useState(String(healthRecord?.vaccineTotalDoses || ''))
+  const [vaccineSuggestions, setVaccineSuggestions] = useState<VaccineSuggestion[]>([])
+  const [vaccineSuggestionsLoading, setVaccineSuggestionsLoading] = useState(false)
+  const [selectedVaccineSuggestionKey, setSelectedVaccineSuggestionKey] = useState('')
   const [diaperType, setDiaperType] = useState(healthRecord?.diaperType || 'PEE')
   const [diaperStatus, setDiaperStatus] = useState(healthRecord?.diaperStatus || '')
   const [adGiven, setAdGiven] = useState(healthRecord?.adGiven ?? true)
 
+  const fieldValues: HealthFieldValues = {
+    weight,
+    height,
+    temperature,
+    medicationName,
+    medicationDose,
+    vaccineName,
+    vaccineManufacturer,
+    vaccineDoseNumber,
+    vaccineTotalDoses,
+    diaperType: diaperType as 'PEE' | 'POOP' | 'BOTH',
+    diaperStatus,
+    adGiven,
+  }
+
+  const feedingFieldValues: FeedingFieldValues = {
+    leftBreastDuration: leftDuration,
+    rightBreastDuration: rightDuration,
+    breastMilkAmount: breastMilkAmt,
+    formulaAmount: formulaAmt,
+  }
+
+  useEffect(() => {
+    if (isFeeding || currentHealthType !== 'VACCINE') {
+      setVaccineSuggestions([])
+      setVaccineSuggestionsLoading(false)
+      return
+    }
+
+    let cancelled = false
+
+    const fetchVaccineSuggestions = async () => {
+      setVaccineSuggestionsLoading(true)
+
+      try {
+        const response = await fetch(`/api/health?babyId=${record.babyId}&type=VACCINE`)
+        if (!response.ok) {
+          throw new Error('获取疫苗记录失败')
+        }
+
+        const data = await response.json()
+        if (!Array.isArray(data) || cancelled) {
+          return
+        }
+
+        setVaccineSuggestions(buildVaccineSuggestions(data, { excludeRecordId: record.id }))
+      } catch (error) {
+        console.error('获取疫苗快捷候选失败:', error)
+        if (!cancelled) {
+          setVaccineSuggestions([])
+        }
+      } finally {
+        if (!cancelled) {
+          setVaccineSuggestionsLoading(false)
+        }
+      }
+    }
+
+    fetchVaccineSuggestions()
+
+    return () => {
+      cancelled = true
+    }
+  }, [currentHealthType, isFeeding, record])
+
+  useEffect(() => {
+    if (isFeeding || currentHealthType !== 'VACCINE') {
+      setSelectedVaccineSuggestionKey('')
+      return
+    }
+
+    const matchedSuggestion = findSelectedVaccineSuggestion(vaccineSuggestions, {
+      vaccineName,
+      vaccineManufacturer,
+      vaccineDoseNumber,
+      vaccineTotalDoses,
+    })
+
+    setSelectedVaccineSuggestionKey(matchedSuggestion?.key || '')
+  }, [currentHealthType, isFeeding, vaccineDoseNumber, vaccineManufacturer, vaccineName, vaccineSuggestions, vaccineTotalDoses])
+
+  const validationMessage = isFeeding
+    ? ''
+    : getHealthFieldValidationMessage(currentHealthType, fieldValues)
+
+  const handleApplyVaccineSuggestion = (suggestion: VaccineSuggestion) => {
+    setVaccineName(suggestion.vaccineName)
+    setVaccineManufacturer(suggestion.vaccineManufacturer)
+    setVaccineDoseNumber(String(suggestion.nextDoseNumber))
+    setVaccineTotalDoses(String(suggestion.totalDoses))
+  }
+
+  const feedingValidationMessage = isFeeding
+    ? getFeedingValidationMessage(currentFeedingType, feedingFieldValues)
+    : ''
+
+  const resolvedValidationMessage = isFeeding ? feedingValidationMessage : validationMessage
+
   const handleSave = () => {
+    if (resolvedValidationMessage) {
+      return
+    }
+
     const timeISO = toBeijingISO(editTime)
     const data: Record<string, unknown> = {
-      type: record.type,
+      type: isFeeding ? currentFeedingType : currentHealthType,
       notes: editNotes || null,
     }
 
     if (isFeeding) {
       data.startTime = timeISO
-      if (record.type === 'BREAST_MILK') {
-        data.leftBreastDuration = parseInt(leftDuration) || 0
-        data.rightBreastDuration = parseInt(rightDuration) || 0
-      } else if (record.type === 'BREAST_MILK_BOTTLE') {
-        data.breastMilkAmount = parseFloat(breastMilkAmt) || 0
-      } else if (record.type === 'FORMULA') {
-        data.formulaAmount = parseFloat(formulaAmt) || 0
-      }
+      Object.assign(data, buildFeedingRecordPayload(currentFeedingType, feedingFieldValues))
     } else {
       data.recordedAt = timeISO
-      if (record.type === 'WEIGHT') data.weight = parseFloat(weight) || null
-      else if (record.type === 'HEIGHT') data.height = parseFloat(height) || null
-      else if (record.type === 'TEMPERATURE') data.temperature = parseFloat(temperature) || null
-      else if (record.type === 'MEDICATION') {
-        data.medicationName = medicationName || null
-        data.medicationDose = medicationDose || null
-      } else if (record.type === 'VACCINE') data.vaccineName = vaccineName || null
-      else if (record.type === 'DIAPER') {
-        data.diaperType = diaperType
-        data.diaperStatus = diaperStatus || null
-      } else if (record.type === 'AD_VITAMIN') data.adGiven = adGiven
+      Object.assign(data, buildHealthRecordPayload(currentHealthType, fieldValues))
     }
 
     onSave(data)
   }
 
   const getTypeLabel = () => {
-    switch (record.type) {
+    const activeType = isFeeding ? currentFeedingType : currentHealthType
+
+    switch (activeType) {
       case 'BREAST_MILK':
         return '母乳亲喂'
       case 'BREAST_MILK_BOTTLE':
@@ -130,6 +241,34 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
     }
   }
 
+  const feedingTypeCards = [
+    {
+      key: 'BREAST',
+      title: '母乳',
+      active: currentFeedingType === 'BREAST_MILK' || currentFeedingType === 'BREAST_MILK_BOTTLE',
+      onClick: () => {
+        const nextType = breastMode === 'bottle' ? 'BREAST_MILK_BOTTLE' : 'BREAST_MILK'
+        setCurrentFeedingType(nextType)
+      },
+    },
+    {
+      key: 'FORMULA',
+      title: '奶粉',
+      active: currentFeedingType === 'FORMULA',
+      onClick: () => setCurrentFeedingType('FORMULA'),
+    },
+  ] as const
+
+  const healthTypeOptions = [
+    { value: 'WEIGHT', label: '体重' },
+    { value: 'HEIGHT', label: '身高' },
+    { value: 'TEMPERATURE', label: '体温' },
+    { value: 'AD_VITAMIN', label: 'AD' },
+    { value: 'MEDICATION', label: '服药' },
+    { value: 'VACCINE', label: '疫苗' },
+    { value: 'DIAPER', label: '大小便' },
+  ] as const
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={onCancel}>
       <div
@@ -145,137 +284,117 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
         </div>
 
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              <Clock size={14} className="inline mr-1" />
-              记录时间
-            </label>
-            <input
-              type="datetime-local"
-              value={editTime}
-              onChange={(e) => setEditTime(e.target.value)}
-              className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
+          <RecordTimeField
+            mode="edit"
+            value={editTime}
+            onChange={setEditTime}
+          />
 
-          {record.type === 'BREAST_MILK' && (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">左侧（分钟）</label>
-                <input type="number" value={leftDuration} onChange={(e) => setLeftDuration(e.target.value)} min="0" className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">右侧（分钟）</label>
-                <input type="number" value={rightDuration} onChange={(e) => setRightDuration(e.target.value)} min="0" className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500" />
-              </div>
-            </div>
-          )}
-
-          {record.type === 'BREAST_MILK_BOTTLE' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">母乳量（ml）</label>
-              <input type="number" value={breastMilkAmt} onChange={(e) => setBreastMilkAmt(e.target.value)} min="0" step="5" className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500" />
-            </div>
-          )}
-
-          {record.type === 'FORMULA' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">奶粉量（ml）</label>
-              <input type="number" value={formulaAmt} onChange={(e) => setFormulaAmt(e.target.value)} min="0" step="5" className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500" />
-            </div>
-          )}
-
-          {record.type === 'WEIGHT' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">体重（kg）</label>
-              <input type="number" value={weight} onChange={(e) => setWeight(e.target.value)} min="0" step="0.01" className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500" />
-            </div>
-          )}
-
-          {record.type === 'HEIGHT' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">身高（cm）</label>
-              <input type="number" value={height} onChange={(e) => setHeight(e.target.value)} min="0" step="0.1" className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500" />
-            </div>
-          )}
-
-          {record.type === 'TEMPERATURE' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">体温（°C）</label>
-              <input type="number" value={temperature} onChange={(e) => setTemperature(e.target.value)} min="35" max="42" step="0.1" className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500" />
-            </div>
-          )}
-
-          {record.type === 'MEDICATION' && (
+          {isFeeding ? (
             <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">药物名称</label>
-                <input type="text" value={medicationName} onChange={(e) => setMedicationName(e.target.value)} className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">剂量</label>
-                <input type="text" value={medicationDose} onChange={(e) => setMedicationDose(e.target.value)} className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500" />
-              </div>
-            </div>
-          )}
-
-          {record.type === 'VACCINE' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">疫苗名称</label>
-              <input type="text" value={vaccineName} onChange={(e) => setVaccineName(e.target.value)} className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500" />
-            </div>
-          )}
-
-          {record.type === 'DIAPER' && (
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">类型</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { value: 'PEE', label: '小便' },
-                    { value: 'POOP', label: '大便' },
-                    { value: 'BOTH', label: '都有' },
-                  ].map((opt) => (
+              <div className="rounded-2xl bg-gray-50/80 p-2">
+                <div className="grid grid-cols-2 gap-2">
+                  {feedingTypeCards.map((card) => (
                     <button
-                      key={opt.value}
+                      key={card.key}
                       type="button"
-                      onClick={() => setDiaperType(opt.value)}
-                      className={`mobile-touch-target rounded-xl border-2 px-2 py-3 text-sm font-medium transition ${
-                        diaperType === opt.value
-                          ? 'border-amber-500 bg-amber-50 text-amber-700'
-                          : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                      onClick={card.onClick}
+                      className={`mobile-touch-target rounded-xl border px-3 py-2.5 text-sm font-medium transition ${
+                        card.active
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
                       }`}
                     >
-                      {opt.label}
+                      {card.title}
                     </button>
                   ))}
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">状态（可选）</label>
-                <input type="text" value={diaperStatus} onChange={(e) => setDiaperStatus(e.target.value)} className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500" placeholder="例如：正常、稀便等" />
+
+              <FeedingRecordFields
+                type={currentFeedingType}
+                breastMode={breastMode}
+                mode="edit"
+                values={feedingFieldValues}
+                setters={{
+                  setType: (nextType) => {
+                    setCurrentFeedingType(nextType)
+                    setBreastMode(getBreastModeFromType(nextType))
+                  },
+                  setBreastMode,
+                  setLeftBreastDuration: setLeftDuration,
+                  setRightBreastDuration: setRightDuration,
+                  setBreastMilkAmount: setBreastMilkAmt,
+                  setFormulaAmount: setFormulaAmt,
+                }}
+              />
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="rounded-2xl bg-gray-50/80 p-2">
+                <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
+                  {healthTypeOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setCurrentHealthType(option.value)}
+                      className={`mobile-touch-target rounded-xl border-2 px-2 py-2 text-[11px] font-medium leading-4 transition ${
+                        currentHealthType === option.value
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              <HealthRecordFields
+                type={currentHealthType}
+                mode="edit"
+                validationMessage={validationMessage}
+                vaccineSuggestions={vaccineSuggestions}
+                vaccineSuggestionsLoading={vaccineSuggestionsLoading}
+                selectedVaccineSuggestionKey={selectedVaccineSuggestionKey}
+                onApplyVaccineSuggestion={handleApplyVaccineSuggestion}
+                values={fieldValues}
+                setters={{
+                  setWeight,
+                  setHeight,
+                  setTemperature,
+                  setMedicationName,
+                  setMedicationDose,
+                  setVaccineName,
+                  setVaccineManufacturer,
+                  setVaccineDoseNumber,
+                  setVaccineTotalDoses,
+                  setDiaperType: (value) => setDiaperType(value),
+                  setDiaperStatus,
+                  setAdGiven,
+                }}
+              />
             </div>
           )}
 
-          {record.type === 'AD_VITAMIN' && (
-            <label className="flex items-center space-x-3 rounded-xl bg-gray-50 px-3 py-3">
-              <input type="checkbox" checked={adGiven} onChange={(e) => setAdGiven(e.target.checked)} className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-              <span className="text-sm font-medium text-gray-700">已服用AD滴剂</span>
-            </label>
-          )}
+          <RecordNotesField
+            mode="edit"
+            label="备注"
+            value={editNotes}
+            onChange={setEditNotes}
+            rows={3}
+          />
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">备注</label>
-            <textarea value={editNotes} onChange={(e) => setEditNotes(e.target.value)} rows={3} className="w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 resize-none" placeholder="添加备注..." />
-          </div>
-
-          <div className="sticky bottom-0 -mx-4 flex gap-3 border-t border-gray-100 bg-white/95 px-4 pt-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0">
-            <button type="button" onClick={onCancel} className="mobile-touch-target flex-1 rounded-xl bg-gray-100 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-200">取消</button>
-            <button type="button" onClick={handleSave} disabled={saving} className="mobile-touch-target flex flex-1 items-center justify-center gap-1 rounded-xl bg-blue-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-50">
-              {saving ? '保存中...' : (<><Check size={16} />保存</>)}
-            </button>
-          </div>
+          <RecordActionBar
+            mode="edit"
+            validationMessage={resolvedValidationMessage}
+            primaryLabel="保存"
+            loadingLabel="保存中..."
+            loading={saving}
+            disabled={!!resolvedValidationMessage}
+            onPrimaryClick={handleSave}
+            onCancel={onCancel}
+          />
         </div>
       </div>
     </div>

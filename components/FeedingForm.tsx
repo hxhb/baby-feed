@@ -5,10 +5,13 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { getBeijingNow, toBeijingISO } from '@/lib/time'
 import { invalidateRequestCache } from '@/lib/client-request-cache'
+import { buildFeedingRecordPayload, getFeedingValidationMessage, getBreastModeFromType, type BreastMode, type FeedingFieldValues, type FeedingType } from '@/lib/feeding-records'
+import FeedingRecordFields from '@/components/FeedingRecordFields'
+import RecordActionBar from '@/components/RecordActionBar'
+import { RecordNotesField, RecordTimeField } from '@/components/RecordMetaFields'
 import {
   Droplets,
   Milk,
-  Clock,
   Scale,
   Pill,
   Thermometer,
@@ -28,7 +31,7 @@ interface SharedDraft {
 }
 
 interface FeedingDraft {
-  breastMode: 'direct' | 'bottle'
+  breastMode: BreastMode
   leftBreastDuration: string
   rightBreastDuration: string
   breastMilkAmount: string
@@ -73,10 +76,10 @@ export default function FeedingForm({
   const [submitError, setSubmitError] = useState('')
 
   const [babyId, setBabyId] = useState('')
-  const [type, setType] = useState<'BREAST_MILK' | 'BREAST_MILK_BOTTLE' | 'FORMULA'>(
+  const [type, setType] = useState<FeedingType>(
     initialType === 'formula' ? 'FORMULA' : initialType === 'breast_bottle' ? 'BREAST_MILK_BOTTLE' : 'BREAST_MILK'
   )
-  const [breastMode, setBreastMode] = useState<'direct' | 'bottle'>(
+  const [breastMode, setBreastMode] = useState<BreastMode>(
     initialType === 'breast_bottle' ? 'bottle' : 'direct'
   )
   const [leftBreastDuration, setLeftBreastDuration] = useState('')
@@ -227,45 +230,23 @@ export default function FeedingForm({
     }
   }
 
+  const fieldValues: FeedingFieldValues = {
+    leftBreastDuration,
+    rightBreastDuration,
+    breastMilkAmount,
+    formulaAmount,
+  }
+
   const getValidationMessage = () => {
     if (!babyId) {
       return '请先选择宝宝'
     }
 
-    if (type === 'BREAST_MILK') {
-      const leftDuration = parseInt(leftBreastDuration, 10) || 0
-      const rightDuration = parseInt(rightBreastDuration, 10) || 0
-
-      if (leftDuration <= 0 && rightDuration <= 0) {
-        return '请至少填写一侧亲喂时长'
-      }
-    }
-
-    if (type === 'BREAST_MILK_BOTTLE' && !(parseFloat(breastMilkAmount) > 0)) {
-      return '请填写有效的母乳量'
-    }
-
-    if (type === 'FORMULA' && !(parseFloat(formulaAmount) > 0)) {
-      return '请填写有效的奶粉量'
-    }
-
-    return ''
+    return getFeedingValidationMessage(type, fieldValues)
   }
 
   const validationMessage = getValidationMessage()
   const canSubmit = babies.length > 0 && !loading && !validationMessage
-
-  const applyQuickAmount = (value: number) => {
-    const formatted = String(value)
-    if (type === 'FORMULA') {
-      setFormulaAmount(formatted)
-      return
-    }
-
-    if (type === 'BREAST_MILK_BOTTLE') {
-      setBreastMilkAmount(formatted)
-    }
-  }
 
   const feedingTypeCards = [
     {
@@ -326,16 +307,8 @@ export default function FeedingForm({
         babyId,
         type,
         startTime: toBeijingISO(startTime),
-        notes: notes.trim() || null
-      }
-
-      if (type === 'BREAST_MILK') {
-        data.leftBreastDuration = parseInt(leftBreastDuration, 10) || 0
-        data.rightBreastDuration = parseInt(rightBreastDuration, 10) || 0
-      } else if (type === 'BREAST_MILK_BOTTLE') {
-        data.breastMilkAmount = parseFloat(breastMilkAmount) || 0
-      } else if (type === 'FORMULA') {
-        data.formulaAmount = parseFloat(formulaAmount) || 0
+        notes: notes.trim() || null,
+        ...buildFeedingRecordPayload(type, fieldValues)
       }
 
       const response = await fetch('/api/feeding', {
@@ -456,203 +429,46 @@ export default function FeedingForm({
           </div>
         </div>
 
-        {(type === 'BREAST_MILK' || type === 'BREAST_MILK_BOTTLE') && (
-          <div className="space-y-3">
-            <div className="flex gap-1.5 rounded-2xl bg-gray-50 p-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setBreastMode('direct')
-                  setType('BREAST_MILK')
-                }}
-                className={`mobile-touch-target flex-1 rounded-xl px-3 py-2 text-sm font-medium transition ${
-                  breastMode === 'direct'
-                    ? 'bg-pink-500 text-white shadow-sm'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                亲喂
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setBreastMode('bottle')
-                  setType('BREAST_MILK_BOTTLE')
-                }}
-                className={`mobile-touch-target flex-1 rounded-xl px-3 py-2 text-sm font-medium transition ${
-                  breastMode === 'bottle'
-                    ? 'bg-pink-500 text-white shadow-sm'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                瓶喂
-              </button>
-            </div>
-
-            {breastMode === 'direct' && (
-              <div className="grid grid-cols-2 gap-2.5">
-                <div className="rounded-2xl bg-gray-50/70 p-3">
-                  <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                    左侧（分钟）
-                  </label>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={leftBreastDuration}
-                    onChange={(e) => setLeftBreastDuration(e.target.value)}
-                    min="0"
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-transparent focus:ring-2 focus:ring-blue-500"
-                    placeholder="10"
-                  />
-                </div>
-                <div className="rounded-2xl bg-gray-50/70 p-3">
-                  <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                    右侧（分钟）
-                  </label>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={rightBreastDuration}
-                    onChange={(e) => setRightBreastDuration(e.target.value)}
-                    min="0"
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-transparent focus:ring-2 focus:ring-blue-500"
-                    placeholder="10"
-                  />
-                </div>
-              </div>
-            )}
-
-            {breastMode === 'bottle' && (
-              <div className="rounded-2xl bg-gray-50/70 p-3">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <label className="text-sm font-medium text-gray-700">
-                    母乳量（毫升）
-                  </label>
-                  <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-gray-500">
-                    快捷填入
-                  </span>
-                </div>
-                <div className="mb-2 flex flex-wrap gap-1.5">
-                  {[60, 90, 120].map(value => (
-                    <button
-                      key={`breast-milk-${value}`}
-                      type="button"
-                      onClick={() => applyQuickAmount(value)}
-                      className="mobile-touch-target rounded-full bg-white px-2.5 py-1.5 text-[11px] font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-900"
-                    >
-                      {value}ml
-                    </button>
-                  ))}
-                </div>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  value={breastMilkAmount}
-                  onChange={(e) => setBreastMilkAmount(e.target.value)}
-                  min="0"
-                  step="5"
-                  className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-transparent focus:ring-2 focus:ring-blue-500"
-                  placeholder="例如：60"
-                />
-              </div>
-            )}
-          </div>
-        )}
-
-        {type === 'FORMULA' && (
-          <div className="rounded-2xl bg-gray-50/70 p-3">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <label className="text-sm font-medium text-gray-700">
-                奶粉量（毫升）
-              </label>
-              <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-gray-500">
-                快捷填入
-              </span>
-            </div>
-            <div className="mb-2 flex flex-wrap gap-1.5">
-              {[60, 90, 120, 150].map(value => (
-                <button
-                  key={`formula-${value}`}
-                  type="button"
-                  onClick={() => applyQuickAmount(value)}
-                  className="mobile-touch-target rounded-full bg-white px-2.5 py-1.5 text-[11px] font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-900"
-                >
-                  {value}ml
-                </button>
-              ))}
-            </div>
-            <input
-              type="number"
-              inputMode="decimal"
-              value={formulaAmount}
-              onChange={(e) => setFormulaAmount(e.target.value)}
-              min="0"
-              step="5"
-              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-transparent focus:ring-2 focus:ring-blue-500"
-              placeholder="例如：60"
-            />
-          </div>
-        )}
-      </div>
-
-      <div className="rounded-2xl border border-gray-100 bg-white p-2.5 shadow-sm sm:p-3">
-        <div className="mb-1 flex items-center justify-between gap-2">
-          <label className="block text-sm font-medium text-gray-700">
-            <Clock size={14} className="mr-1 inline" />
-            记录时间
-          </label>
-        </div>
-        <input
-          type="datetime-local"
-          value={startTime}
-          onChange={(e) => setStartTime(e.target.value)}
-          className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-transparent focus:ring-2 focus:ring-blue-500"
+        <FeedingRecordFields
+          type={type}
+          breastMode={breastMode}
+          mode="create"
+          values={fieldValues}
+          setters={{
+            setType: (nextType) => {
+              setType(nextType)
+              setBreastMode(getBreastModeFromType(nextType))
+            },
+            setBreastMode,
+            setLeftBreastDuration,
+            setRightBreastDuration,
+            setBreastMilkAmount,
+            setFormulaAmount,
+          }}
         />
       </div>
 
-      <div className="rounded-2xl border border-gray-100 bg-white p-3.5 shadow-sm sm:p-4">
-        <div className="mb-1.5 flex items-center justify-between gap-3">
-          <label className="block text-sm font-medium text-gray-700">
-            备注（可选）
-          </label>
-          {notes ? (
-            <button
-              type="button"
-              onClick={() => setNotes('')}
-              className="mobile-touch-target rounded-lg bg-gray-50 px-2 py-1 text-[11px] font-medium text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
-            >
-              清空
-            </button>
-          ) : null}
-        </div>
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          rows={2}
-          className="w-full resize-none rounded-xl border border-gray-300 px-3.5 py-2.5 text-sm outline-none transition focus:border-transparent focus:ring-2 focus:ring-blue-500"
-          placeholder="添加备注..."
-        />
-      </div>
+      <RecordTimeField
+        mode="create"
+        value={startTime}
+        onChange={setStartTime}
+      />
 
-      <div className="sticky bottom-0 z-10 rounded-2xl border border-gray-100 bg-white/95 p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur sm:bottom-4 sm:p-3.5 sm:shadow-sm">
-        {submitError ? (
-          <div className="mb-2.5 rounded-2xl border border-red-100 bg-red-50 px-3.5 py-2.5 text-sm text-red-600" role="alert">
-            {submitError}
-          </div>
-        ) : null}
-        {!submitError && validationMessage ? (
-          <div className="mb-2.5 rounded-2xl border border-amber-100 bg-amber-50 px-3.5 py-2.5 text-sm text-amber-700">
-            {validationMessage}
-          </div>
-        ) : null}
-        <button
-          type="submit"
-          disabled={!canSubmit}
-          className="mobile-touch-target w-full rounded-xl bg-blue-600 px-4 py-3 font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {loading ? '保存中...' : validationMessage ? '请先补充必填信息' : '提交记录'}
-        </button>
-      </div>
+      <RecordNotesField
+        mode="create"
+        value={notes}
+        onChange={setNotes}
+      />
+
+      <RecordActionBar
+        mode="create"
+        submitError={submitError}
+        validationMessage={validationMessage}
+        primaryLabel={validationMessage ? '请先补充必填信息' : '提交记录'}
+        loadingLabel="保存中..."
+        loading={loading}
+        disabled={!canSubmit}
+      />
     </form>
   )
 }
