@@ -26,6 +26,10 @@ interface ValidationResult {
   error?: string
 }
 
+function isProvided(value: unknown) {
+  return value !== undefined && value !== null
+}
+
 // 验证是否为合法的枚举值
 export function validateEnum(value: unknown, allowedValues: readonly string[], fieldName: string): ValidationResult {
   if (value === undefined || value === null) {
@@ -143,6 +147,29 @@ export function validateDateOnlyString(value: unknown, fieldName: string): Valid
   return validateDateString(date.toISOString(), fieldName)
 }
 
+export function validateDateOrder(startValue: unknown, endValue: unknown, startFieldName: string, endFieldName: string): ValidationResult {
+  if (!isProvided(startValue) || !isProvided(endValue)) {
+    return { valid: true }
+  }
+
+  if (typeof startValue !== 'string' || typeof endValue !== 'string') {
+    return { valid: false, error: `${startFieldName} 和 ${endFieldName} 必须是字符串` }
+  }
+
+  const start = new Date(startValue)
+  const end = new Date(endValue)
+
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+    return { valid: false, error: `${startFieldName} 或 ${endFieldName} 不是有效的日期格式` }
+  }
+
+  if (end.getTime() < start.getTime()) {
+    return { valid: false, error: `${endFieldName} 不能早于 ${startFieldName}` }
+  }
+
+  return { valid: true }
+}
+
 // 验证 CUID 格式的 ID
 export function validateId(value: unknown, fieldName: string = 'ID'): ValidationResult {
   if (value === undefined || value === null) {
@@ -179,8 +206,38 @@ export function validateFeedingInput(body: Record<string, unknown>) {
     validateBoolean(body.adGiven, 'AD补充'),
     validateDateString(body.startTime, '开始时间'),
     validateDateString(body.endTime, '结束时间'),
-    validateString(body.notes, '备注', 1000)
+    validateDateOrder(body.startTime, body.endTime, '开始时间', '结束时间'),
+    validateString(body.notes, '备注', 1000),
+    validateFeedingBusinessRules(body)
   )
+}
+
+function validateFeedingBusinessRules(body: Record<string, unknown>): ValidationResult {
+  const type = body.type
+  if (type === undefined || type === null) {
+    return { valid: true }
+  }
+
+  if (typeof type !== 'string' || !FEEDING_TYPES.includes(type as FeedingType)) {
+    return { valid: false, error: '喂养类型的值无效' }
+  }
+
+  if (type === 'BREAST_MILK') {
+    const hasDuration = isProvided(body.leftBreastDuration) || isProvided(body.rightBreastDuration)
+    if (!hasDuration) {
+      return { valid: false, error: '亲喂记录至少需要填写一侧哺乳时长' }
+    }
+  }
+
+  if (type === 'BREAST_MILK_BOTTLE' && !isProvided(body.breastMilkAmount)) {
+    return { valid: false, error: '瓶喂母乳记录需要填写母乳量' }
+  }
+
+  if (type === 'FORMULA' && !isProvided(body.formulaAmount)) {
+    return { valid: false, error: '奶粉记录需要填写配方奶量' }
+  }
+
+  return { valid: true }
 }
 
 // 验证健康记录输入
@@ -207,6 +264,11 @@ export function validateHealthInput(body: Record<string, unknown>) {
     return baseValidation
   }
 
+  const businessValidation = validateHealthBusinessRules(body)
+  if (!businessValidation.valid) {
+    return businessValidation
+  }
+
   const hasVaccineDoseNumber = body.vaccineDoseNumber !== undefined && body.vaccineDoseNumber !== null
   const hasVaccineTotalDoses = body.vaccineTotalDoses !== undefined && body.vaccineTotalDoses !== null
 
@@ -222,6 +284,52 @@ export function validateHealthInput(body: Record<string, unknown>) {
     body.vaccineDoseNumber > body.vaccineTotalDoses
   ) {
     return { valid: false, error: '当前针次不能大于总针数' }
+  }
+
+  return { valid: true }
+}
+
+function validateHealthBusinessRules(body: Record<string, unknown>): ValidationResult {
+  const type = body.type
+  if (type === undefined || type === null) {
+    return { valid: true }
+  }
+
+  if (typeof type !== 'string' || !HEALTH_TYPES.includes(type as HealthType)) {
+    return { valid: false, error: '健康记录类型的值无效' }
+  }
+
+  if (type === 'WEIGHT' && !isProvided(body.weight)) {
+    return { valid: false, error: '体重记录需要填写体重' }
+  }
+
+  if (type === 'HEIGHT' && !isProvided(body.height)) {
+    return { valid: false, error: '身高记录需要填写身高' }
+  }
+
+  if (type === 'TEMPERATURE' && !isProvided(body.temperature)) {
+    return { valid: false, error: '体温记录需要填写体温' }
+  }
+
+  if (type === 'MEDICATION' && !isProvided(body.medicationName)) {
+    return { valid: false, error: '用药记录需要填写药品名称' }
+  }
+
+  if (type === 'VACCINE') {
+    if (!isProvided(body.vaccineName)) {
+      return { valid: false, error: '疫苗记录需要填写疫苗名称' }
+    }
+    if (!isProvided(body.vaccineDoseNumber) || !isProvided(body.vaccineTotalDoses)) {
+      return { valid: false, error: '疫苗记录需要填写当前针次和总针数' }
+    }
+  }
+
+  if (type === 'DIAPER' && !isProvided(body.diaperType)) {
+    return { valid: false, error: '大小便记录需要填写尿布类型' }
+  }
+
+  if (type === 'AD_VITAMIN' && !isProvided(body.adGiven)) {
+    return { valid: false, error: 'AD 补充记录需要填写是否已补充' }
   }
 
   return { valid: true }

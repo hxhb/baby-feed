@@ -76,6 +76,7 @@ export async function DELETE(request: NextRequest) {
       await tx.feedingRecord.deleteMany({ where: { createdBy: userId } })
       await tx.healthRecord.deleteMany({ where: { createdBy: userId } })
       await tx.baby.deleteMany({ where: { createdBy: userId } })
+      await tx.apiKey.deleteMany({ where: { userId } })
       await tx.user.delete({ where: { id: userId } })
     })
 

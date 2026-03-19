@@ -50,11 +50,6 @@ export async function PUT(
       return NextResponse.json({ error: parseError || '请求体格式不正确' }, { status: 400, headers: noStoreHeaders })
     }
 
-    const validation = validateHealthInput(body)
-    if (!validation.valid) {
-      return NextResponse.json({ error: validation.error }, { status: 400, headers: noStoreHeaders })
-    }
-
     const {
       type,
       weight,
@@ -73,129 +68,6 @@ export async function PUT(
       notes
     } = body
 
-    const updateData: {
-      type?: string
-      weight?: number | null
-      height?: number | null
-      temperature?: number | null
-      medicationName?: string | null
-      medicationDose?: string | null
-      vaccineName?: string | null
-      vaccineManufacturer?: string | null
-      vaccineDoseNumber?: number | null
-      vaccineTotalDoses?: number | null
-      diaperType?: string | null
-      diaperStatus?: string | null
-      adGiven?: boolean | null
-      recordedAt?: Date
-      notes?: string | null
-    } = {}
-
-    if (type !== undefined) {
-      if (typeof type !== 'string') {
-        return NextResponse.json({ error: '健康记录类型字段无效' }, { status: 400, headers: noStoreHeaders })
-      }
-      updateData.type = type
-    }
-
-    if (weight !== undefined) {
-      if (weight !== null && typeof weight !== 'number') {
-        return NextResponse.json({ error: '体重字段无效' }, { status: 400, headers: noStoreHeaders })
-      }
-      updateData.weight = weight as number | null
-    }
-
-    if (height !== undefined) {
-      if (height !== null && typeof height !== 'number') {
-        return NextResponse.json({ error: '身高字段无效' }, { status: 400, headers: noStoreHeaders })
-      }
-      updateData.height = height as number | null
-    }
-
-    if (temperature !== undefined) {
-      if (temperature !== null && typeof temperature !== 'number') {
-        return NextResponse.json({ error: '体温字段无效' }, { status: 400, headers: noStoreHeaders })
-      }
-      updateData.temperature = temperature as number | null
-    }
-
-    if (medicationName !== undefined) {
-      if (medicationName !== null && typeof medicationName !== 'string') {
-        return NextResponse.json({ error: '药物名称字段无效' }, { status: 400, headers: noStoreHeaders })
-      }
-      updateData.medicationName = medicationName as string | null
-    }
-
-    if (medicationDose !== undefined) {
-      if (medicationDose !== null && typeof medicationDose !== 'string') {
-        return NextResponse.json({ error: '药物剂量字段无效' }, { status: 400, headers: noStoreHeaders })
-      }
-      updateData.medicationDose = medicationDose as string | null
-    }
-
-    if (vaccineName !== undefined) {
-      if (vaccineName !== null && typeof vaccineName !== 'string') {
-        return NextResponse.json({ error: '疫苗名称字段无效' }, { status: 400, headers: noStoreHeaders })
-      }
-      updateData.vaccineName = vaccineName as string | null
-    }
-
-    if (vaccineManufacturer !== undefined) {
-      if (vaccineManufacturer !== null && typeof vaccineManufacturer !== 'string') {
-        return NextResponse.json({ error: '疫苗生产厂商字段无效' }, { status: 400, headers: noStoreHeaders })
-      }
-      updateData.vaccineManufacturer = vaccineManufacturer as string | null
-    }
-
-    if (vaccineDoseNumber !== undefined) {
-      if (vaccineDoseNumber !== null && typeof vaccineDoseNumber !== 'number') {
-        return NextResponse.json({ error: '当前针次字段无效' }, { status: 400, headers: noStoreHeaders })
-      }
-      updateData.vaccineDoseNumber = vaccineDoseNumber as number | null
-    }
-
-    if (vaccineTotalDoses !== undefined) {
-      if (vaccineTotalDoses !== null && typeof vaccineTotalDoses !== 'number') {
-        return NextResponse.json({ error: '总针数字段无效' }, { status: 400, headers: noStoreHeaders })
-      }
-      updateData.vaccineTotalDoses = vaccineTotalDoses as number | null
-    }
-
-    if (diaperType !== undefined) {
-      if (diaperType !== null && typeof diaperType !== 'string') {
-        return NextResponse.json({ error: '便便类型字段无效' }, { status: 400, headers: noStoreHeaders })
-      }
-      updateData.diaperType = diaperType as string | null
-    }
-
-    if (diaperStatus !== undefined) {
-      if (diaperStatus !== null && typeof diaperStatus !== 'string') {
-        return NextResponse.json({ error: '尿布状态字段无效' }, { status: 400, headers: noStoreHeaders })
-      }
-      updateData.diaperStatus = diaperStatus as string | null
-    }
-
-    if (adGiven !== undefined) {
-      if (adGiven !== null && typeof adGiven !== 'boolean') {
-        return NextResponse.json({ error: 'AD 字段无效' }, { status: 400, headers: noStoreHeaders })
-      }
-      updateData.adGiven = adGiven as boolean | null
-    }
-
-    if (recordedAt !== undefined) {
-      if (typeof recordedAt !== 'string') {
-        return NextResponse.json({ error: '记录时间字段无效' }, { status: 400, headers: noStoreHeaders })
-      }
-      updateData.recordedAt = new Date(recordedAt)
-    }
-
-    if (notes !== undefined) {
-      if (notes !== null && typeof notes !== 'string') {
-        return NextResponse.json({ error: '备注字段无效' }, { status: 400, headers: noStoreHeaders })
-      }
-      updateData.notes = notes as string | null
-    }
-
     const existingRecord = await prisma.healthRecord.findFirst({
       where: {
         id,
@@ -207,9 +79,80 @@ export async function PUT(
       return NextResponse.json({ error: '记录不存在' }, { status: 404, headers: noStoreHeaders })
     }
 
+    const nextType = typeof type === 'string' ? type : existingRecord.type
+    if (typeof nextType !== 'string') {
+      return NextResponse.json({ error: '健康记录类型字段无效' }, { status: 400, headers: noStoreHeaders })
+    }
+
+    const nextRecordedAt = recordedAt === undefined
+      ? existingRecord.recordedAt.toISOString()
+      : recordedAt
+
+    const normalizedBody = {
+      type: nextType,
+      weight: weight === undefined ? existingRecord.weight : weight,
+      height: height === undefined ? existingRecord.height : height,
+      temperature: temperature === undefined ? existingRecord.temperature : temperature,
+      medicationName: medicationName === undefined ? existingRecord.medicationName : medicationName,
+      medicationDose: medicationDose === undefined ? existingRecord.medicationDose : medicationDose,
+      vaccineName: vaccineName === undefined ? existingRecord.vaccineName : vaccineName,
+      vaccineManufacturer: vaccineManufacturer === undefined ? existingRecord.vaccineManufacturer : vaccineManufacturer,
+      vaccineDoseNumber: vaccineDoseNumber === undefined ? existingRecord.vaccineDoseNumber : vaccineDoseNumber,
+      vaccineTotalDoses: vaccineTotalDoses === undefined ? existingRecord.vaccineTotalDoses : vaccineTotalDoses,
+      diaperType: diaperType === undefined ? existingRecord.diaperType : diaperType,
+      diaperStatus: diaperStatus === undefined ? existingRecord.diaperStatus : diaperStatus,
+      adGiven: adGiven === undefined ? existingRecord.adGiven : adGiven,
+      recordedAt: nextRecordedAt,
+      notes: notes === undefined ? existingRecord.notes : notes,
+    }
+
+    const mergedValidation = validateHealthInput(normalizedBody)
+    if (!mergedValidation.valid) {
+      return NextResponse.json({ error: mergedValidation.error }, { status: 400, headers: noStoreHeaders })
+    }
+
+    const normalizedData = {
+      type: nextType,
+      weight: null as number | null,
+      height: null as number | null,
+      temperature: null as number | null,
+      medicationName: null as string | null,
+      medicationDose: null as string | null,
+      vaccineName: null as string | null,
+      vaccineManufacturer: null as string | null,
+      vaccineDoseNumber: null as number | null,
+      vaccineTotalDoses: null as number | null,
+      diaperType: null as string | null,
+      diaperStatus: null as string | null,
+      adGiven: null as boolean | null,
+      recordedAt: new Date(nextRecordedAt),
+      notes: normalizedBody.notes === undefined ? null : normalizedBody.notes as string | null,
+    }
+
+    if (nextType === 'WEIGHT') {
+      normalizedData.weight = normalizedBody.weight === undefined ? null : normalizedBody.weight as number | null
+    } else if (nextType === 'HEIGHT') {
+      normalizedData.height = normalizedBody.height === undefined ? null : normalizedBody.height as number | null
+    } else if (nextType === 'TEMPERATURE') {
+      normalizedData.temperature = normalizedBody.temperature === undefined ? null : normalizedBody.temperature as number | null
+    } else if (nextType === 'MEDICATION') {
+      normalizedData.medicationName = normalizedBody.medicationName === undefined ? null : normalizedBody.medicationName as string | null
+      normalizedData.medicationDose = normalizedBody.medicationDose === undefined ? null : normalizedBody.medicationDose as string | null
+    } else if (nextType === 'VACCINE') {
+      normalizedData.vaccineName = normalizedBody.vaccineName === undefined ? null : normalizedBody.vaccineName as string | null
+      normalizedData.vaccineManufacturer = normalizedBody.vaccineManufacturer === undefined ? null : normalizedBody.vaccineManufacturer as string | null
+      normalizedData.vaccineDoseNumber = normalizedBody.vaccineDoseNumber === undefined ? null : normalizedBody.vaccineDoseNumber as number | null
+      normalizedData.vaccineTotalDoses = normalizedBody.vaccineTotalDoses === undefined ? null : normalizedBody.vaccineTotalDoses as number | null
+    } else if (nextType === 'DIAPER') {
+      normalizedData.diaperType = normalizedBody.diaperType === undefined ? null : normalizedBody.diaperType as string | null
+      normalizedData.diaperStatus = normalizedBody.diaperStatus === undefined ? null : normalizedBody.diaperStatus as string | null
+    } else if (nextType === 'AD_VITAMIN') {
+      normalizedData.adGiven = normalizedBody.adGiven === undefined ? null : normalizedBody.adGiven as boolean | null
+    }
+
     const record = await prisma.healthRecord.update({
       where: { id },
-      data: updateData,
+      data: normalizedData,
       include: { baby: true }
     })
 

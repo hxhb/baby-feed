@@ -136,6 +136,8 @@ export async function GET(request: NextRequest) {
         formulaCount: 0,
         totalFormulaAmount: 0,
         adGiven: false,
+        peeCount: 0,
+        poopCount: 0,
         weight: undefined,
         temperature: undefined
       })
@@ -170,6 +172,13 @@ export async function GET(request: NextRequest) {
           dayStats.temperature = record.temperature
         } else if (record.type === 'AD_VITAMIN' && record.adGiven) {
           dayStats.adGiven = true
+        } else if (record.type === 'DIAPER') {
+          if (record.diaperType === 'PEE' || record.diaperType === 'BOTH') {
+            dayStats.peeCount += 1
+          }
+          if (record.diaperType === 'POOP' || record.diaperType === 'BOTH') {
+            dayStats.poopCount += 1
+          }
         }
       }
     })

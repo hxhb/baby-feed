@@ -16,6 +16,8 @@ export interface PreloadedStatsDay {
   formulaCount: number
   totalFormulaAmount: number
   adGiven: boolean
+  peeCount: number
+  poopCount: number
   weight?: number
   height?: number
   temperature?: number
@@ -87,6 +89,8 @@ function createEmptyStatsDay(date: string): PreloadedStatsDay {
     formulaCount: 0,
     totalFormulaAmount: 0,
     adGiven: false,
+    peeCount: 0,
+    poopCount: 0,
     weight: undefined,
     height: undefined,
     temperature: undefined,
@@ -225,6 +229,13 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
       dayStats.temperature = record.temperature
     } else if (record.type === 'AD_VITAMIN' && record.adGiven) {
       dayStats.adGiven = true
+    } else if (record.type === 'DIAPER') {
+      if (record.diaperType === 'PEE' || record.diaperType === 'BOTH') {
+        dayStats.peeCount += 1
+      }
+      if (record.diaperType === 'POOP' || record.diaperType === 'BOTH') {
+        dayStats.poopCount += 1
+      }
     }
   })
 

@@ -442,7 +442,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
 
       {/* 宝宝管理 */}
       <div className="bg-white rounded-2xl p-5 shadow-sm sm:p-6 lg:p-7">
-        <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-lg font-bold text-gray-900">宝宝管理</h2>
           <button
             onClick={() => {
@@ -451,9 +451,9 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
               setGender('MALE')
               setActiveModal('addBaby')
             }}
-            className="mobile-touch-target inline-flex items-center rounded-xl px-2 py-2 text-blue-600 transition hover:text-blue-700"
+            className="mobile-touch-target inline-flex w-full items-center justify-center rounded-xl bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100 sm:w-auto"
           >
-            <PlusCircle size={20} className="mr-1" />
+            <PlusCircle size={16} className="mr-1.5" />
             添加宝宝
           </button>
         </div>
@@ -464,37 +464,47 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
             <p>还没有添加宝宝</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {babies.map(baby => (
               <div
                 key={baby.id}
-                className="flex flex-col gap-3 rounded-xl bg-gray-50 p-4 sm:flex-row sm:items-center sm:justify-between"
+                className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2.5 shadow-sm shadow-slate-100"
               >
-                <div className="flex items-center space-x-4 min-w-0">
-                  <div className="w-12 h-12 bg-gradient-to-br from-pink-100 to-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <Baby size={24} className="text-blue-600" />
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-pink-100 to-blue-100">
+                    <Baby size={18} className="text-blue-600" />
                   </div>
-                  <div className="min-w-0">
-                    <p className="font-medium text-gray-900 truncate">{baby.name}</p>
-                    <p className="text-sm text-gray-500 break-words">
-                      {baby.gender === 'MALE' ? '👦 男宝' : '👧 女宝'} · 
-                      {format(parseDateAsBeijing(baby.birthDate), 'yyyy年MM月dd日出生', { locale: zhCN })}
-                    </p>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <p className="text-sm font-semibold text-gray-900 break-words">{baby.name}</p>
+                      <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${baby.gender === 'MALE' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}`}>
+                        {baby.gender === 'MALE' ? '男宝' : '女宝'}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
+                      <span>出生 {format(parseDateAsBeijing(baby.birthDate), 'yyyy年MM月dd日', { locale: zhCN })}</span>
+                      <span className="text-slate-300">•</span>
+                      <span>创建于 {format(parseDateAsBeijing(baby.createdAt), 'yyyy年MM月dd日', { locale: zhCN })}</span>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center justify-end space-x-2 sm:justify-start">
-                  <button
-                    onClick={() => openEditBabyModal(baby)}
-                    className="mobile-touch-target rounded-xl p-2 text-gray-400 transition hover:text-blue-600"
-                  >
-                    <Edit2 size={18} />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteBaby(baby.id)}
-                    className="mobile-touch-target rounded-xl p-2 text-gray-400 transition hover:text-red-500"
-                  >
-                    <Trash2 size={18} />
-                  </button>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      onClick={() => openEditBabyModal(baby)}
+                      className="mobile-touch-target inline-flex items-center justify-center rounded-lg bg-white p-2 text-blue-700 transition hover:bg-blue-50"
+                      aria-label={`编辑${baby.name}`}
+                      title="编辑资料"
+                    >
+                      <Edit2 size={15} />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteBaby(baby.id)}
+                      className="mobile-touch-target inline-flex items-center justify-center rounded-lg bg-white p-2 text-red-600 transition hover:bg-red-50"
+                      aria-label={`删除${baby.name}`}
+                      title="删除宝宝"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

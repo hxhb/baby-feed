@@ -50,11 +50,6 @@ export async function PUT(
       return NextResponse.json({ error: parseError || '请求体格式不正确' }, { status: 400, headers: noStoreHeaders })
     }
 
-    const validation = validateFeedingInput(body)
-    if (!validation.valid) {
-      return NextResponse.json({ error: validation.error }, { status: 400, headers: noStoreHeaders })
-    }
-
     const {
       type,
       leftBreastDuration,
@@ -67,81 +62,6 @@ export async function PUT(
       notes
     } = body
 
-    const updateData: {
-      type?: string
-      leftBreastDuration?: number | null
-      rightBreastDuration?: number | null
-      breastMilkAmount?: number | null
-      formulaAmount?: number | null
-      adGiven?: boolean | null
-      startTime?: Date
-      endTime?: Date | null
-      notes?: string | null
-    } = {}
-
-    if (type !== undefined) {
-      if (typeof type !== 'string') {
-        return NextResponse.json({ error: '喂养类型字段无效' }, { status: 400, headers: noStoreHeaders })
-      }
-      updateData.type = type
-    }
-
-    if (leftBreastDuration !== undefined) {
-      if (leftBreastDuration !== null && typeof leftBreastDuration !== 'number') {
-        return NextResponse.json({ error: '左乳时长字段无效' }, { status: 400, headers: noStoreHeaders })
-      }
-      updateData.leftBreastDuration = leftBreastDuration as number | null
-    }
-
-    if (rightBreastDuration !== undefined) {
-      if (rightBreastDuration !== null && typeof rightBreastDuration !== 'number') {
-        return NextResponse.json({ error: '右乳时长字段无效' }, { status: 400, headers: noStoreHeaders })
-      }
-      updateData.rightBreastDuration = rightBreastDuration as number | null
-    }
-
-    if (breastMilkAmount !== undefined) {
-      if (breastMilkAmount !== null && typeof breastMilkAmount !== 'number') {
-        return NextResponse.json({ error: '母乳瓶喂量字段无效' }, { status: 400, headers: noStoreHeaders })
-      }
-      updateData.breastMilkAmount = breastMilkAmount as number | null
-    }
-
-    if (formulaAmount !== undefined) {
-      if (formulaAmount !== null && typeof formulaAmount !== 'number') {
-        return NextResponse.json({ error: '奶粉量字段无效' }, { status: 400, headers: noStoreHeaders })
-      }
-      updateData.formulaAmount = formulaAmount as number | null
-    }
-
-    if (adGiven !== undefined) {
-      if (adGiven !== null && typeof adGiven !== 'boolean') {
-        return NextResponse.json({ error: 'AD 字段无效' }, { status: 400, headers: noStoreHeaders })
-      }
-      updateData.adGiven = adGiven as boolean | null
-    }
-
-    if (startTime !== undefined) {
-      if (typeof startTime !== 'string') {
-        return NextResponse.json({ error: '开始时间字段无效' }, { status: 400, headers: noStoreHeaders })
-      }
-      updateData.startTime = new Date(startTime)
-    }
-
-    if (endTime !== undefined) {
-      if (endTime !== null && typeof endTime !== 'string') {
-        return NextResponse.json({ error: '结束时间字段无效' }, { status: 400, headers: noStoreHeaders })
-      }
-      updateData.endTime = endTime ? new Date(endTime) : null
-    }
-
-    if (notes !== undefined) {
-      if (notes !== null && typeof notes !== 'string') {
-        return NextResponse.json({ error: '备注字段无效' }, { status: 400, headers: noStoreHeaders })
-      }
-      updateData.notes = notes as string | null
-    }
-
     const existingRecord = await prisma.feedingRecord.findFirst({
       where: {
         id,
@@ -153,9 +73,59 @@ export async function PUT(
       return NextResponse.json({ error: '记录不存在' }, { status: 404, headers: noStoreHeaders })
     }
 
+    const nextType = typeof type === 'string' ? type : existingRecord.type
+    if (typeof nextType !== 'string') {
+      return NextResponse.json({ error: '喂养类型字段无效' }, { status: 400, headers: noStoreHeaders })
+    }
+
+    const nextStartTime = startTime === undefined
+      ? existingRecord.startTime.toISOString()
+      : startTime
+    const nextEndTime = endTime === undefined
+      ? existingRecord.endTime?.toISOString() ?? null
+      : endTime
+
+    const normalizedBody = {
+      type: nextType,
+      leftBreastDuration: leftBreastDuration === undefined ? existingRecord.leftBreastDuration : leftBreastDuration,
+      rightBreastDuration: rightBreastDuration === undefined ? existingRecord.rightBreastDuration : rightBreastDuration,
+      breastMilkAmount: breastMilkAmount === undefined ? existingRecord.breastMilkAmount : breastMilkAmount,
+      formulaAmount: formulaAmount === undefined ? existingRecord.formulaAmount : formulaAmount,
+      adGiven: adGiven === undefined ? existingRecord.adGiven : adGiven,
+      startTime: nextStartTime,
+      endTime: nextEndTime,
+      notes: notes === undefined ? existingRecord.notes : notes,
+    }
+
+    const mergedValidation = validateFeedingInput(normalizedBody)
+    if (!mergedValidation.valid) {
+      return NextResponse.json({ error: mergedValidation.error }, { status: 400, headers: noStoreHeaders })
+    }
+
+    const normalizedData = {
+      type: nextType,
+      leftBreastDuration: null as number | null,
+      rightBreastDuration: null as number | null,
+      breastMilkAmount: null as number | null,
+      formulaAmount: null as number | null,
+      adGiven: normalizedBody.adGiven === undefined ? null : normalizedBody.adGiven as boolean | null,
+      startTime: new Date(nextStartTime),
+      endTime: nextEndTime ? new Date(nextEndTime) : null,
+      notes: normalizedBody.notes === undefined ? null : normalizedBody.notes as string | null,
+    }
+
+    if (nextType === 'BREAST_MILK') {
+      normalizedData.leftBreastDuration = normalizedBody.leftBreastDuration === undefined ? null : normalizedBody.leftBreastDuration as number | null
+      normalizedData.rightBreastDuration = normalizedBody.rightBreastDuration === undefined ? null : normalizedBody.rightBreastDuration as number | null
+    } else if (nextType === 'BREAST_MILK_BOTTLE') {
+      normalizedData.breastMilkAmount = normalizedBody.breastMilkAmount === undefined ? null : normalizedBody.breastMilkAmount as number | null
+    } else if (nextType === 'FORMULA') {
+      normalizedData.formulaAmount = normalizedBody.formulaAmount === undefined ? null : normalizedBody.formulaAmount as number | null
+    }
+
     const record = await prisma.feedingRecord.update({
       where: { id },
-      data: updateData,
+      data: normalizedData,
       include: { baby: true }
     })
 

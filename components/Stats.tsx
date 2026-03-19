@@ -260,6 +260,20 @@ export default function StatsComponent({
   const latestHeightChange = latestHeightRecord && previousHeightRecord
     ? Number((latestHeightRecord.height - previousHeightRecord.height).toFixed(1))
     : null
+  const totalPeeCount = stats?.lastDays.reduce((sum, day) => sum + day.peeCount, 0) || 0
+  const totalPoopCount = stats?.lastDays.reduce((sum, day) => sum + day.poopCount, 0) || 0
+  const diaperActiveDays = stats?.lastDays.filter(day => day.peeCount > 0 || day.poopCount > 0).length || 0
+  const averagePeePerActiveDay = diaperActiveDays > 0 ? totalPeeCount / diaperActiveDays : 0
+  const averagePoopPerActiveDay = diaperActiveDays > 0 ? totalPoopCount / diaperActiveDays : 0
+  const peakDiaperDay = stats?.lastDays.reduce<StatsData['lastDays'][number] | null>((best, day) => {
+    const currentTotal = day.peeCount + day.poopCount
+    const bestTotal = best ? best.peeCount + best.poopCount : -1
+    if (!best || currentTotal > bestTotal) {
+      return day
+    }
+    return best
+  }, null) || null
+  const latestDiaperDay = [...(stats?.lastDays || [])].find(day => day.peeCount > 0 || day.poopCount > 0) || null
   const chartTabs = [
     {
       key: 'breastfeeding' as const,
@@ -786,8 +800,6 @@ export default function StatsComponent({
               </div>
 
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1fr)]">
-                {recentVaccineCard}
-
                 <div className="rounded-2xl border border-emerald-100 bg-white p-3.5 shadow-sm">
                   <div className="flex items-center gap-2 text-emerald-600">
                     <ChartColumn size={16} />
@@ -800,14 +812,14 @@ export default function StatsComponent({
                   </p>
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     <div className="rounded-xl border border-teal-100 bg-teal-50/80 px-3 py-2.5">
-                      <div className="flex items-start justify-between gap-2">
+                      <div className="flex flex-col gap-2">
                         <div>
                           <p className="text-[11px] font-medium text-teal-700">体重变化</p>
                           <p className="mt-1 text-base font-bold text-slate-900">
                             {overallWeightChange !== null ? `${overallWeightChange >= 0 ? '+' : ''}${overallWeightChange}kg` : '暂无趋势'}
                           </p>
                         </div>
-                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${latestWeightChange === null ? 'bg-white text-slate-500' : latestWeightChange >= 0 ? 'bg-teal-700 text-white' : 'bg-amber-500 text-white'}`}>
+                        <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-bold ${latestWeightChange === null ? 'bg-white text-slate-500' : latestWeightChange >= 0 ? 'bg-teal-700 text-white' : 'bg-amber-500 text-white'}`}>
                           {latestWeightChange !== null ? `较上次 ${latestWeightChange >= 0 ? '+' : ''}${latestWeightChange}kg` : '较上次 暂无'}
                         </span>
                       </div>
@@ -818,14 +830,14 @@ export default function StatsComponent({
                       </p>
                     </div>
                     <div className="rounded-xl border border-blue-100 bg-blue-50/80 px-3 py-2.5">
-                      <div className="flex items-start justify-between gap-2">
+                      <div className="flex flex-col gap-2">
                         <div>
                           <p className="text-[11px] font-medium text-blue-700">身高变化</p>
                           <p className="mt-1 text-base font-bold text-slate-900">
                             {overallHeightChange !== null ? `${overallHeightChange >= 0 ? '+' : ''}${overallHeightChange}cm` : '暂无趋势'}
                           </p>
                         </div>
-                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${latestHeightChange === null ? 'bg-white text-slate-500' : latestHeightChange >= 0 ? 'bg-blue-700 text-white' : 'bg-amber-500 text-white'}`}>
+                        <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-bold ${latestHeightChange === null ? 'bg-white text-slate-500' : latestHeightChange >= 0 ? 'bg-blue-700 text-white' : 'bg-amber-500 text-white'}`}>
                           {latestHeightChange !== null ? `较上次 ${latestHeightChange >= 0 ? '+' : ''}${latestHeightChange}cm` : '较上次 暂无'}
                         </span>
                       </div>
@@ -835,6 +847,46 @@ export default function StatsComponent({
                           : '最近记录：暂无'}
                       </p>
                     </div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-violet-100 bg-white p-3.5 shadow-sm">
+                  <div className="flex items-center gap-2 text-violet-600">
+                    <ChartColumn size={16} />
+                    <p className="text-sm font-semibold">大小便趋势</p>
+                  </div>
+                  <p className="mt-2 text-sm font-medium text-gray-900">
+                    {diaperActiveDays > 0
+                      ? `近 ${days} 天共有 ${diaperActiveDays} 天记录了大小便情况。`
+                      : '当前周期内还没有大小便记录，添加后可查看排泄趋势。'}
+                  </p>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <div className="rounded-xl border border-sky-100 bg-sky-50/80 px-3 py-2.5">
+                      <p className="text-[11px] font-medium text-sky-700">小便次数</p>
+                      <p className="mt-1 text-base font-bold text-slate-900">{totalPeeCount} 次</p>
+                      <p className="mt-2 text-[11px] leading-5 text-slate-500">
+                        {diaperActiveDays > 0 ? `活跃日均 ${averagePeePerActiveDay.toFixed(1)} 次` : '活跃日均 暂无'}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-amber-100 bg-amber-50/80 px-3 py-2.5">
+                      <p className="text-[11px] font-medium text-amber-700">大便次数</p>
+                      <p className="mt-1 text-base font-bold text-slate-900">{totalPoopCount} 次</p>
+                      <p className="mt-2 text-[11px] leading-5 text-slate-500">
+                        {diaperActiveDays > 0 ? `活跃日均 ${averagePoopPerActiveDay.toFixed(1)} 次` : '活跃日均 暂无'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-2 space-y-1.5 text-xs leading-5 text-gray-500">
+                    <p>
+                      {peakDiaperDay && (peakDiaperDay.peeCount > 0 || peakDiaperDay.poopCount > 0)
+                        ? `${peakDiaperDay.date} 记录最集中，小便 ${peakDiaperDay.peeCount} 次，大便 ${peakDiaperDay.poopCount} 次。`
+                        : '当前周期暂无明显的大小便峰值日。'}
+                    </p>
+                    <p>
+                      {latestDiaperDay
+                        ? `最近一次有记录的日期是 ${latestDiaperDay.date}，当天小便 ${latestDiaperDay.peeCount} 次，大便 ${latestDiaperDay.poopCount} 次。`
+                        : '最近暂无大小便记录。'}
+                    </p>
                   </div>
                 </div>
 
@@ -864,14 +916,11 @@ export default function StatsComponent({
                         ? `当前周期最高体温为 ${maxTemperatureDay.temperature}°C，记录于 ${maxTemperatureDay.date}。`
                         : '当前周期暂无可比较的体温峰值。'}
                     </p>
-                    <p>
-                      {latestVaccineRecord
-                        ? `最近疫苗：${latestVaccineRecord.vaccineName}${formatVaccineProgress(latestVaccineRecord.vaccineDoseNumber, latestVaccineRecord.vaccineTotalDoses) ? `（${formatVaccineProgress(latestVaccineRecord.vaccineDoseNumber, latestVaccineRecord.vaccineTotalDoses)}）` : ''}`
-                        : '暂无疫苗记录，记录后这里会帮助你快速回顾最近接种信息。'}
-                    </p>
                   </div>
                 </div>
               </div>
+
+              {recentVaccineCard}
             </div>
           )}
         </>
