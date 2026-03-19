@@ -351,6 +351,7 @@ export default function TimelineComponent({
   const [saving, setSaving] = useState(false)
   const latestRequestKeyRef = useRef<string | null>(null)
   const datePickerWrapperRef = useRef<HTMLDivElement | null>(null)
+  const calendarInputRef = useRef<HTMLInputElement | null>(null)
   const currentDateStr = format(currentDate, 'yyyy-MM-dd')
   const hasInitialRecords = !!initialDate && selectedBabyId === initialSelectedBabyId && currentDateStr === initialDate
   const hasInitialValidDates = selectedBabyId === initialSelectedBabyId
@@ -655,6 +656,21 @@ export default function TimelineComponent({
     setIsCalendarOpen(false)
   }, [currentDateStr, prefetchAdjacentDates, selectedBabyId, validDates])
 
+  const openCalendarPicker = useCallback(() => {
+    const input = calendarInputRef.current as (HTMLInputElement & { showPicker?: () => void }) | null
+    if (!input) {
+      setIsCalendarOpen(true)
+      return
+    }
+
+    if (typeof input.showPicker === 'function') {
+      input.showPicker()
+      return
+    }
+
+    setIsCalendarOpen(true)
+  }, [])
+
   const formatDateLabel = (date: Date) => {
     if (isToday(date)) return '今天'
     if (isYesterday(date)) return '昨天'
@@ -812,13 +828,25 @@ export default function TimelineComponent({
               <h2 className="text-base font-bold text-gray-900">{formatDateLabel(currentDate)}</h2>
               <button
                 type="button"
-                onClick={() => setIsCalendarOpen((open) => !open)}
+                onClick={openCalendarPicker}
                 className="mt-1 inline-flex rounded-lg px-2 py-1 text-xs text-gray-500 transition hover:bg-gray-50 hover:text-gray-700"
                 aria-expanded={isCalendarOpen}
                 aria-haspopup="dialog"
               >
                 {format(currentDate, 'yyyy年MM月dd日')}
               </button>
+              <input
+                ref={calendarInputRef}
+                type="date"
+                value={currentDateStr}
+                min={validDates[validDates.length - 1] || currentDateStr}
+                max={validDates[0] || currentDateStr}
+                onChange={handleCalendarDateChange}
+                list="timeline-valid-dates"
+                className="sr-only"
+                tabIndex={-1}
+                aria-hidden="true"
+              />
             </div>
 
             {isCalendarOpen && (
