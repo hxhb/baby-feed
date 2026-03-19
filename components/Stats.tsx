@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { cloneElement, isValidElement, useState, useEffect, useCallback, useRef, type ReactElement } from 'react'
 import {
   BarChart,
   Bar,
@@ -8,7 +8,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
   LineChart,
   Line,
   Legend,
@@ -31,6 +30,71 @@ interface Props {
   onSelectBaby: (id: string | null) => void
   initialBabies?: Baby[]
   initialStats?: PreloadedStatsData | null
+}
+
+type MeasuredChartElement = ReactElement<{
+  width?: number
+  height?: number
+}>
+
+function StableResponsiveChart({
+  className,
+  children,
+}: {
+  className: string
+  children: MeasuredChartElement
+}) {
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const [size, setSize] = useState({ width: 0, height: 0 })
+
+  useEffect(() => {
+    const node = containerRef.current
+    if (!node) {
+      return
+    }
+
+    const updateSize = () => {
+      const { width, height } = node.getBoundingClientRect()
+      setSize(prev => {
+        const nextWidth = Math.floor(width)
+        const nextHeight = Math.floor(height)
+
+        if (prev.width === nextWidth && prev.height === nextHeight) {
+          return prev
+        }
+
+        return {
+          width: nextWidth,
+          height: nextHeight,
+        }
+      })
+    }
+
+    updateSize()
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', updateSize)
+      return () => window.removeEventListener('resize', updateSize)
+    }
+
+    const observer = new ResizeObserver(() => updateSize())
+    observer.observe(node)
+
+    return () => observer.disconnect()
+  }, [])
+
+  const isReady = size.width > 0 && size.height > 0
+
+  return (
+    <div ref={containerRef} className={className} style={{ outline: 'none' }}>
+      {isReady && isValidElement(children)
+        ? cloneElement(children, {
+            width: size.width,
+            height: size.height,
+          })
+        : <div className="h-full w-full rounded-xl bg-white/40" />}
+    </div>
+  )
 }
 
 export default function StatsComponent({
@@ -319,9 +383,13 @@ export default function StatsComponent({
       totalDoses: number | null
       latestRecordedAt: string
       latestDate: string
-      recordCount: number
-      notes: string[]
-      latestNote: string | null
+      doseEntries: {
+        id: string
+        recordedAt: string
+        doseNumber: number | null
+        totalDoses: number | null
+        note: string | null
+      }[]
       isCompleted: boolean
       remainingDoses: number | null
     }>>((acc, record) => {
@@ -333,6 +401,13 @@ export default function StatsComponent({
       const remainingDoses = !!doseNumber && !!totalDoses && doseNumber < totalDoses
         ? totalDoses - doseNumber
         : 0
+      const doseEntry = {
+        id: record.id,
+        recordedAt: record.recordedAt,
+        doseNumber,
+        totalDoses,
+        note: record.notes?.trim() || null,
+      }
 
       if (!existing) {
         acc[key] = {
@@ -341,22 +416,20 @@ export default function StatsComponent({
           totalDoses,
           latestRecordedAt: record.recordedAt,
           latestDate: record.date,
-          recordCount: 1,
-          notes: record.notes ? [record.notes] : [],
-          latestNote: record.notes ?? null,
+          doseEntries: [doseEntry],
           isCompleted,
           remainingDoses,
         }
         return acc
       }
 
-      existing.recordCount += 1
-      if (record.notes) {
-        existing.notes.push(record.notes)
-      }
+      existing.doseEntries.push(doseEntry)
       return acc
     }, {})
-  )
+  ).map(item => ({
+    ...item,
+    doseEntries: [...item.doseEntries].sort((a, b) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime()),
+  }))
   const pendingVaccines = vaccineProgressSummary.filter(item => item.remainingDoses && item.remainingDoses > 0)
   const recentVaccineCard = (
     <StatsFeatureCard
@@ -481,28 +554,26 @@ export default function StatsComponent({
                         <p className="mt-1 text-xs text-gray-500">亲喂时长 + 瓶喂母乳量</p>
                       </div>
                     </div>
-                    <div className="min-w-0 h-56 sm:h-72 -ml-2" style={{ outline: 'none' }}>
-                      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                        <BarChart data={chartData} margin={{ top: 25, right: 5, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                          <YAxis tick={{ fontSize: 11 }} />
-                          <Tooltip formatter={(value, name) => {
-                            if (name === '亲喂时长(分钟)') {
-                              return [`${value}分钟`, name]
-                            }
-                            return [`${value}ml`, name]
-                          }} />
-                          <Legend wrapperStyle={{ fontSize: 12 }} />
-                          <Bar dataKey="母乳时长" fill="#ec4899" name="亲喂时长(分钟)" radius={[2, 2, 0, 0]}>
-                            <LabelList dataKey="母乳时长" position="top" fill="#ec4899" fontSize={10} fontWeight={600} />
-                          </Bar>
-                          <Bar dataKey="母乳瓶喂量" fill="#a855f7" name="瓶喂量(ml)" radius={[2, 2, 0, 0]}>
-                            <LabelList dataKey="母乳瓶喂量" position="top" fill="#a855f7" fontSize={10} fontWeight={600} />
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
+                    <StableResponsiveChart className="min-w-0 h-56 sm:h-72 -ml-2">
+                      <BarChart data={chartData} margin={{ top: 25, right: 5, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} />
+                        <Tooltip formatter={(value, name) => {
+                          if (name === '亲喂时长(分钟)') {
+                            return [`${value}分钟`, name]
+                          }
+                          return [`${value}ml`, name]
+                        }} />
+                        <Legend wrapperStyle={{ fontSize: 12 }} />
+                        <Bar dataKey="母乳时长" fill="#ec4899" name="亲喂时长(分钟)" radius={[2, 2, 0, 0]}>
+                          <LabelList dataKey="母乳时长" position="top" fill="#ec4899" fontSize={10} fontWeight={600} />
+                        </Bar>
+                        <Bar dataKey="母乳瓶喂量" fill="#a855f7" name="瓶喂量(ml)" radius={[2, 2, 0, 0]}>
+                          <LabelList dataKey="母乳瓶喂量" position="top" fill="#a855f7" fontSize={10} fontWeight={600} />
+                        </Bar>
+                      </BarChart>
+                    </StableResponsiveChart>
                   </div>
 
                   <div className="min-w-0 rounded-2xl border border-blue-100 bg-blue-50/40 p-3">
@@ -520,20 +591,18 @@ export default function StatsComponent({
                         className="py-10 text-center text-gray-400"
                       />
                     ) : (
-                      <div className="min-w-0 h-56 sm:h-72 -ml-2" style={{ outline: 'none' }}>
-                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                          <BarChart data={chartData} margin={{ top: 25, right: 5, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#dbeafe" />
-                            <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#475569' }} axisLine={{ stroke: '#bfdbfe' }} tickLine={{ stroke: '#bfdbfe' }} />
-                            <YAxis tick={{ fontSize: 11, fill: '#475569' }} axisLine={{ stroke: '#bfdbfe' }} tickLine={{ stroke: '#bfdbfe' }} />
-                            <Tooltip formatter={(value) => [`${value}ml`, '奶粉量']} />
-                            <Legend wrapperStyle={{ fontSize: 12 }} />
-                            <Bar dataKey="奶粉量" fill={palette.blue} name="奶粉量(ml)" radius={[2, 2, 0, 0]} barSize={18}>
-                              <LabelList dataKey="奶粉量" position="top" fill={palette.blue} fontSize={10} fontWeight={600} />
-                            </Bar>
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
+                      <StableResponsiveChart className="min-w-0 h-56 sm:h-72 -ml-2">
+                        <BarChart data={chartData} margin={{ top: 25, right: 5, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#dbeafe" />
+                          <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#475569' }} axisLine={{ stroke: '#bfdbfe' }} tickLine={{ stroke: '#bfdbfe' }} />
+                          <YAxis tick={{ fontSize: 11, fill: '#475569' }} axisLine={{ stroke: '#bfdbfe' }} tickLine={{ stroke: '#bfdbfe' }} />
+                          <Tooltip formatter={(value) => [`${value}ml`, '奶粉量']} />
+                          <Legend wrapperStyle={{ fontSize: 12 }} />
+                          <Bar dataKey="奶粉量" fill={palette.blue} name="奶粉量(ml)" radius={[2, 2, 0, 0]} barSize={18}>
+                            <LabelList dataKey="奶粉量" position="top" fill={palette.blue} fontSize={10} fontWeight={600} />
+                          </Bar>
+                        </BarChart>
+                      </StableResponsiveChart>
                     )}
                   </div>
 
@@ -545,51 +614,49 @@ export default function StatsComponent({
                       </div>
                     </div>
                     {weightData.length > 0 ? (
-                      <div className="min-w-0 h-56 sm:h-64 -ml-2" style={{ outline: 'none' }}>
-                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                          <LineChart data={weightData} margin={{ top: 10, right: 15, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#ccfbf1" />
-                            <XAxis
-                              dataKey="timestamp"
-                              type="number"
-                              domain={['dataMin', 'dataMax']}
-                              scale="time"
-                              tick={{ fontSize: 11, fill: '#475569' }}
-                              tickFormatter={formatTrendAxisDate}
-                              axisLine={{ stroke: '#99f6e4' }}
-                              tickLine={{ stroke: '#99f6e4' }}
-                            />
-                            <YAxis
-                              domain={['dataMin - 0.3', 'dataMax + 0.3']}
-                              tick={{ fontSize: 11, fill: '#475569' }}
-                              tickFormatter={(v) => `${v}kg`}
-                              axisLine={{ stroke: '#99f6e4' }}
-                              tickLine={{ stroke: '#99f6e4' }}
-                            />
-                            <Tooltip
-                              labelFormatter={(value) => formatTrendTooltipLabel(Number(value))}
-                              formatter={(value) => [`${value} kg`, '体重']}
-                            />
-                            <Line
-                              type="monotone"
+                      <StableResponsiveChart className="min-w-0 h-56 sm:h-64 -ml-2">
+                        <LineChart data={weightData} margin={{ top: 10, right: 15, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#ccfbf1" />
+                          <XAxis
+                            dataKey="timestamp"
+                            type="number"
+                            domain={['dataMin', 'dataMax']}
+                            scale="time"
+                            tick={{ fontSize: 11, fill: '#475569' }}
+                            tickFormatter={formatTrendAxisDate}
+                            axisLine={{ stroke: '#99f6e4' }}
+                            tickLine={{ stroke: '#99f6e4' }}
+                          />
+                          <YAxis
+                            domain={['dataMin - 0.3', 'dataMax + 0.3']}
+                            tick={{ fontSize: 11, fill: '#475569' }}
+                            tickFormatter={(v) => `${v}kg`}
+                            axisLine={{ stroke: '#99f6e4' }}
+                            tickLine={{ stroke: '#99f6e4' }}
+                          />
+                          <Tooltip
+                            labelFormatter={(value) => formatTrendTooltipLabel(Number(value))}
+                            formatter={(value) => [`${value} kg`, '体重']}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="体重"
+                            stroke={palette.teal}
+                            strokeWidth={2.5}
+                            dot={{ fill: palette.teal, r: 4 }}
+                            activeDot={{ r: 6 }}
+                          >
+                            <LabelList
                               dataKey="体重"
-                              stroke={palette.teal}
-                              strokeWidth={2.5}
-                              dot={{ fill: palette.teal, r: 4 }}
-                              activeDot={{ r: 6 }}
-                            >
-                              <LabelList
-                                dataKey="体重"
-                                position="top"
-                                fill={palette.teal}
-                                fontSize={11}
-                                fontWeight={600}
-                                formatter={(v) => `${v}kg`}
-                              />
-                            </Line>
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </div>
+                              position="top"
+                              fill={palette.teal}
+                              fontSize={11}
+                              fontWeight={600}
+                              formatter={(v) => `${v}kg`}
+                            />
+                          </Line>
+                        </LineChart>
+                      </StableResponsiveChart>
                     ) : (
                       <StatsEmptyState
                         icon={Scale}
@@ -607,51 +674,49 @@ export default function StatsComponent({
                       </div>
                     </div>
                     {heightData.length > 0 ? (
-                      <div className="min-w-0 h-56 sm:h-64 -ml-2" style={{ outline: 'none' }}>
-                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                          <LineChart data={heightData} margin={{ top: 10, right: 15, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
-                            <XAxis
-                              dataKey="timestamp"
-                              type="number"
-                              domain={['dataMin', 'dataMax']}
-                              scale="time"
-                              tick={{ fontSize: 11, fill: '#475569' }}
-                              tickFormatter={formatTrendAxisDate}
-                              axisLine={{ stroke: '#c7d2fe' }}
-                              tickLine={{ stroke: '#c7d2fe' }}
-                            />
-                            <YAxis
-                              domain={['dataMin - 1', 'dataMax + 1']}
-                              tick={{ fontSize: 11, fill: '#475569' }}
-                              tickFormatter={(v) => `${v}cm`}
-                              axisLine={{ stroke: '#c7d2fe' }}
-                              tickLine={{ stroke: '#c7d2fe' }}
-                            />
-                            <Tooltip
-                              labelFormatter={(value) => formatTrendTooltipLabel(Number(value))}
-                              formatter={(value) => [`${value} cm`, '身高']}
-                            />
-                            <Line
-                              type="monotone"
+                      <StableResponsiveChart className="min-w-0 h-56 sm:h-64 -ml-2">
+                        <LineChart data={heightData} margin={{ top: 10, right: 15, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
+                          <XAxis
+                            dataKey="timestamp"
+                            type="number"
+                            domain={['dataMin', 'dataMax']}
+                            scale="time"
+                            tick={{ fontSize: 11, fill: '#475569' }}
+                            tickFormatter={formatTrendAxisDate}
+                            axisLine={{ stroke: '#c7d2fe' }}
+                            tickLine={{ stroke: '#c7d2fe' }}
+                          />
+                          <YAxis
+                            domain={['dataMin - 1', 'dataMax + 1']}
+                            tick={{ fontSize: 11, fill: '#475569' }}
+                            tickFormatter={(v) => `${v}cm`}
+                            axisLine={{ stroke: '#c7d2fe' }}
+                            tickLine={{ stroke: '#c7d2fe' }}
+                          />
+                          <Tooltip
+                            labelFormatter={(value) => formatTrendTooltipLabel(Number(value))}
+                            formatter={(value) => [`${value} cm`, '身高']}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="身高"
+                            stroke={palette.indigo}
+                            strokeWidth={2.5}
+                            dot={{ fill: palette.indigo, r: 4 }}
+                            activeDot={{ r: 6 }}
+                          >
+                            <LabelList
                               dataKey="身高"
-                              stroke={palette.indigo}
-                              strokeWidth={2.5}
-                              dot={{ fill: palette.indigo, r: 4 }}
-                              activeDot={{ r: 6 }}
-                            >
-                              <LabelList
-                                dataKey="身高"
-                                position="top"
-                                fill={palette.indigo}
-                                fontSize={11}
-                                fontWeight={600}
-                                formatter={(v) => `${v}cm`}
-                              />
-                            </Line>
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </div>
+                              position="top"
+                              fill={palette.indigo}
+                              fontSize={11}
+                              fontWeight={600}
+                              formatter={(v) => `${v}cm`}
+                            />
+                          </Line>
+                        </LineChart>
+                      </StableResponsiveChart>
                     ) : (
                       <StatsEmptyState
                         icon={Ruler}
@@ -691,14 +756,6 @@ export default function StatsComponent({
                           <span className="rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white">
                             {formatVaccineProgress(item.latestDoseNumber, item.totalDoses) || '未标注针次'}
                           </span>
-                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
-                            记录 {item.recordCount} 次
-                          </span>
-                          {item.totalDoses ? (
-                            <span className="rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-semibold text-sky-700">
-                              全程 {item.totalDoses} 针
-                            </span>
-                          ) : null}
                           {!item.isCompleted && item.remainingDoses ? (
                             <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
                               待完成 {item.remainingDoses} 针
@@ -706,14 +763,32 @@ export default function StatsComponent({
                           ) : null}
                         </div>
 
-                        {item.latestNote ? (
-                          <div className="mt-3 rounded-xl bg-slate-50 px-3 py-2">
-                            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Recent Note</p>
-                            <p className="mt-1 line-clamp-2 break-words text-[12px] leading-5 text-slate-700">
-                              {item.latestNote}
-                            </p>
+                        <div className="mt-3 rounded-xl bg-slate-50 px-2.5 py-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-[11px] font-semibold text-slate-500">接种记录</p>
+                            <span className="text-[10px] font-medium text-slate-400">{item.doseEntries.length} 次</span>
                           </div>
-                        ) : null}
+                          <div className="mt-1.5 space-y-1 text-[11px] leading-4 text-slate-600">
+                            {item.doseEntries.map(doseEntry => (
+                              <div key={doseEntry.id} className="flex items-start gap-2">
+                                <span className="shrink-0 text-slate-400">•</span>
+                                <p className="min-w-0 break-words">
+                                  <span className="font-medium text-slate-700">
+                                    {formatVaccineProgress(doseEntry.doseNumber, doseEntry.totalDoses) || '未标注针次'}
+                                  </span>
+                                  {' · '}
+                                  <span>{formatRecordedSummaryTime(doseEntry.recordedAt)}</span>
+                                  {doseEntry.note ? (
+                                    <>
+                                      {'：'}
+                                      <span>{doseEntry.note}</span>
+                                    </>
+                                  ) : null}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>

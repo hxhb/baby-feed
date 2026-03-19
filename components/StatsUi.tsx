@@ -95,7 +95,7 @@ export function StatsSegmentedTabs({
             disabled={item.disabled}
             className={`min-w-0 flex-1 rounded-xl px-3 py-2 text-sm font-medium transition sm:flex-none sm:px-4 ${
               active
-                ? 'bg-white text-gray-900 shadow-sm'
+                ? 'bg-white text-blue-700 shadow-sm'
                 : item.disabled
                   ? 'cursor-not-allowed text-gray-400'
                   : 'text-gray-600 hover:bg-white hover:text-gray-900'
