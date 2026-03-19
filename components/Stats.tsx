@@ -303,12 +303,12 @@ export default function StatsComponent({
   const subpageTabs = [
     {
       key: 'dashboard',
-      label: '趋势与疫苗',
+      label: '趋势',
       description: '查看趋势工作台与疫苗记录',
     },
     {
       key: 'insights',
-      label: '洞察信息',
+      label: '洞察',
       description: '查看喂养、成长与健康洞察',
     },
   ]
@@ -474,15 +474,15 @@ export default function StatsComponent({
                 </div>
 
                 <div className="mt-4 grid gap-4 xl:grid-cols-2">
-                  <div className="rounded-2xl border border-pink-100 bg-pink-50/30 p-3">
+                  <div className="min-w-0 rounded-2xl border border-pink-100 bg-pink-50/30 p-3">
                     <div className="mb-3 flex items-center justify-between gap-2">
                       <div>
                         <p className="text-sm font-semibold text-gray-900">母乳趋势</p>
                         <p className="mt-1 text-xs text-gray-500">亲喂时长 + 瓶喂母乳量</p>
                       </div>
                     </div>
-                    <div className="h-56 sm:h-72 -ml-2" style={{ outline: 'none' }}>
-                      <ResponsiveContainer width="100%" height="100%">
+                    <div className="min-w-0 h-56 sm:h-72 -ml-2" style={{ outline: 'none' }}>
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <BarChart data={chartData} margin={{ top: 25, right: 5, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis dataKey="date" tick={{ fontSize: 11 }} />
@@ -505,7 +505,7 @@ export default function StatsComponent({
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-blue-100 bg-blue-50/40 p-3">
+                  <div className="min-w-0 rounded-2xl border border-blue-100 bg-blue-50/40 p-3">
                     <div className="mb-3 flex items-center justify-between gap-2">
                       <div>
                         <p className="text-sm font-semibold text-gray-900">奶粉趋势</p>
@@ -520,8 +520,8 @@ export default function StatsComponent({
                         className="py-10 text-center text-gray-400"
                       />
                     ) : (
-                      <div className="h-56 sm:h-72 -ml-2" style={{ outline: 'none' }}>
-                        <ResponsiveContainer width="100%" height="100%">
+                      <div className="min-w-0 h-56 sm:h-72 -ml-2" style={{ outline: 'none' }}>
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                           <BarChart data={chartData} margin={{ top: 25, right: 5, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#dbeafe" />
                             <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#475569' }} axisLine={{ stroke: '#bfdbfe' }} tickLine={{ stroke: '#bfdbfe' }} />
@@ -537,7 +537,7 @@ export default function StatsComponent({
                     )}
                   </div>
 
-                  <div className="rounded-2xl border border-teal-100 bg-teal-50/40 p-3">
+                  <div className="min-w-0 rounded-2xl border border-teal-100 bg-teal-50/40 p-3">
                     <div className="mb-3 flex items-center justify-between gap-2">
                       <div>
                         <p className="text-sm font-semibold text-gray-900">体重趋势</p>
@@ -545,8 +545,8 @@ export default function StatsComponent({
                       </div>
                     </div>
                     {weightData.length > 0 ? (
-                      <div className="h-56 sm:h-64 -ml-2" style={{ outline: 'none' }}>
-                        <ResponsiveContainer width="100%" height="100%">
+                      <div className="min-w-0 h-56 sm:h-64 -ml-2" style={{ outline: 'none' }}>
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                           <LineChart data={weightData} margin={{ top: 10, right: 15, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#ccfbf1" />
                             <XAxis
@@ -599,7 +599,7 @@ export default function StatsComponent({
                     )}
                   </div>
 
-                  <div className="rounded-2xl border border-indigo-100 bg-indigo-50/40 p-3">
+                  <div className="min-w-0 rounded-2xl border border-indigo-100 bg-indigo-50/40 p-3">
                     <div className="mb-3 flex items-center justify-between gap-2">
                       <div>
                         <p className="text-sm font-semibold text-gray-900">身高趋势</p>
@@ -607,8 +607,8 @@ export default function StatsComponent({
                       </div>
                     </div>
                     {heightData.length > 0 ? (
-                      <div className="h-56 sm:h-64 -ml-2" style={{ outline: 'none' }}>
-                        <ResponsiveContainer width="100%" height="100%">
+                      <div className="min-w-0 h-56 sm:h-64 -ml-2" style={{ outline: 'none' }}>
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                           <LineChart data={heightData} margin={{ top: 10, right: 15, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
                             <XAxis
