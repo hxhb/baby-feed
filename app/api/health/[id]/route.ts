@@ -86,7 +86,12 @@ export async function PUT(
 
     const nextRecordedAt = recordedAt === undefined
       ? existingRecord.recordedAt.toISOString()
-      : recordedAt
+      : typeof recordedAt === 'string'
+        ? recordedAt
+        : null
+    if (nextRecordedAt === null) {
+      return NextResponse.json({ error: '记录时间格式不正确' }, { status: 400, headers: noStoreHeaders })
+    }
 
     const normalizedBody = {
       type: nextType,

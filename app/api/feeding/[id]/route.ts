@@ -80,10 +80,23 @@ export async function PUT(
 
     const nextStartTime = startTime === undefined
       ? existingRecord.startTime.toISOString()
-      : startTime
+      : typeof startTime === 'string'
+        ? startTime
+        : null
+    if (nextStartTime === null) {
+      return NextResponse.json({ error: '开始时间格式不正确' }, { status: 400, headers: noStoreHeaders })
+    }
+
     const nextEndTime = endTime === undefined
       ? existingRecord.endTime?.toISOString() ?? null
-      : endTime
+      : endTime === null
+        ? null
+        : typeof endTime === 'string'
+          ? endTime
+          : undefined
+    if (nextEndTime === undefined) {
+      return NextResponse.json({ error: '结束时间格式不正确' }, { status: 400, headers: noStoreHeaders })
+    }
 
     const normalizedBody = {
       type: nextType,
