@@ -241,33 +241,8 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
     }
   }
 
-  const feedingTypeCards = [
-    {
-      key: 'BREAST',
-      title: '母乳',
-      active: currentFeedingType === 'BREAST_MILK' || currentFeedingType === 'BREAST_MILK_BOTTLE',
-      onClick: () => {
-        const nextType = breastMode === 'bottle' ? 'BREAST_MILK_BOTTLE' : 'BREAST_MILK'
-        setCurrentFeedingType(nextType)
-      },
-    },
-    {
-      key: 'FORMULA',
-      title: '奶粉',
-      active: currentFeedingType === 'FORMULA',
-      onClick: () => setCurrentFeedingType('FORMULA'),
-    },
-  ] as const
 
-  const healthTypeOptions = [
-    { value: 'WEIGHT', label: '体重' },
-    { value: 'HEIGHT', label: '身高' },
-    { value: 'TEMPERATURE', label: '体温' },
-    { value: 'AD_VITAMIN', label: 'AD' },
-    { value: 'MEDICATION', label: '服药' },
-    { value: 'VACCINE', label: '疫苗' },
-    { value: 'DIAPER', label: '大小便' },
-  ] as const
+
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={onCancel}>
@@ -291,90 +266,48 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
           />
 
           {isFeeding ? (
-            <div className="space-y-3">
-              <div className="rounded-2xl bg-gray-50/80 p-2">
-                <div className="grid grid-cols-2 gap-2">
-                  {feedingTypeCards.map((card) => (
-                    <button
-                      key={card.key}
-                      type="button"
-                      onClick={card.onClick}
-                      className={`mobile-touch-target rounded-xl border px-3 py-2.5 text-sm font-medium transition ${
-                        card.active
-                          ? 'border-blue-500 bg-blue-50 text-blue-700'
-                          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                      }`}
-                    >
-                      {card.title}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <FeedingRecordFields
-                type={currentFeedingType}
-                breastMode={breastMode}
-                mode="edit"
-                values={feedingFieldValues}
-                setters={{
-                  setType: (nextType) => {
-                    setCurrentFeedingType(nextType)
-                    setBreastMode(getBreastModeFromType(nextType))
-                  },
-                  setBreastMode,
-                  setLeftBreastDuration: setLeftDuration,
-                  setRightBreastDuration: setRightDuration,
-                  setBreastMilkAmount: setBreastMilkAmt,
-                  setFormulaAmount: setFormulaAmt,
-                }}
-              />
-            </div>
+            <FeedingRecordFields
+              type={currentFeedingType}
+              breastMode={breastMode}
+              mode="edit"
+              values={feedingFieldValues}
+              setters={{
+                setType: (nextType) => {
+                  setCurrentFeedingType(nextType)
+                  setBreastMode(getBreastModeFromType(nextType))
+                },
+                setBreastMode,
+                setLeftBreastDuration: setLeftDuration,
+                setRightBreastDuration: setRightDuration,
+                setBreastMilkAmount: setBreastMilkAmt,
+                setFormulaAmount: setFormulaAmt,
+              }}
+            />
           ) : (
-            <div className="space-y-3">
-              <div className="rounded-2xl bg-gray-50/80 p-2">
-                <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
-                  {healthTypeOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => setCurrentHealthType(option.value)}
-                      className={`mobile-touch-target rounded-xl border-2 px-2 py-2 text-[11px] font-medium leading-4 transition ${
-                        currentHealthType === option.value
-                          ? 'border-blue-500 bg-blue-50 text-blue-700'
-                          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <HealthRecordFields
-                type={currentHealthType}
-                mode="edit"
-                validationMessage={validationMessage}
-                vaccineSuggestions={vaccineSuggestions}
-                vaccineSuggestionsLoading={vaccineSuggestionsLoading}
-                selectedVaccineSuggestionKey={selectedVaccineSuggestionKey}
-                onApplyVaccineSuggestion={handleApplyVaccineSuggestion}
-                values={fieldValues}
-                setters={{
-                  setWeight,
-                  setHeight,
-                  setTemperature,
-                  setMedicationName,
-                  setMedicationDose,
-                  setVaccineName,
-                  setVaccineManufacturer,
-                  setVaccineDoseNumber,
-                  setVaccineTotalDoses,
-                  setDiaperType: (value) => setDiaperType(value),
-                  setDiaperStatus,
-                  setAdGiven,
-                }}
-              />
-            </div>
+            <HealthRecordFields
+              type={currentHealthType}
+              mode="edit"
+              validationMessage={validationMessage}
+              vaccineSuggestions={vaccineSuggestions}
+              vaccineSuggestionsLoading={vaccineSuggestionsLoading}
+              selectedVaccineSuggestionKey={selectedVaccineSuggestionKey}
+              onApplyVaccineSuggestion={handleApplyVaccineSuggestion}
+              values={fieldValues}
+              setters={{
+                setWeight,
+                setHeight,
+                setTemperature,
+                setMedicationName,
+                setMedicationDose,
+                setVaccineName,
+                setVaccineManufacturer,
+                setVaccineDoseNumber,
+                setVaccineTotalDoses,
+                setDiaperType: (value) => setDiaperType(value),
+                setDiaperStatus,
+                setAdGiven,
+              }}
+            />
           )}
 
           <RecordNotesField

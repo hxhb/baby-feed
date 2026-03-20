@@ -28,6 +28,7 @@ export default function FeedingRecordFields({
 }: Props) {
   const cardClassName = mode === 'create' ? 'rounded-2xl bg-gray-50/70 p-3' : ''
   const quickAmounts = getQuickFeedingAmounts(type)
+  const canSwitchBreastMode = mode !== 'edit'
 
   const applyQuickAmount = (value: number) => {
     const formatted = String(value)
@@ -44,36 +45,38 @@ export default function FeedingRecordFields({
   if (type === 'BREAST_MILK' || type === 'BREAST_MILK_BOTTLE') {
     return (
       <div className="space-y-3">
-        <div className="flex gap-1.5 rounded-2xl bg-gray-50 p-1">
-          <button
-            type="button"
-            onClick={() => {
-              setters.setBreastMode('direct')
-              setters.setType('BREAST_MILK')
-            }}
-            className={`mobile-touch-target flex-1 rounded-xl px-3 py-2 text-sm font-medium transition ${
-              breastMode === 'direct'
-                ? 'bg-pink-500 text-white shadow-sm'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            亲喂
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setters.setBreastMode('bottle')
-              setters.setType('BREAST_MILK_BOTTLE')
-            }}
-            className={`mobile-touch-target flex-1 rounded-xl px-3 py-2 text-sm font-medium transition ${
-              breastMode === 'bottle'
-                ? 'bg-pink-500 text-white shadow-sm'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            瓶喂
-          </button>
-        </div>
+        {canSwitchBreastMode && (
+          <div className="flex gap-1.5 rounded-2xl bg-gray-50 p-1">
+            <button
+              type="button"
+              onClick={() => {
+                setters.setBreastMode('direct')
+                setters.setType('BREAST_MILK')
+              }}
+              className={`mobile-touch-target flex-1 rounded-xl px-3 py-2 text-sm font-medium transition ${
+                breastMode === 'direct'
+                  ? 'bg-pink-500 text-white shadow-sm'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              亲喂
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setters.setBreastMode('bottle')
+                setters.setType('BREAST_MILK_BOTTLE')
+              }}
+              className={`mobile-touch-target flex-1 rounded-xl px-3 py-2 text-sm font-medium transition ${
+                breastMode === 'bottle'
+                  ? 'bg-pink-500 text-white shadow-sm'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              瓶喂
+            </button>
+          </div>
+        )}
 
         {breastMode === 'direct' ? (
           <div className="grid grid-cols-2 gap-2.5">
