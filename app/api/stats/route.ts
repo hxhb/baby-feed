@@ -139,6 +139,7 @@ export async function GET(request: NextRequest) {
         peeCount: 0,
         poopCount: 0,
         weight: undefined,
+        height: undefined,
         temperature: undefined
       })
     }
@@ -168,6 +169,8 @@ export async function GET(request: NextRequest) {
       if (dayStats) {
         if (record.type === 'WEIGHT' && record.weight) {
           dayStats.weight = record.weight
+        } else if (record.type === 'HEIGHT' && record.height) {
+          dayStats.height = record.height
         } else if (record.type === 'TEMPERATURE' && record.temperature) {
           dayStats.temperature = record.temperature
         } else if (record.type === 'AD_VITAMIN' && record.adGiven) {

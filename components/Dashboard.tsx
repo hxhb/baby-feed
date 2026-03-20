@@ -90,6 +90,10 @@ function formatBreastFeedingDetails(record: FeedingRecord) {
 }
 
 function buildDailyStats(feedingData: FeedingRecord[], healthData: HealthRecord[]): DailyStats {
+  const latestWeightRecord = healthData.find(r => r.type === 'WEIGHT' && typeof r.weight === 'number')
+  const latestHeightRecord = healthData.find(r => r.type === 'HEIGHT' && typeof r.height === 'number')
+  const latestTemperatureRecord = healthData.find(r => r.type === 'TEMPERATURE' && typeof r.temperature === 'number')
+
   return {
     breastFeedingCount: feedingData.filter(r => r.type === 'BREAST_MILK').length,
     totalBreastDuration: feedingData
@@ -104,9 +108,9 @@ function buildDailyStats(feedingData: FeedingRecord[], healthData: HealthRecord[
       .filter(r => r.type === 'FORMULA')
       .reduce((sum, r) => sum + (r.formulaAmount || 0), 0),
     adGiven: healthData.some(r => r.type === 'AD_VITAMIN' && r.adGiven),
-    weight: healthData.find(r => r.type === 'WEIGHT')?.weight,
-    height: healthData.find(r => r.type === 'HEIGHT')?.height,
-    temperature: healthData.find(r => r.type === 'TEMPERATURE')?.temperature,
+    weight: latestWeightRecord?.weight,
+    height: latestHeightRecord?.height,
+    temperature: latestTemperatureRecord?.temperature,
     peeCount: healthData.filter(r => r.type === 'DIAPER' && (r.diaperType === 'PEE' || r.diaperType === 'BOTH')).length,
     poopCount: healthData.filter(r => r.type === 'DIAPER' && (r.diaperType === 'POOP' || r.diaperType === 'BOTH')).length,
   }

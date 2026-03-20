@@ -300,7 +300,7 @@ export default function StatsComponent({
     }
     return best
   }, null) || null
-  const latestTemperatureDay = [...(stats?.lastDays || [])].find(day => typeof day.temperature === 'number') || null
+  const latestTemperatureDay = [...(stats?.lastDays || [])].reverse().find(day => typeof day.temperature === 'number') || null
   const maxTemperatureDay = stats?.lastDays.reduce<StatsData['lastDays'][number] | null>((best, day) => {
     if (typeof day.temperature !== 'number') {
       return best
@@ -337,7 +337,7 @@ export default function StatsComponent({
     }
     return best
   }, null) || null
-  const latestDiaperDay = [...(stats?.lastDays || [])].find(day => day.peeCount > 0 || day.poopCount > 0) || null
+  const latestDiaperDay = [...(stats?.lastDays || [])].reverse().find(day => day.peeCount > 0 || day.poopCount > 0) || null
   const chartTabs = [
     {
       key: 'breastfeeding' as const,
@@ -835,11 +835,11 @@ export default function StatsComponent({
 
                 <div className="mt-2 grid grid-cols-2 gap-2 xl:grid-cols-4">
                   <div className="rounded-xl bg-blue-100/70 px-2.5 py-2">
-                    <p className="text-[10px] font-medium text-blue-700">平均奶量 / 日</p>
+                    <p className="text-[10px] font-medium text-blue-700">活跃日均奶量</p>
                     <p className="mt-1 text-sm font-bold text-slate-900">{averageMilkPerActiveDay}ml</p>
                   </div>
                   <div className="rounded-xl bg-sky-100/70 px-2.5 py-2">
-                    <p className="text-[10px] font-medium text-sky-700">平均频次 / 日</p>
+                    <p className="text-[10px] font-medium text-sky-700">活跃日均频次</p>
                     <p className="mt-1 text-sm font-bold text-slate-900">{averageFeedingsPerActiveDay > 0 ? `${averageFeedingsPerActiveDay.toFixed(1)} 次` : '暂无'}</p>
                   </div>
                   <div className="rounded-xl bg-indigo-100/70 px-2.5 py-2">
@@ -982,7 +982,7 @@ export default function StatsComponent({
                   </div>
                   <p className="mt-3 text-sm font-medium text-gray-900">
                     {latestTemperatureDay
-                      ? `最近一次体温记录为 ${latestTemperatureDay.temperature}°C。`
+                      ? `最近一次体温记录为 ${latestTemperatureDay.temperature}°C，记录于 ${latestTemperatureDay.date}。`
                       : '当前周期内没有体温记录。'}
                   </p>
                   <div className="mt-2 space-y-1.5 text-xs leading-5 text-gray-500">
