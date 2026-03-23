@@ -86,6 +86,15 @@ export async function GET(request: NextRequest) {
       where: {
         id: babyId,
         createdBy: session.user.id
+      },
+      select: {
+        id: true,
+        name: true,
+        birthDate: true,
+        gender: true,
+        createdAt: true,
+        updatedAt: true,
+        createdBy: true,
       }
     })
 
@@ -131,6 +140,8 @@ export async function GET(request: NextRequest) {
         date,
         breastFeedingCount: 0,
         totalBreastDuration: 0,
+        leftBreastDuration: 0,
+        rightBreastDuration: 0,
         breastBottleCount: 0,
         totalBreastMilkAmount: 0,
         formulaCount: 0,
@@ -138,6 +149,7 @@ export async function GET(request: NextRequest) {
         adGiven: false,
         peeCount: 0,
         poopCount: 0,
+        nightFeedingCount: 0,
         weight: undefined,
         height: undefined,
         temperature: undefined
@@ -149,9 +161,14 @@ export async function GET(request: NextRequest) {
       const dayStats = statsMap.get(date)
       
       if (dayStats) {
+        const leftDur = record.leftBreastDuration || 0
+        const rightDur = record.rightBreastDuration || 0
+
         if (record.type === 'BREAST_MILK') {
           dayStats.breastFeedingCount++
-          dayStats.totalBreastDuration += (record.leftBreastDuration || 0) + (record.rightBreastDuration || 0)
+          dayStats.totalBreastDuration += leftDur + rightDur
+          dayStats.leftBreastDuration += leftDur
+          dayStats.rightBreastDuration += rightDur
         } else if (record.type === 'BREAST_MILK_BOTTLE') {
           dayStats.breastBottleCount++
           dayStats.totalBreastMilkAmount += record.breastMilkAmount || 0
@@ -159,8 +176,26 @@ export async function GET(request: NextRequest) {
           dayStats.formulaCount++
           dayStats.totalFormulaAmount += record.formulaAmount || 0
         }
+
+        // Night feeding detection (22:00 - 06:00 Beijing time)
+        const bjTime = new Date(new Date(record.startTime).getTime() + 8 * 60 * 60 * 1000)
+        const hour = bjTime.getUTCHours()
+        if (hour >= 22 || hour < 6) {
+          dayStats.nightFeedingCount += 1
+        }
       }
     })
+
+    // Calculate feeding intervals (minutes between consecutive feedings)
+    const feedingIntervals: number[] = []
+    for (let i = 1; i < feedingRecords.length; i++) {
+      const prev = new Date(feedingRecords[i - 1].startTime).getTime()
+      const curr = new Date(feedingRecords[i].startTime).getTime()
+      const intervalMinutes = Math.round((curr - prev) / (60 * 1000))
+      if (intervalMinutes > 0 && intervalMinutes < 720) {
+        feedingIntervals.push(intervalMinutes)
+      }
+    }
 
     healthRecords.forEach(record => {
       const date = getBeijingDateStr(new Date(record.recordedAt))
@@ -201,7 +236,7 @@ export async function GET(request: NextRequest) {
 
     const todayStats = statsMap.get(todayStr)
 
-    const [allWeightRecords, allHeightRecords, vaccineRecords] = await Promise.all([
+    const [allWeightRecords, allHeightRecords, vaccineRecords, medicationRecords] = await Promise.all([
       prisma.healthRecord.findMany({
         where: {
           babyId,
@@ -237,6 +272,26 @@ export async function GET(request: NextRequest) {
           notes: true,
           vaccineDoseNumber: true,
           vaccineTotalDoses: true
+        }
+      }),
+      prisma.healthRecord.findMany({
+        where: {
+          babyId,
+          createdBy: session.user.id,
+          type: 'MEDICATION',
+          medicationName: { not: null },
+          recordedAt: {
+            gte: rangeStart,
+            lte: rangeEnd
+          }
+        },
+        orderBy: { recordedAt: 'desc' },
+        select: {
+          id: true,
+          medicationName: true,
+          medicationDose: true,
+          recordedAt: true,
+          notes: true
         }
       })
     ])
@@ -286,7 +341,23 @@ export async function GET(request: NextRequest) {
           vaccineDoseNumber: record.vaccineDoseNumber,
           vaccineTotalDoses: record.vaccineTotalDoses
         }
-      })
+      }),
+      medicationRecords: medicationRecords.flatMap(record => {
+        if (!record.medicationName) {
+          return []
+        }
+
+        return {
+          id: record.id,
+          medicationName: record.medicationName,
+          medicationDose: record.medicationDose,
+          date: getBeijingDateStr(new Date(record.recordedAt)),
+          recordedAt: record.recordedAt,
+          notes: record.notes
+        }
+      }),
+      feedingIntervals,
+      babyBirthDate: baby.birthDate ? getBeijingDateStr(new Date(baby.birthDate)) : null,
     }, { headers: noStoreHeaders })
   } catch (error) {
     console.error('获取统计数据失败:', error)

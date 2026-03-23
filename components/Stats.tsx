@@ -13,10 +13,10 @@ import {
   Legend,
   LabelList,
 } from 'recharts'
-import { ChartColumn, Milk, Ruler, Scale, Syringe, Thermometer } from 'lucide-react'
+import { Baby as BabyIcon, ChartColumn, Clock, Droplets, Milk, Moon, Pill, Ruler, Scale, Syringe, Thermometer, TrendingUp } from 'lucide-react'
 import { dedupeRequest } from '@/lib/client-request-cache'
 import type { PreloadedStatsData } from '@/lib/server-stats'
-import { StatsEmptyState, StatsFeatureCard, StatsPanel, StatsSegmentedTabs } from '@/components/StatsUi'
+import { StatsEmptyState, StatsPanel, StatsSegmentedTabs } from '@/components/StatsUi'
 
 interface Baby {
   id: string
@@ -280,8 +280,7 @@ export default function StatsComponent({
   const totalBreastfeedingSessions = stats?.lastDays.reduce((sum, day) => sum + day.breastFeedingCount, 0) || 0
   const totalBreastMilkBottleSessions = stats?.lastDays.reduce((sum, day) => sum + day.breastBottleCount, 0) || 0
   const totalFormulaSessions = stats?.lastDays.reduce((sum, day) => sum + day.formulaCount, 0) || 0
-  const breastMilkRecordDays = stats?.lastDays.filter(day => day.totalBreastDuration > 0 || day.totalBreastMilkAmount > 0).length || 0
-  const formulaRecordDays = stats?.lastDays.filter(day => day.totalFormulaAmount > 0).length || 0
+
   const averageMilkPerActiveDay = activeFeedingDays > 0 ? Math.round(totalMilkAmount / activeFeedingDays) : 0
   const averageFeedingsPerActiveDay = activeFeedingDays > 0
     ? (stats?.totalStats.totalFeedings || 0) / activeFeedingDays
@@ -338,6 +337,110 @@ export default function StatsComponent({
     return best
   }, null) || null
   const latestDiaperDay = [...(stats?.lastDays || [])].reverse().find(day => day.peeCount > 0 || day.poopCount > 0) || null
+
+  // --- New insight computations ---
+
+  // Night feeding stats (22:00 - 06:00)
+  const totalNightFeedings = stats?.lastDays.reduce((sum, day) => sum + day.nightFeedingCount, 0) || 0
+  const nightFeedingActiveDays = stats?.lastDays.filter(day => day.nightFeedingCount > 0).length || 0
+
+  // Left/right breast ratio
+  const totalLeftBreast = stats?.lastDays.reduce((sum, day) => sum + day.leftBreastDuration, 0) || 0
+  const totalRightBreast = stats?.lastDays.reduce((sum, day) => sum + day.rightBreastDuration, 0) || 0
+  const totalBreastTime = totalLeftBreast + totalRightBreast
+  const leftBreastPct = totalBreastTime > 0 ? Math.round((totalLeftBreast / totalBreastTime) * 100) : 0
+  const rightBreastPct = totalBreastTime > 0 ? 100 - leftBreastPct : 0
+
+  // Feeding intervals
+  const feedingIntervals = stats?.feedingIntervals || []
+  const avgFeedingInterval = feedingIntervals.length > 0
+    ? Math.round(feedingIntervals.reduce((a, b) => a + b, 0) / feedingIntervals.length)
+    : 0
+  const maxFeedingInterval = feedingIntervals.length > 0 ? Math.max(...feedingIntervals) : 0
+
+  // Consecutive no-poop days (count from today backwards)
+  const consecutiveNoPoopDays = (() => {
+    const reversed = [...(stats?.lastDays || [])].reverse()
+    let count = 0
+    for (const day of reversed) {
+      if (day.poopCount > 0) break
+      count++
+    }
+    return count
+  })()
+
+  // Baby age in days
+  const babyAgeDays = (() => {
+    const birthDate = stats?.babyBirthDate
+    if (!birthDate) return null
+    const birth = new Date(birthDate)
+    const now = new Date()
+    return Math.floor((now.getTime() - birth.getTime()) / (1000 * 60 * 60 * 24))
+  })()
+
+  const babyAgeLabel = (() => {
+    if (babyAgeDays === null) return null
+    if (babyAgeDays < 30) return `${babyAgeDays}天`
+    const months = Math.floor(babyAgeDays / 30)
+    const remainDays = babyAgeDays % 30
+    if (months < 12) return remainDays > 0 ? `${months}个月${remainDays}天` : `${months}个月`
+    const years = Math.floor(months / 12)
+    const remainMonths = months % 12
+    return remainMonths > 0 ? `${years}岁${remainMonths}个月` : `${years}岁`
+  })()
+
+  // AD consecutive streak (from today backwards)
+  const adConsecutiveStreak = (() => {
+    const reversed = [...(stats?.lastDays || [])].reverse()
+    let count = 0
+    for (const day of reversed) {
+      if (!day.adGiven) break
+      count++
+    }
+    return count
+  })()
+
+  const adMissedRecently = (() => {
+    const reversed = [...(stats?.lastDays || [])].reverse()
+    let count = 0
+    for (const day of reversed) {
+      if (day.adGiven) break
+      count++
+    }
+    return count
+  })()
+
+  // Temperature normal range ratio
+  const normalTempDays = stats?.lastDays.filter(day =>
+    typeof day.temperature === 'number' && day.temperature >= 36 && day.temperature <= 37.5
+  ).length || 0
+  const abnormalTempDays = stats?.lastDays.filter(day =>
+    typeof day.temperature === 'number' && (day.temperature < 36 || day.temperature > 37.5)
+  ).length || 0
+
+  // Medication records
+  const medicationRecords = stats?.medicationRecords || []
+  const uniqueMedications = [...new Set(medicationRecords.map(r => r.medicationName))]
+
+  // Daily milk amount standard deviation (feeding regularity)
+  const dailyMilkAmounts = (stats?.lastDays || [])
+    .map(day => day.totalBreastMilkAmount + day.totalFormulaAmount)
+    .filter(amount => amount > 0)
+  const milkAmountStdDev = (() => {
+    if (dailyMilkAmounts.length < 2) return null
+    const mean = dailyMilkAmounts.reduce((a, b) => a + b, 0) / dailyMilkAmounts.length
+    const variance = dailyMilkAmounts.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / dailyMilkAmounts.length
+    return Math.round(Math.sqrt(variance))
+  })()
+  const feedingRegularity = (() => {
+    if (milkAmountStdDev === null || averageMilkPerActiveDay === 0) return null
+    const cv = milkAmountStdDev / averageMilkPerActiveDay
+    if (cv < 0.15) return '非常稳定'
+    if (cv < 0.3) return '较为稳定'
+    if (cv < 0.5) return '波动一般'
+    return '波动较大'
+  })()
+
   const chartTabs = [
     {
       key: 'breastfeeding' as const,
@@ -431,56 +534,74 @@ export default function StatsComponent({
     doseEntries: [...item.doseEntries].sort((a, b) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime()),
   }))
   const pendingVaccines = vaccineProgressSummary.filter(item => item.remainingDoses && item.remainingDoses > 0)
+  const totalVaccineTypes = vaccineProgressSummary.length
+  const completedVaccineTypes = vaccineProgressSummary.filter(v => v.isCompleted).length
   const recentVaccineCard = (
-    <StatsFeatureCard
-      title="最近疫苗"
-      icon={Syringe}
-      className="border border-teal-100 bg-gradient-to-br from-teal-50 to-white"
-      iconClassName="text-teal-600"
-    >
-      {pendingVaccines.length > 0 ? (
-        <div className="space-y-2.5">
-          <p className="text-xs font-medium text-teal-700">以下疫苗尚未完成，请按针次继续跟进：</p>
+    <div className="rounded-2xl border border-teal-100 bg-gradient-to-br from-teal-50/80 to-white p-2.5 shadow-sm">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 text-teal-600">
+          <Syringe size={13} />
+          <p className="text-[13px] font-bold">疫苗进度</p>
+        </div>
+        {totalVaccineTypes > 0 && (
+          <div className="flex items-center gap-1.5">
+            {pendingVaccines.length > 0 && (
+              <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">待完成{pendingVaccines.length}种</span>
+            )}
+            <span className="rounded-full bg-teal-100 px-1.5 py-0.5 text-[9px] font-bold text-teal-700">{completedVaccineTypes}/{totalVaccineTypes}种</span>
+          </div>
+        )}
+      </div>
+
+      {totalVaccineTypes > 0 ? (
+        <div className="mt-2 space-y-1">
+          {/* Pending vaccines - highlighted */}
           {pendingVaccines.map(item => (
-            <div key={item.vaccineName} className="rounded-2xl border border-teal-100 bg-white/90 px-3 py-2.5">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-gray-900 break-words">{item.vaccineName}</p>
-                  <p className="mt-1 text-[11px] text-gray-500">最近记录 {formatRecordedSummaryTime(item.latestRecordedAt)}</p>
+            <div key={item.vaccineName} className="flex items-center gap-2 rounded-lg border border-amber-100 bg-amber-50/60 px-2 py-1.5">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <p className="text-xs font-bold text-slate-900 truncate">{item.vaccineName}</p>
+                  <span className="shrink-0 rounded-full bg-amber-200 px-1.5 py-0.5 text-[8px] font-bold text-amber-800">差{item.remainingDoses}针</span>
                 </div>
-                <span className="shrink-0 rounded-full bg-amber-100 px-2 py-1 text-[10px] font-semibold text-amber-700">
-                  还差 {item.remainingDoses} 针
-                </span>
+                <div className="mt-0.5 flex items-center gap-1.5 text-[9px] text-slate-500">
+                  <span className="font-medium text-teal-600">{formatVaccineProgress(item.latestDoseNumber, item.totalDoses) || '未标注'}</span>
+                  <span>·</span>
+                  <span>{item.latestDate}</span>
+                </div>
               </div>
-              <div className="mt-2 flex flex-wrap gap-1.5 text-[10px]">
-                <span className="rounded-full bg-teal-100 px-2 py-1 font-medium text-teal-700">
-                  {formatVaccineProgress(item.latestDoseNumber, item.totalDoses) || '未标注针次'}
-                </span>
-                {item.totalDoses ? (
-                  <span className="rounded-full bg-slate-100 px-2 py-1 font-medium text-slate-600">
-                    全程 {item.totalDoses} 针
-                  </span>
-                ) : null}
-              </div>
+              {/* Mini progress bar */}
+              {item.latestDoseNumber && item.totalDoses && (
+                <div className="shrink-0 w-10">
+                  <div className="flex h-1.5 overflow-hidden rounded-full bg-amber-100">
+                    <div className="bg-teal-500 rounded-full transition-all" style={{ width: `${Math.round((item.latestDoseNumber / item.totalDoses) * 100)}%` }} />
+                  </div>
+                  <p className="mt-0.5 text-center text-[7px] text-slate-400">{item.latestDoseNumber}/{item.totalDoses}</p>
+                </div>
+              )}
             </div>
           ))}
+          {/* Completed vaccines - compact list */}
+          {vaccineProgressSummary.filter(v => v.isCompleted).length > 0 && (
+            <div className="rounded-lg bg-emerald-50/60 px-2 py-1.5">
+              <div className="flex flex-wrap gap-x-2 gap-y-0.5">
+                {vaccineProgressSummary.filter(v => v.isCompleted).map(item => (
+                  <span key={item.vaccineName} className="text-[9px] text-emerald-700">
+                    ✓ <span className="font-medium">{item.vaccineName}</span>
+                    {item.totalDoses && <span className="text-emerald-500">({item.totalDoses}针)</span>}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* Latest record timestamp */}
+          {latestVaccineRecord && (
+            <p className="text-[8px] text-slate-400 pl-0.5">最近接种 {formatRecordedSummaryTime(latestVaccineRecord.recordedAt)}</p>
+          )}
         </div>
-      ) : latestVaccineRecord ? (
-        <>
-          <p className="text-lg font-bold text-teal-700 break-words">{latestVaccineRecord.vaccineName}</p>
-          <p className="mt-1 text-xs text-gray-500">
-            记录于 {formatRecordedSummaryTime(latestVaccineRecord.recordedAt)}
-          </p>
-          {formatVaccineProgress(latestVaccineRecord.vaccineDoseNumber, latestVaccineRecord.vaccineTotalDoses) ? (
-            <p className="mt-2 inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-medium text-emerald-700">
-              {formatVaccineProgress(latestVaccineRecord.vaccineDoseNumber, latestVaccineRecord.vaccineTotalDoses)} · 已完成全程
-            </p>
-          ) : null}
-        </>
       ) : (
-        <p className="text-sm text-gray-400">暂无疫苗记录</p>
+        <p className="mt-2 text-[11px] text-slate-400">暂无疫苗记录，添加后可查看接种进度</p>
       )}
-    </StatsFeatureCard>
+    </div>
   )
 
   return (
@@ -804,196 +925,294 @@ export default function StatsComponent({
           )}
 
           {activeSubpage === 'insights' && (
-            <div className="space-y-3">
-              <div className="rounded-2xl border border-blue-100 bg-gradient-to-br from-white via-blue-50/50 to-sky-50/70 p-3.5 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-2 text-blue-700">
-                  <div className="flex items-center gap-2">
-                    <Milk size={16} />
-                    <p className="text-sm font-semibold">喂养洞察</p>
-                  </div>
-                  <span className="rounded-full bg-blue-100 px-2.5 py-1 text-[11px] font-semibold text-blue-700">近 {days} 天</span>
-                </div>
+            <div className="space-y-2.5">
 
-                <div className="mt-3 grid grid-cols-2 gap-2 xl:grid-cols-4">
-                  <div className="rounded-xl border border-blue-100 bg-white px-2.5 py-2">
-                    <p className="text-[10px] font-medium text-slate-500">总喂养次数</p>
-                    <p className="mt-1 text-base font-bold text-slate-900">{stats.totalStats.totalFeedings}</p>
-                  </div>
-                  <div className="rounded-xl border border-blue-100 bg-white px-2.5 py-2">
-                    <p className="text-[10px] font-medium text-slate-500">总亲喂时长</p>
-                    <p className="mt-1 text-base font-bold text-slate-900">{formatMinutes(stats.totalStats.totalBreastDuration)}</p>
-                  </div>
-                  <div className="rounded-xl border border-blue-100 bg-white px-2.5 py-2">
-                    <p className="text-[10px] font-medium text-slate-500">奶量总计</p>
-                    <p className="mt-1 text-base font-bold text-slate-900">{totalMilkAmount}ml</p>
-                  </div>
-                  <div className="rounded-xl border border-blue-100 bg-white px-2.5 py-2">
-                    <p className="text-[10px] font-medium text-slate-500">记录天数</p>
-                    <p className="mt-1 text-base font-bold text-slate-900">{activeFeedingDays} 天</p>
-                  </div>
-                </div>
-
-                <div className="mt-2 grid grid-cols-2 gap-2 xl:grid-cols-4">
-                  <div className="rounded-xl bg-blue-100/70 px-2.5 py-2">
-                    <p className="text-[10px] font-medium text-blue-700">活跃日均奶量</p>
-                    <p className="mt-1 text-sm font-bold text-slate-900">{averageMilkPerActiveDay}ml</p>
-                  </div>
-                  <div className="rounded-xl bg-sky-100/70 px-2.5 py-2">
-                    <p className="text-[10px] font-medium text-sky-700">活跃日均频次</p>
-                    <p className="mt-1 text-sm font-bold text-slate-900">{averageFeedingsPerActiveDay > 0 ? `${averageFeedingsPerActiveDay.toFixed(1)} 次` : '暂无'}</p>
-                  </div>
-                  <div className="rounded-xl bg-indigo-100/70 px-2.5 py-2">
-                    <p className="text-[10px] font-medium text-indigo-700">母乳记录天数</p>
-                    <p className="mt-1 text-sm font-bold text-slate-900">{breastMilkRecordDays} 天</p>
-                  </div>
-                  <div className="rounded-xl bg-cyan-100/70 px-2.5 py-2">
-                    <p className="text-[10px] font-medium text-cyan-700">奶粉记录天数</p>
-                    <p className="mt-1 text-sm font-bold text-slate-900">{formulaRecordDays} 天</p>
-                  </div>
-                </div>
-
-                <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
-                  <span className="rounded-full bg-slate-900 px-2.5 py-1 font-semibold text-white">亲喂 {totalBreastfeedingSessions} 次</span>
-                  <span className="rounded-full bg-blue-100 px-2.5 py-1 font-semibold text-blue-700">瓶喂母乳 {totalBreastMilkBottleSessions} 次</span>
-                  <span className="rounded-full bg-sky-100 px-2.5 py-1 font-semibold text-sky-700">奶粉 {totalFormulaSessions} 次</span>
-                </div>
-
-                <div className="mt-2 space-y-1 text-[12px] leading-5 text-slate-600">
-                  <p>
-                    {activeFeedingDays > 0
-                      ? `近 ${days} 天共有 ${activeFeedingDays} 天有喂养记录，平均每天约 ${averageMilkPerActiveDay}ml。`
-                      : `近 ${days} 天还没有可用于分析的喂养记录。`}
+              {/* Baby age banner */}
+              {babyAgeLabel && (
+                <div className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-pink-50 to-purple-50 border border-pink-100 px-3 py-2">
+                  <BabyIcon size={14} className="shrink-0 text-pink-500" />
+                  <p className="text-xs font-medium text-gray-700">
+                    <span className="font-bold text-pink-600">{stats.baby.name}</span>
+                    {' · '}当前月龄 <span className="font-bold text-purple-600">{babyAgeLabel}</span>
+                    {babyAgeDays !== null && <span className="text-gray-400"> ({babyAgeDays}天)</span>}
                   </p>
-                  <p>
-                    {peakMilkIntakeDay && (peakMilkIntakeDay.totalBreastMilkAmount + peakMilkIntakeDay.totalFormulaAmount > 0)
-                      ? `${peakMilkIntakeDay.date} 奶量最高 ${peakMilkIntakeDay.totalBreastMilkAmount + peakMilkIntakeDay.totalFormulaAmount}ml；${maxBreastfeedingDay && maxBreastfeedingDay.totalBreastDuration > 0 ? `${maxBreastfeedingDay.date} 亲喂时长最高 ${formatMinutes(maxBreastfeedingDay.totalBreastDuration)}。` : '暂无明显亲喂峰值。'}`
-                      : maxBreastfeedingDay && maxBreastfeedingDay.totalBreastDuration > 0
-                        ? `${maxBreastfeedingDay.date} 的亲喂时长最高，达到 ${formatMinutes(maxBreastfeedingDay.totalBreastDuration)}。`
-                        : '当前周期内还没有明显的奶量或亲喂峰值可供比较。'}
-                  </p>
+                </div>
+              )}
+
+              {/* Feeding insights */}
+              <div className="rounded-2xl border border-blue-100 bg-gradient-to-br from-white via-blue-50/40 to-sky-50/60 p-3 shadow-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 text-blue-700">
+                    <Milk size={14} />
+                    <p className="text-[13px] font-bold">喂养洞察</p>
+                  </div>
+                  <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">近{days}天</span>
+                </div>
+
+                {/* Core metrics - 4 col grid, compact */}
+                <div className="mt-2 grid grid-cols-4 gap-1.5">
+                  <div className="rounded-lg bg-white/80 border border-blue-50 px-2 py-1.5 text-center">
+                    <p className="text-[9px] text-slate-500">喂养次数</p>
+                    <p className="text-sm font-bold text-slate-900">{stats.totalStats.totalFeedings}</p>
+                  </div>
+                  <div className="rounded-lg bg-white/80 border border-blue-50 px-2 py-1.5 text-center">
+                    <p className="text-[9px] text-slate-500">亲喂时长</p>
+                    <p className="text-sm font-bold text-slate-900">{formatMinutes(stats.totalStats.totalBreastDuration)}</p>
+                  </div>
+                  <div className="rounded-lg bg-white/80 border border-blue-50 px-2 py-1.5 text-center">
+                    <p className="text-[9px] text-slate-500">奶量总计</p>
+                    <p className="text-sm font-bold text-slate-900">{totalMilkAmount}<span className="text-[10px] font-medium">ml</span></p>
+                  </div>
+                  <div className="rounded-lg bg-white/80 border border-blue-50 px-2 py-1.5 text-center">
+                    <p className="text-[9px] text-slate-500">记录天数</p>
+                    <p className="text-sm font-bold text-slate-900">{activeFeedingDays}<span className="text-[10px] font-medium">/{days}</span></p>
+                  </div>
+                </div>
+
+                {/* Secondary metrics row */}
+                <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+                  <div className="rounded-lg bg-blue-50/80 px-2 py-1.5 text-center">
+                    <p className="text-[9px] text-blue-600">日均奶量</p>
+                    <p className="text-[13px] font-bold text-slate-900">{averageMilkPerActiveDay}<span className="text-[10px] font-medium">ml</span></p>
+                  </div>
+                  <div className="rounded-lg bg-sky-50/80 px-2 py-1.5 text-center">
+                    <p className="text-[9px] text-sky-600">日均频次</p>
+                    <p className="text-[13px] font-bold text-slate-900">{averageFeedingsPerActiveDay > 0 ? averageFeedingsPerActiveDay.toFixed(1) : '-'}<span className="text-[10px] font-medium">次</span></p>
+                  </div>
+                  <div className="rounded-lg bg-indigo-50/80 px-2 py-1.5 text-center">
+                    <p className="text-[9px] text-indigo-600">喂养规律</p>
+                    <p className="text-[13px] font-bold text-slate-900">{feedingRegularity || '-'}</p>
+                  </div>
+                </div>
+
+                {/* Feeding type tags */}
+                <div className="mt-1.5 flex flex-wrap gap-1 text-[10px]">
+                  <span className="rounded-full bg-slate-800 px-2 py-0.5 font-semibold text-white">亲喂{totalBreastfeedingSessions}次</span>
+                  <span className="rounded-full bg-blue-100 px-2 py-0.5 font-semibold text-blue-700">瓶喂{totalBreastMilkBottleSessions}次</span>
+                  <span className="rounded-full bg-sky-100 px-2 py-0.5 font-semibold text-sky-700">奶粉{totalFormulaSessions}次</span>
+                  {totalNightFeedings > 0 && (
+                    <span className="rounded-full bg-violet-100 px-2 py-0.5 font-semibold text-violet-700">夜奶{totalNightFeedings}次</span>
+                  )}
+                </div>
+
+                {/* New insights: intervals + night + L/R ratio */}
+                <div className="mt-2 grid grid-cols-2 gap-1.5">
+                  {avgFeedingInterval > 0 && (
+                    <div className="flex items-center gap-1.5 rounded-lg border border-blue-100 bg-white px-2 py-1.5">
+                      <Clock size={12} className="shrink-0 text-blue-500" />
+                      <div className="min-w-0">
+                        <p className="text-[9px] text-slate-500">平均喂养间隔</p>
+                        <p className="text-xs font-bold text-slate-900">{formatMinutes(avgFeedingInterval)}</p>
+                        {maxFeedingInterval > 0 && <p className="text-[9px] text-slate-400">最长 {formatMinutes(maxFeedingInterval)}</p>}
+                      </div>
+                    </div>
+                  )}
+                  {totalNightFeedings > 0 && (
+                    <div className="flex items-center gap-1.5 rounded-lg border border-violet-100 bg-white px-2 py-1.5">
+                      <Moon size={12} className="shrink-0 text-violet-500" />
+                      <div className="min-w-0">
+                        <p className="text-[9px] text-slate-500">夜间喂养(22-06时)</p>
+                        <p className="text-xs font-bold text-slate-900">{totalNightFeedings}次 / {nightFeedingActiveDays}天</p>
+                        <p className="text-[9px] text-slate-400">日均 {nightFeedingActiveDays > 0 ? (totalNightFeedings / nightFeedingActiveDays).toFixed(1) : '0'}次</p>
+                      </div>
+                    </div>
+                  )}
+                  {totalBreastTime > 0 && (
+                    <div className="col-span-2 rounded-lg border border-pink-100 bg-white px-2 py-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[9px] text-slate-500">左右乳喂养比例</p>
+                        <p className="text-[10px] font-bold text-slate-600">{formatMinutes(totalLeftBreast)} / {formatMinutes(totalRightBreast)}</p>
+                      </div>
+                      <div className="mt-1 flex h-2 overflow-hidden rounded-full bg-gray-100">
+                        <div className="bg-pink-400 transition-all" style={{ width: `${leftBreastPct}%` }} />
+                        <div className="bg-rose-200 transition-all" style={{ width: `${rightBreastPct}%` }} />
+                      </div>
+                      <div className="mt-0.5 flex justify-between text-[9px]">
+                        <span className="text-pink-600 font-medium">左 {leftBreastPct}%</span>
+                        <span className="text-rose-400 font-medium">右 {rightBreastPct}%</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Peak days summary - compact text */}
+                <div className="mt-2 space-y-0.5 text-[11px] leading-4 text-slate-500">
+                  {peakMilkIntakeDay && (peakMilkIntakeDay.totalBreastMilkAmount + peakMilkIntakeDay.totalFormulaAmount > 0) && (
+                    <p>📈 {peakMilkIntakeDay.date} 奶量最高 <span className="font-semibold text-blue-700">{peakMilkIntakeDay.totalBreastMilkAmount + peakMilkIntakeDay.totalFormulaAmount}ml</span></p>
+                  )}
+                  {maxBreastfeedingDay && maxBreastfeedingDay.totalBreastDuration > 0 && (
+                    <p>🤱 {maxBreastfeedingDay.date} 亲喂最长 <span className="font-semibold text-pink-600">{formatMinutes(maxBreastfeedingDay.totalBreastDuration)}</span></p>
+                  )}
+                  {milkAmountStdDev !== null && averageMilkPerActiveDay > 0 && (
+                    <p>📊 日奶量波动 ±{milkAmountStdDev}ml（均值 {averageMilkPerActiveDay}ml）</p>
+                  )}
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1fr)]">
-                <div className="rounded-2xl border border-emerald-100 bg-white p-3.5 shadow-sm">
-                  <div className="flex items-center gap-2 text-emerald-600">
-                    <ChartColumn size={16} />
-                    <p className="text-sm font-semibold">成长洞察</p>
+              {/* Growth + Diaper + Health - 2 columns on mobile, 3 on desktop */}
+              <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
+
+                {/* Growth insight */}
+                <div className="col-span-2 lg:col-span-1 rounded-2xl border border-emerald-100 bg-white p-2.5 shadow-sm">
+                  <div className="flex items-center gap-1.5 text-emerald-600">
+                    <TrendingUp size={13} />
+                    <p className="text-[13px] font-bold">成长洞察</p>
                   </div>
-                  <p className="mt-2 text-sm font-medium text-gray-900">
-                    {latestWeightRecord || latestHeightRecord
-                      ? `最近一次成长记录${latestWeightRecord ? `体重 ${latestWeightRecord.weight}kg` : ''}${latestWeightRecord && latestHeightRecord ? '，' : ''}${latestHeightRecord ? `身高 ${latestHeightRecord.height}cm` : ''}。`
-                      : '当前还没有体重或身高记录，添加后可查看增长趋势。'}
-                  </p>
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    <div className="rounded-xl border border-teal-100 bg-teal-50/80 px-3 py-2.5">
-                      <div className="flex flex-col gap-2">
-                        <div>
-                          <p className="text-[11px] font-medium text-teal-700">体重变化</p>
-                          <p className="mt-1 text-base font-bold text-slate-900">
-                            {overallWeightChange !== null ? `${overallWeightChange >= 0 ? '+' : ''}${overallWeightChange}kg` : '暂无趋势'}
-                          </p>
-                        </div>
-                        <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-bold ${latestWeightChange === null ? 'bg-white text-slate-500' : latestWeightChange >= 0 ? 'bg-teal-700 text-white' : 'bg-amber-500 text-white'}`}>
-                          {latestWeightChange !== null ? `较上次 ${latestWeightChange >= 0 ? '+' : ''}${latestWeightChange}kg` : '较上次 暂无'}
-                        </span>
-                      </div>
-                      <p className="mt-2 text-[11px] leading-5 text-slate-500">
-                        {latestWeightRecord
-                          ? `最近记录：${formatRecordedSummaryTime(latestWeightRecord.recordedAt)}`
-                          : '最近记录：暂无'}
+                  <div className="mt-2 grid grid-cols-2 gap-1.5">
+                    <div className="rounded-xl bg-teal-50/80 px-2.5 py-2">
+                      <p className="text-[9px] font-medium text-teal-600">体重</p>
+                      <p className="mt-0.5 text-base font-bold text-slate-900">
+                        {latestWeightRecord ? `${latestWeightRecord.weight}kg` : '-'}
                       </p>
+                      <span className={`mt-1 inline-flex rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
+                        latestWeightChange === null ? 'bg-gray-100 text-slate-400'
+                        : latestWeightChange >= 0 ? 'bg-teal-600 text-white' : 'bg-amber-500 text-white'
+                      }`}>
+                        {latestWeightChange !== null ? `${latestWeightChange >= 0 ? '+' : ''}${latestWeightChange}kg` : '暂无'}
+                      </span>
+                      {overallWeightChange !== null && overallWeightChange !== latestWeightChange && (
+                        <p className="mt-1 text-[9px] text-slate-400">整体 {overallWeightChange >= 0 ? '+' : ''}{overallWeightChange}kg</p>
+                      )}
                     </div>
-                    <div className="rounded-xl border border-blue-100 bg-blue-50/80 px-3 py-2.5">
-                      <div className="flex flex-col gap-2">
-                        <div>
-                          <p className="text-[11px] font-medium text-blue-700">身高变化</p>
-                          <p className="mt-1 text-base font-bold text-slate-900">
-                            {overallHeightChange !== null ? `${overallHeightChange >= 0 ? '+' : ''}${overallHeightChange}cm` : '暂无趋势'}
-                          </p>
-                        </div>
-                        <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-bold ${latestHeightChange === null ? 'bg-white text-slate-500' : latestHeightChange >= 0 ? 'bg-blue-700 text-white' : 'bg-amber-500 text-white'}`}>
-                          {latestHeightChange !== null ? `较上次 ${latestHeightChange >= 0 ? '+' : ''}${latestHeightChange}cm` : '较上次 暂无'}
-                        </span>
-                      </div>
-                      <p className="mt-2 text-[11px] leading-5 text-slate-500">
-                        {latestHeightRecord
-                          ? `最近记录：${formatRecordedSummaryTime(latestHeightRecord.recordedAt)}`
-                          : '最近记录：暂无'}
+                    <div className="rounded-xl bg-blue-50/80 px-2.5 py-2">
+                      <p className="text-[9px] font-medium text-blue-600">身高</p>
+                      <p className="mt-0.5 text-base font-bold text-slate-900">
+                        {latestHeightRecord ? `${latestHeightRecord.height}cm` : '-'}
                       </p>
+                      <span className={`mt-1 inline-flex rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
+                        latestHeightChange === null ? 'bg-gray-100 text-slate-400'
+                        : latestHeightChange >= 0 ? 'bg-blue-600 text-white' : 'bg-amber-500 text-white'
+                      }`}>
+                        {latestHeightChange !== null ? `${latestHeightChange >= 0 ? '+' : ''}${latestHeightChange}cm` : '暂无'}
+                      </span>
+                      {overallHeightChange !== null && overallHeightChange !== latestHeightChange && (
+                        <p className="mt-1 text-[9px] text-slate-400">整体 {overallHeightChange >= 0 ? '+' : ''}{overallHeightChange}cm</p>
+                      )}
                     </div>
+                  </div>
+                  {(latestWeightRecord || latestHeightRecord) && (
+                    <div className="mt-1.5 text-[9px] text-slate-400">
+                      {latestWeightRecord && <p>体重记录于 {formatRecordedSummaryTime(latestWeightRecord.recordedAt)}</p>}
+                      {latestHeightRecord && <p>身高记录于 {formatRecordedSummaryTime(latestHeightRecord.recordedAt)}</p>}
+                    </div>
+                  )}
+                </div>
+
+                {/* Diaper insight */}
+                <div className="rounded-2xl border border-violet-100 bg-white p-2.5 shadow-sm">
+                  <div className="flex items-center gap-1.5 text-violet-600">
+                    <Droplets size={13} />
+                    <p className="text-[13px] font-bold">大小便</p>
+                  </div>
+                  <div className="mt-2 space-y-1.5">
+                    <div className="grid grid-cols-2 gap-1">
+                      <div className="rounded-lg bg-sky-50 px-2 py-1.5 text-center">
+                        <p className="text-[9px] text-sky-600">小便</p>
+                        <p className="text-sm font-bold text-slate-900">{totalPeeCount}<span className="text-[10px]">次</span></p>
+                        <p className="text-[9px] text-slate-400">日均{diaperActiveDays > 0 ? averagePeePerActiveDay.toFixed(1) : '-'}</p>
+                      </div>
+                      <div className="rounded-lg bg-amber-50 px-2 py-1.5 text-center">
+                        <p className="text-[9px] text-amber-600">大便</p>
+                        <p className="text-sm font-bold text-slate-900">{totalPoopCount}<span className="text-[10px]">次</span></p>
+                        <p className="text-[9px] text-slate-400">日均{diaperActiveDays > 0 ? averagePoopPerActiveDay.toFixed(1) : '-'}</p>
+                      </div>
+                    </div>
+                    {consecutiveNoPoopDays >= 2 && (
+                      <div className="rounded-lg bg-red-50 border border-red-100 px-2 py-1.5">
+                        <p className="text-[10px] font-semibold text-red-600">⚠️ 已连续 {consecutiveNoPoopDays} 天未记录大便</p>
+                      </div>
+                    )}
+                    {peakDiaperDay && (peakDiaperDay.peeCount > 0 || peakDiaperDay.poopCount > 0) && (
+                      <p className="text-[9px] text-slate-400">高峰 {peakDiaperDay.date} 小便{peakDiaperDay.peeCount}+大便{peakDiaperDay.poopCount}</p>
+                    )}
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-violet-100 bg-white p-3.5 shadow-sm">
-                  <div className="flex items-center gap-2 text-violet-600">
-                    <ChartColumn size={16} />
-                    <p className="text-sm font-semibold">大小便趋势</p>
+                {/* Health reminder */}
+                <div className="rounded-2xl border border-amber-100 bg-white p-2.5 shadow-sm">
+                  <div className="flex items-center gap-1.5 text-amber-600">
+                    <Thermometer size={13} />
+                    <p className="text-[13px] font-bold">健康提醒</p>
                   </div>
-                  <p className="mt-2 text-sm font-medium text-gray-900">
-                    {diaperActiveDays > 0
-                      ? `近 ${days} 天共有 ${diaperActiveDays} 天记录了大小便情况。`
-                      : '当前周期内还没有大小便记录，添加后可查看排泄趋势。'}
-                  </p>
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    <div className="rounded-xl border border-sky-100 bg-sky-50/80 px-3 py-2.5">
-                      <p className="text-[11px] font-medium text-sky-700">小便次数</p>
-                      <p className="mt-1 text-base font-bold text-slate-900">{totalPeeCount} 次</p>
-                      <p className="mt-2 text-[11px] leading-5 text-slate-500">
-                        {diaperActiveDays > 0 ? `活跃日均 ${averagePeePerActiveDay.toFixed(1)} 次` : '活跃日均 暂无'}
-                      </p>
+                  <div className="mt-2 space-y-1.5">
+                    {/* Temperature */}
+                    <div className="rounded-lg bg-amber-50 px-2 py-1.5">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[9px] text-amber-600">体温覆盖</p>
+                        <p className="text-[10px] font-bold text-slate-700">{temperatureRecordCount}/{days}天</p>
+                      </div>
+                      {temperatureRecordCount > 0 && (
+                        <div className="mt-1 flex gap-1">
+                          {normalTempDays > 0 && (
+                            <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[8px] font-semibold text-emerald-700">正常{normalTempDays}天</span>
+                          )}
+                          {abnormalTempDays > 0 && (
+                            <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[8px] font-semibold text-red-600">异常{abnormalTempDays}天</span>
+                          )}
+                        </div>
+                      )}
+                      {latestTemperatureDay && (
+                        <p className="mt-1 text-[9px] text-slate-500">最近 <span className="font-semibold">{latestTemperatureDay.temperature}°C</span> ({latestTemperatureDay.date})</p>
+                      )}
+                      {maxTemperatureDay && typeof maxTemperatureDay.temperature === 'number' && maxTemperatureDay.temperature > 37.5 && (
+                        <p className="mt-0.5 text-[9px] text-red-500">⚠ 最高 {maxTemperatureDay.temperature}°C ({maxTemperatureDay.date})</p>
+                      )}
                     </div>
-                    <div className="rounded-xl border border-amber-100 bg-amber-50/80 px-3 py-2.5">
-                      <p className="text-[11px] font-medium text-amber-700">大便次数</p>
-                      <p className="mt-1 text-base font-bold text-slate-900">{totalPoopCount} 次</p>
-                      <p className="mt-2 text-[11px] leading-5 text-slate-500">
-                        {diaperActiveDays > 0 ? `活跃日均 ${averagePoopPerActiveDay.toFixed(1)} 次` : '活跃日均 暂无'}
-                      </p>
+                    {/* AD */}
+                    <div className="rounded-lg bg-orange-50 px-2 py-1.5">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[9px] text-orange-600">AD补充</p>
+                        <p className="text-[10px] font-bold text-slate-700">{adGivenDays}/{days}天</p>
+                      </div>
+                      {adConsecutiveStreak > 0 && (
+                        <p className="mt-1 text-[9px] text-emerald-600 font-medium">✅ 已连续服用 {adConsecutiveStreak} 天</p>
+                      )}
+                      {adConsecutiveStreak === 0 && adMissedRecently > 0 && (
+                        <p className="mt-1 text-[9px] text-amber-600 font-medium">💊 已 {adMissedRecently} 天未服用</p>
+                      )}
                     </div>
-                  </div>
-                  <div className="mt-2 space-y-1.5 text-xs leading-5 text-gray-500">
-                    <p>
-                      {peakDiaperDay && (peakDiaperDay.peeCount > 0 || peakDiaperDay.poopCount > 0)
-                        ? `${peakDiaperDay.date} 记录最集中，小便 ${peakDiaperDay.peeCount} 次，大便 ${peakDiaperDay.poopCount} 次。`
-                        : '当前周期暂无明显的大小便峰值日。'}
-                    </p>
-                    <p>
-                      {latestDiaperDay
-                        ? `最近一次有记录的日期是 ${latestDiaperDay.date}，当天小便 ${latestDiaperDay.peeCount} 次，大便 ${latestDiaperDay.poopCount} 次。`
-                        : '最近暂无大小便记录。'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-amber-100 bg-white p-4 shadow-sm">
-                  <div className="flex items-center gap-2 text-amber-600">
-                    <Thermometer size={16} />
-                    <p className="text-sm font-semibold">健康提醒</p>
-                  </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    <div className="rounded-2xl bg-amber-50 px-3 py-2.5">
-                      <p className="text-[11px] font-medium text-amber-600">体温记录覆盖</p>
-                      <p className="mt-1 text-sm font-bold text-gray-900">{temperatureRecordCount} / {days} 天</p>
-                    </div>
-                    <div className="rounded-2xl bg-orange-50 px-3 py-2.5">
-                      <p className="text-[11px] font-medium text-orange-600">AD 补充记录</p>
-                      <p className="mt-1 text-sm font-bold text-gray-900">{adGivenDays} / {days} 天</p>
-                    </div>
-                  </div>
-                  <p className="mt-3 text-sm font-medium text-gray-900">
-                    {latestTemperatureDay
-                      ? `最近一次体温记录为 ${latestTemperatureDay.temperature}°C，记录于 ${latestTemperatureDay.date}。`
-                      : '当前周期内没有体温记录。'}
-                  </p>
-                  <div className="mt-2 space-y-1.5 text-xs leading-5 text-gray-500">
-                    <p>
-                      {maxTemperatureDay && typeof maxTemperatureDay.temperature === 'number'
-                        ? `当前周期最高体温为 ${maxTemperatureDay.temperature}°C，记录于 ${maxTemperatureDay.date}。`
-                        : '当前周期暂无可比较的体温峰值。'}
-                    </p>
                   </div>
                 </div>
               </div>
+
+              {/* Medication records - only show if there are records */}
+              {medicationRecords.length > 0 && (
+                <div className="rounded-2xl border border-purple-100 bg-white p-2.5 shadow-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 text-purple-600">
+                      <Pill size={13} />
+                      <p className="text-[13px] font-bold">用药记录</p>
+                    </div>
+                    <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-700">{medicationRecords.length}条</span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {uniqueMedications.map(name => {
+                      const count = medicationRecords.filter(r => r.medicationName === name).length
+                      return (
+                        <span key={name} className="rounded-full bg-purple-50 border border-purple-100 px-2 py-0.5 text-[10px] font-medium text-purple-700">
+                          {name} ×{count}
+                        </span>
+                      )
+                    })}
+                  </div>
+                  <div className="mt-2 space-y-1">
+                    {medicationRecords.slice(0, 5).map(record => (
+                      <div key={record.id} className="flex items-start gap-1.5 text-[10px] text-slate-600">
+                        <span className="shrink-0 text-purple-300">•</span>
+                        <p className="min-w-0">
+                          <span className="font-semibold text-slate-700">{record.medicationName}</span>
+                          {record.medicationDose && <span className="text-slate-400"> {record.medicationDose}</span>}
+                          <span className="text-slate-400"> · {formatRecordedSummaryTime(record.recordedAt)}</span>
+                          {record.notes && <span className="text-slate-400">：{record.notes}</span>}
+                        </p>
+                      </div>
+                    ))}
+                    {medicationRecords.length > 5 && (
+                      <p className="text-[9px] text-slate-400 pl-3">还有 {medicationRecords.length - 5} 条记录</p>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {recentVaccineCard}
             </div>

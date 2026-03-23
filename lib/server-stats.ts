@@ -11,6 +11,8 @@ export interface PreloadedStatsDay {
   date: string
   breastFeedingCount: number
   totalBreastDuration: number
+  leftBreastDuration: number
+  rightBreastDuration: number
   breastBottleCount: number
   totalBreastMilkAmount: number
   formulaCount: number
@@ -18,6 +20,7 @@ export interface PreloadedStatsDay {
   adGiven: boolean
   peeCount: number
   poopCount: number
+  nightFeedingCount: number
   weight?: number
   height?: number
   temperature?: number
@@ -52,6 +55,16 @@ export interface PreloadedStatsData {
     vaccineDoseNumber: number | null
     vaccineTotalDoses: number | null
   }[]
+  medicationRecords: {
+    id: string
+    medicationName: string
+    medicationDose: string | null
+    date: string
+    recordedAt: string
+    notes: string | null
+  }[]
+  feedingIntervals: number[]
+  babyBirthDate: string | null
 }
 
 export interface PreloadedStatsPageData {
@@ -84,6 +97,8 @@ function createEmptyStatsDay(date: string): PreloadedStatsDay {
     date,
     breastFeedingCount: 0,
     totalBreastDuration: 0,
+    leftBreastDuration: 0,
+    rightBreastDuration: 0,
     breastBottleCount: 0,
     totalBreastMilkAmount: 0,
     formulaCount: 0,
@@ -91,6 +106,7 @@ function createEmptyStatsDay(date: string): PreloadedStatsDay {
     adGiven: false,
     peeCount: 0,
     poopCount: 0,
+    nightFeedingCount: 0,
     weight: undefined,
     height: undefined,
     temperature: undefined,
@@ -112,6 +128,7 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
     select: {
       id: true,
       name: true,
+      birthDate: true,
     },
   })
 
@@ -124,7 +141,7 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
   const { start: rangeStart } = getBeijingDayRange(startDateStr)
   const { end: rangeEnd } = getBeijingDayRange(todayStr)
 
-  const [feedingRecords, healthRecords, allWeightRecords, allHeightRecords, vaccineRecords] = await Promise.all([
+  const [feedingRecords, healthRecords, allWeightRecords, allHeightRecords, vaccineRecords, medicationRecords] = await Promise.all([
     prisma.feedingRecord.findMany({
       where: {
         babyId,
@@ -184,6 +201,26 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
         vaccineTotalDoses: true,
       },
     }),
+    prisma.healthRecord.findMany({
+      where: {
+        babyId,
+        createdBy: userId,
+        type: 'MEDICATION',
+        medicationName: { not: null },
+        recordedAt: {
+          gte: rangeStart,
+          lte: rangeEnd,
+        },
+      },
+      orderBy: { recordedAt: 'desc' },
+      select: {
+        id: true,
+        medicationName: true,
+        medicationDose: true,
+        recordedAt: true,
+        notes: true,
+      },
+    }),
   ])
 
   const statsMap = new Map<string, PreloadedStatsDay>()
@@ -201,9 +238,14 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
       return
     }
 
+    const leftDur = record.leftBreastDuration || 0
+    const rightDur = record.rightBreastDuration || 0
+
     if (record.type === 'BREAST_MILK') {
       dayStats.breastFeedingCount += 1
-      dayStats.totalBreastDuration += (record.leftBreastDuration || 0) + (record.rightBreastDuration || 0)
+      dayStats.totalBreastDuration += leftDur + rightDur
+      dayStats.leftBreastDuration += leftDur
+      dayStats.rightBreastDuration += rightDur
     } else if (record.type === 'BREAST_MILK_BOTTLE') {
       dayStats.breastBottleCount += 1
       dayStats.totalBreastMilkAmount += record.breastMilkAmount || 0
@@ -211,7 +253,25 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
       dayStats.formulaCount += 1
       dayStats.totalFormulaAmount += record.formulaAmount || 0
     }
+
+    // Night feeding detection (22:00 - 06:00 Beijing time)
+    const bjTime = new Date(new Date(record.startTime).getTime() + 8 * 60 * 60 * 1000)
+    const hour = bjTime.getUTCHours()
+    if (hour >= 22 || hour < 6) {
+      dayStats.nightFeedingCount += 1
+    }
   })
+
+  // Calculate feeding intervals (minutes between consecutive feedings)
+  const feedingIntervals: number[] = []
+  for (let i = 1; i < feedingRecords.length; i++) {
+    const prev = new Date(feedingRecords[i - 1].startTime).getTime()
+    const curr = new Date(feedingRecords[i].startTime).getTime()
+    const intervalMinutes = Math.round((curr - prev) / (60 * 1000))
+    if (intervalMinutes > 0 && intervalMinutes < 720) { // Ignore intervals > 12h (likely different days)
+      feedingIntervals.push(intervalMinutes)
+    }
+  }
 
   healthRecords.forEach((record) => {
     const date = getBeijingDateStr(new Date(record.recordedAt))
@@ -297,6 +357,22 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
         vaccineTotalDoses: record.vaccineTotalDoses,
       }
     }),
+    medicationRecords: medicationRecords.flatMap((record) => {
+      if (!record.medicationName) {
+        return []
+      }
+
+      return {
+        id: record.id,
+        medicationName: record.medicationName,
+        medicationDose: record.medicationDose,
+        date: getBeijingDateStr(new Date(record.recordedAt)),
+        recordedAt: record.recordedAt.toISOString(),
+        notes: record.notes,
+      }
+    }),
+    feedingIntervals,
+    babyBirthDate: baby.birthDate ? getBeijingDateStr(new Date(baby.birthDate)) : null,
   }
 }
 
