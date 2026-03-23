@@ -37,6 +37,8 @@ model ApiKey {
   lastUsedAt  DateTime?                       // 最后使用时间
   expiresAt   DateTime?                       // 过期时间（可选）
   createdAt   DateTime  @default(now())
+
+  @@index([userId])
 }
 
 model Baby {
@@ -50,6 +52,8 @@ model Baby {
   user      User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
   feedingRecords FeedingRecord[]
   healthRecords HealthRecord[]
+
+  @@index([createdBy])
 }
 
 model FeedingRecord {
@@ -71,6 +75,9 @@ model FeedingRecord {
   createdBy           String
   baby                Baby      @relation(fields: [babyId], references: [id], onDelete: Cascade)
   user                User      @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@index([createdBy, babyId, startTime])
+  @@index([babyId, startTime])
 }
 
 model HealthRecord {
@@ -99,4 +106,7 @@ model HealthRecord {
   createdBy         String
   baby              Baby      @relation(fields: [babyId], references: [id], onDelete: Cascade)
   user              User      @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@index([createdBy, babyId, recordedAt])
+  @@index([babyId, type, recordedAt])
 }

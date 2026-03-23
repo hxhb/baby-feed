@@ -3,27 +3,8 @@ import bcrypt from 'bcryptjs'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
-import { safeParseBody, validateSameOrigin } from '@/lib/validation'
-
-const noStoreHeaders = {
-  'Cache-Control': 'no-store, max-age=0',
-  'Pragma': 'no-cache',
-}
-
-// 密码强度要求：至少 8 位，包含字母和数字
-const PASSWORD_MIN_LENGTH = 8
-function validatePassword(password: string): string | null {
-  if (password.length < PASSWORD_MIN_LENGTH) {
-    return `密码长度不能少于 ${PASSWORD_MIN_LENGTH} 位`
-  }
-  if (!/[a-zA-Z]/.test(password)) {
-    return '密码必须包含至少一个字母'
-  }
-  if (!/\d/.test(password)) {
-    return '密码必须包含至少一个数字'
-  }
-  return null
-}
+import { safeParseBody, validateSameOrigin, validatePassword } from '@/lib/validation'
+import { noStoreHeaders } from '@/lib/api-helpers'
 
 // PUT /api/user/password - 修改密码
 export async function PUT(request: NextRequest) {
@@ -82,9 +63,10 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: '新密码不能与当前密码相同' }, { status: 400, headers: noStoreHeaders })
     }
 
-    // 获取当前用户
+    // Get current user (only fetch needed fields)
     const user = await prisma.user.findUnique({
-      where: { id: session.user.id }
+      where: { id: session.user.id },
+      select: { id: true, password: true }
     })
 
     if (!user) {

@@ -2,24 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 import { enforceRateLimit, buildIpActionKey } from '@/lib/rate-limit'
-import { safeParseBody } from '@/lib/validation'
+import { safeParseBody, validatePassword } from '@/lib/validation'
 import { getAllowRegistration } from '@/lib/site-settings'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const PASSWORD_MIN_LENGTH = 8
-
-function validatePassword(password: string): string | null {
-  if (password.length < PASSWORD_MIN_LENGTH) {
-    return `密码长度不能少于 ${PASSWORD_MIN_LENGTH} 位`
-  }
-  if (!/[a-zA-Z]/.test(password)) {
-    return '密码必须包含至少一个字母'
-  }
-  if (!/\d/.test(password)) {
-    return '密码必须包含至少一个数字'
-  }
-  return null
-}
 
 export async function POST(request: NextRequest) {
   try {

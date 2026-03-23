@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { getPreloadedBabies } from '@/lib/server-babies'
 import { getServerSession } from '@/lib/server-auth'
 import { getBeijingToday } from '@/lib/time'
+import { getBeijingDateStr, getBeijingDayRange } from '@/lib/api-helpers'
 
 export interface PreloadedTimelineBaby {
   id: string
@@ -54,22 +55,6 @@ export interface PreloadedTimelinePageData {
   initialDate: string
   initialRecords: PreloadedTimelineRecord[]
   initialValidDates: string[]
-}
-
-function getBeijingDateStr(date: Date): string {
-  const utcMs = date.getTime()
-  const bj = new Date(utcMs + 8 * 60 * 60 * 1000)
-  const y = bj.getUTCFullYear()
-  const m = String(bj.getUTCMonth() + 1).padStart(2, '0')
-  const d = String(bj.getUTCDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
-}
-
-function getBeijingDayRange(dateStr: string) {
-  return {
-    start: new Date(`${dateStr}T00:00:00+08:00`),
-    end: new Date(`${dateStr}T23:59:59.999+08:00`),
-  }
 }
 
 export async function getTimelineValidDates(userId: string, babyId: string): Promise<string[]> {

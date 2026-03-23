@@ -3,11 +3,7 @@ import { invalidateUserCache } from '@/lib/auth'
 import { requireAdmin } from '@/lib/admin'
 import { prisma } from '@/lib/prisma'
 import { validateId, safeParseBody, validateSameOrigin } from '@/lib/validation'
-
-const noStoreHeaders = {
-  'Cache-Control': 'no-store, max-age=0',
-  'Pragma': 'no-cache',
-}
+import { noStoreHeaders } from '@/lib/api-helpers'
 
 export async function GET(request: NextRequest) {
   const check = await requireAdmin(request)

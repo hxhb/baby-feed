@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { getPreloadedBabies } from '@/lib/server-babies'
 import { getServerSession } from '@/lib/server-auth'
+import { getBeijingDateStr, getBeijingDayRange, getBeijingTodayStr, getBeijingDaysAgoStr } from '@/lib/api-helpers'
 
 export interface PreloadedStatsBaby {
   id: string
@@ -76,25 +77,6 @@ export interface PreloadedStatsPageData {
   initialStats: PreloadedStatsData | null
 }
 
-function getBeijingDateStr(date: Date): string {
-  const utcMs = date.getTime()
-  const bj = new Date(utcMs + 8 * 60 * 60 * 1000)
-  const y = bj.getUTCFullYear()
-  const m = String(bj.getUTCMonth() + 1).padStart(2, '0')
-  const d = String(bj.getUTCDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
-}
-
-function getBeijingDayRange(dateStr: string) {
-  const start = new Date(`${dateStr}T00:00:00+08:00`)
-  const end = new Date(`${dateStr}T23:59:59.999+08:00`)
-  return { start, end }
-}
-
-function getBeijingToday(): string {
-  return getBeijingDateStr(new Date())
-}
-
 function createEmptyStatsDay(date: string): PreloadedStatsDay {
   return {
     date,
@@ -119,12 +101,6 @@ function createEmptyStatsDay(date: string): PreloadedStatsDay {
   }
 }
 
-function getBeijingDaysAgo(daysAgo: number): string {
-  const d = new Date()
-  d.setDate(d.getDate() - daysAgo)
-  return getBeijingDateStr(d)
-}
-
 async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7): Promise<PreloadedStatsData | null> {
   const baby = await prisma.baby.findFirst({
     where: {
@@ -142,8 +118,8 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
     return null
   }
 
-  const todayStr = getBeijingToday()
-  const startDateStr = getBeijingDaysAgo(days - 1)
+  const todayStr = getBeijingTodayStr()
+  const startDateStr = getBeijingDaysAgoStr(days - 1)
   const { start: rangeStart } = getBeijingDayRange(startDateStr)
   const { end: rangeEnd } = getBeijingDayRange(todayStr)
 
@@ -232,7 +208,7 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
   const statsMap = new Map<string, PreloadedStatsDay>()
 
   for (let i = 0; i < days; i++) {
-    const date = getBeijingDaysAgo(i)
+    const date = getBeijingDaysAgoStr(i)
     statsMap.set(date, createEmptyStatsDay(date))
   }
 

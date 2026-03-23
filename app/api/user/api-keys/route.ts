@@ -4,11 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { generateApiKey } from '@/lib/api-key'
 import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
 import { validateString, validateId, safeParseBody, validateSameOrigin } from '@/lib/validation'
-
-const noStoreHeaders = {
-  'Cache-Control': 'no-store, max-age=0',
-  'Pragma': 'no-cache',
-}
+import { noStoreHeaders } from '@/lib/api-helpers'
 
 // 每个用户最多拥有的 API Key 数量
 const MAX_KEYS_PER_USER = 10

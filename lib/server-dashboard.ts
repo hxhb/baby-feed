@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { getBeijingToday } from '@/lib/time'
+import { getBeijingDayRange } from '@/lib/api-helpers'
 import { getPreloadedBabies } from '@/lib/server-babies'
 import { getServerSession } from '@/lib/server-auth'
 
@@ -37,13 +38,6 @@ export interface PreloadedDashboardData {
   initialSelectedBabyId: string | null
   initialTodayRecords: PreloadedDashboardFeedingRecord[]
   initialTodayHealthRecords: PreloadedDashboardHealthRecord[]
-}
-
-function getBeijingDayRange(dateStr: string) {
-  return {
-    start: new Date(`${dateStr}T00:00:00+08:00`),
-    end: new Date(`${dateStr}T23:59:59.999+08:00`),
-  }
 }
 
 export async function getPreloadedDashboardData(): Promise<PreloadedDashboardData> {

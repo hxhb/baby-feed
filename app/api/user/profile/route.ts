@@ -3,11 +3,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { safeParseBody, validateSameOrigin } from '@/lib/validation'
 import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
-
-const noStoreHeaders = {
-  'Cache-Control': 'no-store, max-age=0',
-  'Pragma': 'no-cache',
-}
+import { noStoreHeaders } from '@/lib/api-helpers'
 
 export async function GET(request: NextRequest) {
   try {

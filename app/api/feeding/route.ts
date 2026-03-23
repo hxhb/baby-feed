@@ -4,16 +4,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { validateFeedingInput, validateId, FEEDING_TYPES, safeParseBody, validateDateOnlyString, validateSameOrigin } from '@/lib/validation'
 import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
-const noStoreHeaders = {
-  'Cache-Control': 'no-store, max-age=0',
-  'Pragma': 'no-cache',
-}
-
-function getBeijingDayRange(dateStr: string) {
-  const start = new Date(`${dateStr}T00:00:00+08:00`)
-  const end = new Date(`${dateStr}T23:59:59.999+08:00`)
-  return { start, end }
-}
+import { noStoreHeaders, getBeijingDayRange } from '@/lib/api-helpers'
 
 export async function GET(request: NextRequest) {
   try {

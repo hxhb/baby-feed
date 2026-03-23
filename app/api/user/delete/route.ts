@@ -4,11 +4,7 @@ import { auth, invalidateUserCache } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
 import { safeParseBody, validateSameOrigin } from '@/lib/validation'
-
-const noStoreHeaders = {
-  'Cache-Control': 'no-store, max-age=0',
-  'Pragma': 'no-cache',
-}
+import { noStoreHeaders } from '@/lib/api-helpers'
 
 // DELETE /api/user/delete - 注销账户（删除用户及所有关联数据）
 export async function DELETE(request: NextRequest) {
@@ -52,9 +48,10 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: '请输入密码以确认注销' }, { status: 400, headers: noStoreHeaders })
     }
 
-    // 获取当前用户
+    // Get current user (only fetch needed fields)
     const user = await prisma.user.findUnique({
-      where: { id: session.user.id }
+      where: { id: session.user.id },
+      select: { id: true, password: true }
     })
 
     if (!user) {

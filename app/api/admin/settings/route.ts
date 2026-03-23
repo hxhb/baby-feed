@@ -2,11 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/admin'
 import { safeParseBody, validateSameOrigin } from '@/lib/validation'
 import { getSiteSettings, setAllowRegistration } from '@/lib/site-settings'
-
-const noStoreHeaders = {
-  'Cache-Control': 'no-store, max-age=0',
-  'Pragma': 'no-cache',
-}
+import { noStoreHeaders } from '@/lib/api-helpers'
 
 export async function GET(request: NextRequest) {
   const check = await requireAdmin(request)

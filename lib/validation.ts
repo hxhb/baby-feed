@@ -3,6 +3,26 @@
  * 防止非法类型、极端数值、不合法枚举等通过 API 进入数据库
  */
 
+// Password strength requirements
+const PASSWORD_MIN_LENGTH = 8
+
+/**
+ * Validate password strength: at least 8 chars, must contain letter and digit
+ * @returns error message string, or null if valid
+ */
+export function validatePassword(password: string): string | null {
+  if (password.length < PASSWORD_MIN_LENGTH) {
+    return `密码长度不能少于 ${PASSWORD_MIN_LENGTH} 位`
+  }
+  if (!/[a-zA-Z]/.test(password)) {
+    return '密码必须包含至少一个字母'
+  }
+  if (!/\d/.test(password)) {
+    return '密码必须包含至少一个数字'
+  }
+  return null
+}
+
 // 喂养记录类型白名单
 export const FEEDING_TYPES = ['BREAST_MILK', 'BREAST_MILK_BOTTLE', 'FORMULA', 'SOLID_FOOD'] as const
 export type FeedingType = typeof FEEDING_TYPES[number]

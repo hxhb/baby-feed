@@ -1,9 +1,22 @@
 'use client'
 
 import { useState } from 'react'
+import dynamic from 'next/dynamic'
 import type { PreloadedBaby } from '@/lib/server-babies'
 import type { PreloadedStatsData } from '@/lib/server-stats'
-import Stats from '@/components/Stats'
+
+// Dynamically import Stats with SSR disabled to avoid hydration mismatch
+// caused by recharts' internal @loadable/component Suspense boundary
+const Stats = dynamic(() => import('@/components/Stats'), {
+  ssr: false,
+  loading: () => (
+    <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 space-y-4">
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
+      </div>
+    </div>
+  ),
+})
 
 interface Props {
   initialBabies: PreloadedBaby[]

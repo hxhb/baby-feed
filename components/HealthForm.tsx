@@ -393,11 +393,6 @@ export default function HealthForm({
 
   const validationMessage = getValidationMessage()
   const canSubmit = babies.length > 0 && !loading && !validationMessage
-  const _showWeightError = type === 'WEIGHT' && !!validationMessage
-  const _showHeightError = type === 'HEIGHT' && !!validationMessage
-  const _showTemperatureError = type === 'TEMPERATURE' && !!validationMessage
-  const _showMedicationNameError = type === 'MEDICATION' && !!validationMessage
-  const _showVaccineNameError = type === 'VACCINE' && !!validationMessage
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
