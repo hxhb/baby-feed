@@ -106,9 +106,9 @@ function buildDailyStats(feedingData: FeedingRecord[], healthData: HealthRecord[
       .filter(r => r.type === 'FORMULA')
       .reduce((sum, r) => sum + (r.formulaAmount || 0), 0),
     adGiven: healthData.some(r => r.type === 'AD_VITAMIN' && r.adGiven),
-    weight: latestWeightRecord?.weight,
-    height: latestHeightRecord?.height,
-    temperature: latestTemperatureRecord?.temperature,
+    weight: latestWeightRecord?.weight ?? undefined,
+    height: latestHeightRecord?.height ?? undefined,
+    temperature: latestTemperatureRecord?.temperature ?? undefined,
     peeCount: healthData.filter(r => r.type === 'DIAPER' && (r.diaperType === 'PEE' || r.diaperType === 'BOTH')).length,
     poopCount: healthData.filter(r => r.type === 'DIAPER' && (r.diaperType === 'POOP' || r.diaperType === 'BOTH')).length,
   }
