@@ -20,7 +20,9 @@ import {
   Ruler,
   Syringe,
   Baby as BabyIcon,
-  Pencil
+  Pencil,
+  Moon,
+  UtensilsCrossed
 } from 'lucide-react'
 
 interface Baby {
@@ -37,6 +39,8 @@ interface FeedingRecord {
   rightBreastDuration?: number | null
   breastMilkAmount?: number | null
   formulaAmount?: number | null
+  solidFoodName?: string | null
+  solidFoodAmount?: string | null
   adGiven?: boolean | null
   notes?: string | null
   babyId: string
@@ -60,6 +64,9 @@ interface HealthRecord {
   diaperType?: string | null
   diaperStatus?: string | null
   adGiven?: boolean | null
+  sleepStartTime?: string | null
+  sleepEndTime?: string | null
+  sleepQuality?: string | null
   notes?: string | null
   babyId: string
   baby?: Baby
@@ -84,12 +91,6 @@ function buildTimelineCacheKey(babyId: string, dateStr: string) {
 
 function buildTimelineDatesCacheKey(babyId: string) {
   return `timeline-dates:${babyId}`
-}
-
-function shiftDateString(dateStr: string, dayOffset: number) {
-  const date = new Date(`${dateStr}T12:00:00+08:00`)
-  date.setDate(date.getDate() + dayOffset)
-  return format(date, 'yyyy-MM-dd')
 }
 
 function dateStringToBeijingDate(dateStr: string) {
@@ -175,6 +176,10 @@ function getRecordIcon(type: string) {
       return <Syringe size={20} className="text-teal-500" />
     case 'DIAPER':
       return <BabyIcon size={20} className="text-amber-500" />
+    case 'SLEEP':
+      return <Moon size={20} className="text-indigo-500" />
+    case 'SOLID_FOOD':
+      return <UtensilsCrossed size={20} className="text-orange-500" />
     default:
       return null
   }
@@ -222,6 +227,24 @@ function getRecordTitle(record: TimelineRecord) {
       const health = record as HealthRecord
       const typeText = health.diaperType === 'PEE' ? '小便' : health.diaperType === 'POOP' ? '大便' : '大小便'
       return `${typeText}${health.diaperStatus ? ` (${health.diaperStatus})` : ''}`
+    }
+    case 'SLEEP': {
+      const health = record as HealthRecord
+      const sleepStart = health.sleepStartTime ? new Date(health.sleepStartTime) : null
+      const sleepEnd = health.sleepEndTime ? new Date(health.sleepEndTime) : null
+      if (sleepStart && sleepEnd) {
+        const durationMin = Math.round((sleepEnd.getTime() - sleepStart.getTime()) / (60 * 1000))
+        const hours = Math.floor(durationMin / 60)
+        const mins = durationMin % 60
+        return `睡眠 ${hours > 0 ? `${hours}小时` : ''}${mins > 0 ? `${mins}分钟` : ''}`
+      }
+      return '睡眠记录'
+    }
+    case 'SOLID_FOOD': {
+      const feeding = record as FeedingRecord
+      const name = feeding.solidFoodName || '辅食'
+      const amount = feeding.solidFoodAmount
+      return `${name}${amount ? ` ${amount}` : ''}`
     }
     default:
       return '未知记录'

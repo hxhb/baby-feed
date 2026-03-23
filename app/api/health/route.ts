@@ -182,6 +182,9 @@ export async function POST(request: NextRequest) {
     const typedDiaperType = typeof diaperType === 'string' ? diaperType : undefined
     const typedDiaperStatus = typeof diaperStatus === 'string' ? diaperStatus : undefined
     const typedAdGiven = typeof adGiven === 'boolean' ? adGiven : undefined
+    const typedSleepStartTime = typeof body.sleepStartTime === 'string' ? body.sleepStartTime : undefined
+    const typedSleepEndTime = typeof body.sleepEndTime === 'string' ? body.sleepEndTime : undefined
+    const typedSleepQuality = typeof body.sleepQuality === 'string' ? body.sleepQuality : undefined
     const typedNotes = typeof notes === 'string' ? notes : undefined
 
     if (typedType === 'VACCINE') {
@@ -221,6 +224,9 @@ export async function POST(request: NextRequest) {
         diaperType: typedType === 'DIAPER' ? (typedDiaperType ?? null) : null,
         diaperStatus: typedType === 'DIAPER' ? (typedDiaperStatus ?? null) : null,
         adGiven: typedType === 'AD_VITAMIN' ? (typedAdGiven ?? null) : null,
+        sleepStartTime: typedType === 'SLEEP' ? (typedSleepStartTime ? new Date(typedSleepStartTime) : null) : null,
+        sleepEndTime: typedType === 'SLEEP' ? (typedSleepEndTime ? new Date(typedSleepEndTime) : null) : null,
+        sleepQuality: typedType === 'SLEEP' ? (typedSleepQuality ?? null) : null,
         recordedAt: new Date(recordedAt),
         notes: typedNotes,
         createdBy: session.user.id

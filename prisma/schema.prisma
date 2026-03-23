@@ -60,6 +60,8 @@ model FeedingRecord {
   rightBreastDuration Int?
   breastMilkAmount    Float?
   formulaAmount       Float?
+  solidFoodName       String?
+  solidFoodAmount     String?
   adGiven             Boolean?
   startTime           DateTime
   endTime             DateTime?
@@ -87,6 +89,9 @@ model HealthRecord {
   diaperType        String?
   diaperStatus      String?
   adGiven           Boolean?
+  sleepStartTime    DateTime?
+  sleepEndTime      DateTime?
+  sleepQuality      String?
   recordedAt        DateTime
   notes             String?
   createdAt         DateTime  @default(now())

@@ -4,11 +4,11 @@
  */
 
 // 喂养记录类型白名单
-export const FEEDING_TYPES = ['BREAST_MILK', 'BREAST_MILK_BOTTLE', 'FORMULA'] as const
+export const FEEDING_TYPES = ['BREAST_MILK', 'BREAST_MILK_BOTTLE', 'FORMULA', 'SOLID_FOOD'] as const
 export type FeedingType = typeof FEEDING_TYPES[number]
 
 // 健康记录类型白名单
-export const HEALTH_TYPES = ['WEIGHT', 'HEIGHT', 'TEMPERATURE', 'MEDICATION', 'VACCINE', 'DIAPER', 'AD_VITAMIN'] as const
+export const HEALTH_TYPES = ['WEIGHT', 'HEIGHT', 'TEMPERATURE', 'MEDICATION', 'VACCINE', 'DIAPER', 'AD_VITAMIN', 'SLEEP'] as const
 export type HealthType = typeof HEALTH_TYPES[number]
 
 // 性别白名单
@@ -203,6 +203,8 @@ export function validateFeedingInput(body: Record<string, unknown>) {
     validateInt(body.rightBreastDuration, '右侧哺乳时长', 0, 120),
     validateNumber(body.breastMilkAmount, '母乳量', 0, 1000),
     validateNumber(body.formulaAmount, '配方奶量', 0, 1000),
+    validateString(body.solidFoodName, '辅食名称', 200),
+    validateString(body.solidFoodAmount, '辅食量', 200),
     validateBoolean(body.adGiven, 'AD补充'),
     validateDateString(body.startTime, '开始时间'),
     validateDateString(body.endTime, '结束时间'),
@@ -237,6 +239,10 @@ function validateFeedingBusinessRules(body: Record<string, unknown>): Validation
     return { valid: false, error: '奶粉记录需要填写配方奶量' }
   }
 
+  if (type === 'SOLID_FOOD' && !isProvided(body.solidFoodName)) {
+    return { valid: false, error: '辅食记录需要填写辅食名称' }
+  }
+
   return { valid: true }
 }
 
@@ -256,6 +262,9 @@ export function validateHealthInput(body: Record<string, unknown>) {
     validateEnum(body.diaperType, DIAPER_TYPES, '尿布类型'),
     validateString(body.diaperStatus, '尿布状态', 200),
     validateBoolean(body.adGiven, 'AD补充'),
+    validateDateString(body.sleepStartTime, '入睡时间'),
+    validateDateString(body.sleepEndTime, '醒来时间'),
+    validateString(body.sleepQuality, '睡眠质量', 200),
     validateDateString(body.recordedAt, '记录时间'),
     validateString(body.notes, '备注', 1000)
   )
@@ -330,6 +339,10 @@ function validateHealthBusinessRules(body: Record<string, unknown>): ValidationR
 
   if (type === 'AD_VITAMIN' && !isProvided(body.adGiven)) {
     return { valid: false, error: 'AD 补充记录需要填写是否已补充' }
+  }
+
+  if (type === 'SLEEP' && !isProvided(body.sleepStartTime)) {
+    return { valid: false, error: '睡眠记录需要填写入睡时间' }
   }
 
   return { valid: true }

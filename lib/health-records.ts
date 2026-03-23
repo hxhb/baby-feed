@@ -1,4 +1,4 @@
-export type HealthType = 'WEIGHT' | 'HEIGHT' | 'TEMPERATURE' | 'MEDICATION' | 'VACCINE' | 'DIAPER' | 'AD_VITAMIN'
+export type HealthType = 'WEIGHT' | 'HEIGHT' | 'TEMPERATURE' | 'MEDICATION' | 'VACCINE' | 'DIAPER' | 'AD_VITAMIN' | 'SLEEP'
 export type DiaperType = 'PEE' | 'POOP' | 'BOTH'
 
 export interface HealthFieldValues {
@@ -14,6 +14,9 @@ export interface HealthFieldValues {
   diaperType: DiaperType
   diaperStatus: string
   adGiven: boolean
+  sleepStartTime: string
+  sleepEndTime: string
+  sleepQuality: string
 }
 
 export interface VaccineSuggestion {
@@ -61,6 +64,9 @@ export function buildHealthRecordPayload(type: HealthType, values: HealthFieldVa
     diaperType: null,
     diaperStatus: null,
     adGiven: null,
+    sleepStartTime: null,
+    sleepEndTime: null,
+    sleepQuality: null,
   }
 
   if (type === 'WEIGHT') {
@@ -110,9 +116,19 @@ export function buildHealthRecordPayload(type: HealthType, values: HealthFieldVa
     }
   }
 
+  if (type === 'AD_VITAMIN') {
+    return {
+      ...basePayload,
+      adGiven: values.adGiven,
+    }
+  }
+
+  // SLEEP
   return {
     ...basePayload,
-    adGiven: values.adGiven,
+    sleepStartTime: values.sleepStartTime || null,
+    sleepEndTime: values.sleepEndTime || null,
+    sleepQuality: values.sleepQuality.trim() || null,
   }
 }
 

@@ -104,6 +104,8 @@ export async function PUT(
       rightBreastDuration: rightBreastDuration === undefined ? existingRecord.rightBreastDuration : rightBreastDuration,
       breastMilkAmount: breastMilkAmount === undefined ? existingRecord.breastMilkAmount : breastMilkAmount,
       formulaAmount: formulaAmount === undefined ? existingRecord.formulaAmount : formulaAmount,
+      solidFoodName: body.solidFoodName === undefined ? existingRecord.solidFoodName : body.solidFoodName,
+      solidFoodAmount: body.solidFoodAmount === undefined ? existingRecord.solidFoodAmount : body.solidFoodAmount,
       adGiven: adGiven === undefined ? existingRecord.adGiven : adGiven,
       startTime: nextStartTime,
       endTime: nextEndTime,
@@ -121,6 +123,8 @@ export async function PUT(
       rightBreastDuration: null as number | null,
       breastMilkAmount: null as number | null,
       formulaAmount: null as number | null,
+      solidFoodName: null as string | null,
+      solidFoodAmount: null as string | null,
       adGiven: normalizedBody.adGiven === undefined ? null : normalizedBody.adGiven as boolean | null,
       startTime: new Date(nextStartTime),
       endTime: nextEndTime ? new Date(nextEndTime) : null,
@@ -134,6 +138,9 @@ export async function PUT(
       normalizedData.breastMilkAmount = normalizedBody.breastMilkAmount === undefined ? null : normalizedBody.breastMilkAmount as number | null
     } else if (nextType === 'FORMULA') {
       normalizedData.formulaAmount = normalizedBody.formulaAmount === undefined ? null : normalizedBody.formulaAmount as number | null
+    } else if (nextType === 'SOLID_FOOD') {
+      normalizedData.solidFoodName = normalizedBody.solidFoodName === undefined ? null : normalizedBody.solidFoodName as string | null
+      normalizedData.solidFoodAmount = normalizedBody.solidFoodAmount === undefined ? null : normalizedBody.solidFoodAmount as string | null
     }
 
     const record = await prisma.feedingRecord.update({

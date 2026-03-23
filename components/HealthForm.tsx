@@ -17,7 +17,9 @@ import {
   Syringe,
   Baby as BabyIcon,
   Droplets,
-  Milk
+  Milk,
+  Moon,
+  UtensilsCrossed
 } from 'lucide-react'
 
 interface BabyInfo {
@@ -48,7 +50,7 @@ interface HealthDraft {
 }
 
 interface Props {
-  initialType?: 'WEIGHT' | 'HEIGHT' | 'TEMPERATURE' | 'MEDICATION' | 'VACCINE' | 'DIAPER' | 'AD_VITAMIN'
+  initialType?: 'WEIGHT' | 'HEIGHT' | 'TEMPERATURE' | 'MEDICATION' | 'VACCINE' | 'DIAPER' | 'AD_VITAMIN' | 'SLEEP'
   initialBabies?: BabyInfo[]
   initialSharedDraft?: SharedDraft
   onSharedDraftChange?: (draft: SharedDraft) => void
@@ -109,6 +111,9 @@ export default function HealthForm({
   const [diaperType, setDiaperType] = useState<'PEE' | 'POOP' | 'BOTH'>('PEE')
   const [diaperStatus, setDiaperStatus] = useState('')
   const [adGiven, setAdGiven] = useState(true)
+  const [sleepStartTime, setSleepStartTime] = useState('')
+  const [sleepEndTime, setSleepEndTime] = useState('')
+  const [sleepQuality, setSleepQuality] = useState('')
   const [recordedAt, setRecordedAt] = useState(initialSharedDraft?.eventTime || getBeijingNow())
   const [notes, setNotes] = useState(initialSharedDraft?.notes || '')
   const hasHydratedSharedDraft = useRef(false)
@@ -122,6 +127,7 @@ export default function HealthForm({
     }
 
     fetchBabies()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialBabies, initialSharedDraft?.babyId])
 
   useEffect(() => {
@@ -262,6 +268,7 @@ export default function HealthForm({
     }
 
     setSubmitError('')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [babyId, type, weight, height, temperature, medicationName, medicationDose, vaccineName, vaccineManufacturer, vaccineDoseNumber, vaccineTotalDoses, diaperType, diaperStatus, adGiven, recordedAt, notes])
 
   useEffect(() => {
@@ -353,6 +360,9 @@ export default function HealthForm({
       diaperType,
       diaperStatus,
       adGiven,
+      sleepStartTime,
+      sleepEndTime,
+      sleepQuality,
     })
   }
 
@@ -369,6 +379,9 @@ export default function HealthForm({
     diaperType,
     diaperStatus,
     adGiven,
+    sleepStartTime,
+    sleepEndTime,
+    sleepQuality,
   }
 
   const handleApplyVaccineSuggestion = (suggestion: VaccineSuggestion) => {
@@ -380,11 +393,11 @@ export default function HealthForm({
 
   const validationMessage = getValidationMessage()
   const canSubmit = babies.length > 0 && !loading && !validationMessage
-  const showWeightError = type === 'WEIGHT' && !!validationMessage
-  const showHeightError = type === 'HEIGHT' && !!validationMessage
-  const showTemperatureError = type === 'TEMPERATURE' && !!validationMessage
-  const showMedicationNameError = type === 'MEDICATION' && !!validationMessage
-  const showVaccineNameError = type === 'VACCINE' && !!validationMessage
+  const _showWeightError = type === 'WEIGHT' && !!validationMessage
+  const _showHeightError = type === 'HEIGHT' && !!validationMessage
+  const _showTemperatureError = type === 'TEMPERATURE' && !!validationMessage
+  const _showMedicationNameError = type === 'MEDICATION' && !!validationMessage
+  const _showVaccineNameError = type === 'VACCINE' && !!validationMessage
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -440,15 +453,17 @@ export default function HealthForm({
     { value: 'MEDICATION', label: '服药', icon: Pill, color: 'purple', hint: '建议至少记录药物名称，后续回看会更清晰。' },
     { value: 'VACCINE', label: '疫苗', icon: Syringe, color: 'teal', hint: '记录疫苗名称和针次进度，方便以后核对接种情况。' },
     { value: 'DIAPER', label: '大小便', icon: BabyIcon, color: 'amber', hint: '记录排便状态，方便观察宝宝日常情况。' },
+    { value: 'SLEEP', label: '睡眠', icon: Moon, color: 'indigo', hint: '记录宝宝入睡和醒来时间，追踪睡眠规律。' },
   ] as const
 
   const feedingTypeLinks = [
     { href: '/add?type=breast', label: '母乳', icon: Droplets, iconClassName: 'text-pink-500', cardClassName: 'border-pink-100 bg-pink-50/80 text-pink-700 hover:border-pink-200 hover:bg-pink-100/70' },
-    { href: '/add?type=formula', label: '奶粉', icon: Milk, iconClassName: 'text-blue-500', cardClassName: 'border-blue-100 bg-blue-50/80 text-blue-700 hover:border-blue-200 hover:bg-blue-100/70' }
+    { href: '/add?type=formula', label: '奶粉', icon: Milk, iconClassName: 'text-blue-500', cardClassName: 'border-blue-100 bg-blue-50/80 text-blue-700 hover:border-blue-200 hover:bg-blue-100/70' },
+    { href: '/add?type=solid_food', label: '辅食', icon: UtensilsCrossed, iconClassName: 'text-orange-500', cardClassName: 'border-orange-100 bg-orange-50/80 text-orange-700 hover:border-orange-200 hover:bg-orange-100/70' },
   ]
 
   const getColorClasses = (color: string, isSelected: boolean) => {
-    const colors: Record<string, { border: string; bg: string; text: string; icon: string }> = {
+      const colors: Record<string, { border: string; bg: string; text: string; icon: string }> = {
       green: { border: 'border-green-500', bg: 'bg-green-50', text: 'text-green-700', icon: 'text-green-500' },
       blue: { border: 'border-blue-500', bg: 'bg-blue-50', text: 'text-blue-700', icon: 'text-blue-500' },
       red: { border: 'border-red-500', bg: 'bg-red-50', text: 'text-red-700', icon: 'text-red-500' },
@@ -456,6 +471,7 @@ export default function HealthForm({
       purple: { border: 'border-purple-500', bg: 'bg-purple-50', text: 'text-purple-700', icon: 'text-purple-500' },
       teal: { border: 'border-teal-500', bg: 'bg-teal-50', text: 'text-teal-700', icon: 'text-teal-500' },
       amber: { border: 'border-amber-500', bg: 'bg-amber-50', text: 'text-amber-700', icon: 'text-amber-500' },
+      indigo: { border: 'border-indigo-500', bg: 'bg-indigo-50', text: 'text-indigo-700', icon: 'text-indigo-500' },
     }
     const c = colors[color] || colors.green
     return isSelected ? c : { border: 'border-gray-200', bg: '', text: 'text-gray-600', icon: 'text-gray-400' }
@@ -504,17 +520,18 @@ export default function HealthForm({
             {selectedTypeMeta.label}
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-1.5">
           {feedingTypeLinks.map(item => {
             const Icon = item.icon
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`mobile-touch-target flex items-center justify-center gap-2 rounded-xl border py-2.5 transition ${item.cardClassName}`}
+                prefetch={false}
+                className={`mobile-touch-target flex min-w-0 items-center justify-center gap-1 rounded-xl border py-2.5 transition ${item.cardClassName}`}
               >
-                <Icon size={18} className={item.iconClassName} />
-                <span className="text-sm font-medium">{item.label}</span>
+                <Icon size={16} className={`shrink-0 ${item.iconClassName}`} />
+                <span className="truncate text-sm font-medium">{item.label}</span>
               </Link>
             )
           })}
@@ -584,6 +601,9 @@ export default function HealthForm({
             setDiaperType,
             setDiaperStatus,
             setAdGiven,
+            setSleepStartTime,
+            setSleepEndTime,
+            setSleepQuality,
           }}
         />
       </div>

@@ -16,7 +16,7 @@ type AddRecordSharedDraft = {
   notes: string
 }
 
-type HealthInitialType = 'WEIGHT' | 'HEIGHT' | 'TEMPERATURE' | 'MEDICATION' | 'VACCINE' | 'DIAPER' | 'AD_VITAMIN'
+type HealthInitialType = 'WEIGHT' | 'HEIGHT' | 'TEMPERATURE' | 'MEDICATION' | 'VACCINE' | 'DIAPER' | 'AD_VITAMIN' | 'SLEEP'
 
 const SHARED_DRAFT_STORAGE_KEY = 'baby-feed:add-record-shared-draft'
 const emptySharedDraft: AddRecordSharedDraft = {
@@ -41,6 +41,8 @@ function getHealthInitialType(type: string | null): HealthInitialType | undefine
       return 'DIAPER'
     case 'ad':
       return 'AD_VITAMIN'
+    case 'sleep':
+      return 'SLEEP'
     default:
       return undefined
   }
@@ -53,7 +55,7 @@ function isEmptySharedDraft(draft: AddRecordSharedDraft) {
 export default function AddPageClient({ initialBabies }: Props) {
   const searchParams = useSearchParams()
   const type = searchParams.get('type')
-  const isHealthView = !type || ['health', 'weight', 'height', 'temperature', 'medication', 'vaccine', 'diaper', 'ad'].includes(type)
+  const isHealthView = !type || ['health', 'weight', 'height', 'temperature', 'medication', 'vaccine', 'diaper', 'ad', 'sleep'].includes(type)
   const [sharedDraft, setSharedDraft] = useState<AddRecordSharedDraft>(emptySharedDraft)
 
   useEffect(() => {
@@ -118,7 +120,7 @@ export default function AddPageClient({ initialBabies }: Props) {
         />
       ) : (
         <FeedingForm
-          initialType={type as 'breast' | 'breast_bottle' | 'formula' | null}
+          initialType={type as 'breast' | 'breast_bottle' | 'formula' | 'solid_food' | null}
           initialBabies={initialBabies}
           initialSharedDraft={sharedDraft}
           onSharedDraftChange={handleSharedDraftChange}

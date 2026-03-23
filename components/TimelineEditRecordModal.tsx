@@ -19,6 +19,8 @@ interface FeedingRecord {
   rightBreastDuration?: number | null
   breastMilkAmount?: number | null
   formulaAmount?: number | null
+  solidFoodName?: string | null
+  solidFoodAmount?: string | null
   adGiven?: boolean | null
   notes?: string | null
   babyId: string
@@ -41,6 +43,9 @@ interface HealthRecord {
   diaperType?: string | null
   diaperStatus?: string | null
   adGiven?: boolean | null
+  sleepStartTime?: string | null
+  sleepEndTime?: string | null
+  sleepQuality?: string | null
   notes?: string | null
   babyId: string
   recordType: 'health'
@@ -62,7 +67,7 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
   const [currentFeedingType, setCurrentFeedingType] = useState<FeedingType>(
     feedingRecord ? (feedingRecord.type as FeedingType) : 'BREAST_MILK'
   )
-  const [currentHealthType, setCurrentHealthType] = useState<HealthType>(
+  const [currentHealthType] = useState<HealthType>(
     healthRecord ? (healthRecord.type as HealthType) : 'WEIGHT'
   )
 
@@ -91,6 +96,9 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
   const [diaperType, setDiaperType] = useState(healthRecord?.diaperType || 'PEE')
   const [diaperStatus, setDiaperStatus] = useState(healthRecord?.diaperStatus || '')
   const [adGiven, setAdGiven] = useState(healthRecord?.adGiven ?? true)
+  const [sleepStartTime, setSleepStartTime] = useState(healthRecord?.sleepStartTime ? new Date(healthRecord.sleepStartTime).toISOString().slice(0, 16) : '')
+  const [sleepEndTime, setSleepEndTime] = useState(healthRecord?.sleepEndTime ? new Date(healthRecord.sleepEndTime).toISOString().slice(0, 16) : '')
+  const [sleepQuality, setSleepQuality] = useState(healthRecord?.sleepQuality || '')
 
   const fieldValues: HealthFieldValues = {
     weight,
@@ -105,6 +113,9 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
     diaperType: diaperType as 'PEE' | 'POOP' | 'BOTH',
     diaperStatus,
     adGiven,
+    sleepStartTime,
+    sleepEndTime,
+    sleepQuality,
   }
 
   const feedingFieldValues: FeedingFieldValues = {
@@ -112,6 +123,8 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
     rightBreastDuration: rightDuration,
     breastMilkAmount: breastMilkAmt,
     formulaAmount: formulaAmt,
+    solidFoodName: '',
+    solidFoodAmount: '',
   }
 
   useEffect(() => {
@@ -281,6 +294,8 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
                 setRightBreastDuration: setRightDuration,
                 setBreastMilkAmount: setBreastMilkAmt,
                 setFormulaAmount: setFormulaAmt,
+                setSolidFoodName: () => {},
+                setSolidFoodAmount: () => {},
               }}
             />
           ) : (
@@ -306,6 +321,9 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
                 setDiaperType: (value) => setDiaperType(value),
                 setDiaperStatus,
                 setAdGiven,
+                setSleepStartTime,
+                setSleepEndTime,
+                setSleepQuality,
               }}
             />
           )}

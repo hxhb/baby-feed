@@ -1,4 +1,4 @@
-export type FeedingType = 'BREAST_MILK' | 'BREAST_MILK_BOTTLE' | 'FORMULA'
+export type FeedingType = 'BREAST_MILK' | 'BREAST_MILK_BOTTLE' | 'FORMULA' | 'SOLID_FOOD'
 export type BreastMode = 'direct' | 'bottle'
 
 export interface FeedingFieldValues {
@@ -6,6 +6,8 @@ export interface FeedingFieldValues {
   rightBreastDuration: string
   breastMilkAmount: string
   formulaAmount: string
+  solidFoodName: string
+  solidFoodAmount: string
 }
 
 function parsePositiveNumber(value: string) {
@@ -36,6 +38,10 @@ export function getFeedingValidationMessage(type: FeedingType, values: FeedingFi
     return '请填写有效的奶粉量'
   }
 
+  if (type === 'SOLID_FOOD' && !values.solidFoodName.trim()) {
+    return '请填写辅食名称'
+  }
+
   return ''
 }
 
@@ -46,6 +52,8 @@ export function buildFeedingRecordPayload(type: FeedingType, values: FeedingFiel
       rightBreastDuration: parseDuration(values.rightBreastDuration),
       breastMilkAmount: null,
       formulaAmount: null,
+      solidFoodName: null,
+      solidFoodAmount: null,
     }
   }
 
@@ -55,14 +63,30 @@ export function buildFeedingRecordPayload(type: FeedingType, values: FeedingFiel
       rightBreastDuration: null,
       breastMilkAmount: parsePositiveNumber(values.breastMilkAmount),
       formulaAmount: null,
+      solidFoodName: null,
+      solidFoodAmount: null,
     }
   }
 
+  if (type === 'FORMULA') {
+    return {
+      leftBreastDuration: null,
+      rightBreastDuration: null,
+      breastMilkAmount: null,
+      formulaAmount: parsePositiveNumber(values.formulaAmount),
+      solidFoodName: null,
+      solidFoodAmount: null,
+    }
+  }
+
+  // SOLID_FOOD
   return {
     leftBreastDuration: null,
     rightBreastDuration: null,
     breastMilkAmount: null,
-    formulaAmount: parsePositiveNumber(values.formulaAmount),
+    formulaAmount: null,
+    solidFoodName: values.solidFoodName.trim() || null,
+    solidFoodAmount: values.solidFoodAmount.trim() || null,
   }
 }
 

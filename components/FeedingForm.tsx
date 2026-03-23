@@ -17,7 +17,9 @@ import {
   Thermometer,
   Ruler,
   Syringe,
-  Baby as BabyIcon
+  Baby as BabyIcon,
+  Moon,
+  UtensilsCrossed
 } from 'lucide-react'
 interface BabyInfo {
   id: string
@@ -36,10 +38,12 @@ interface FeedingDraft {
   rightBreastDuration: string
   breastMilkAmount: string
   formulaAmount: string
+  solidFoodName: string
+  solidFoodAmount: string
 }
 
 interface Props {
-  initialType: 'breast' | 'breast_bottle' | 'formula' | null
+  initialType: 'breast' | 'breast_bottle' | 'formula' | 'solid_food' | null
   initialBabies?: BabyInfo[]
   initialSharedDraft?: SharedDraft
   onSharedDraftChange?: (draft: SharedDraft) => void
@@ -52,7 +56,9 @@ const emptyFeedingDraft: FeedingDraft = {
   leftBreastDuration: '',
   rightBreastDuration: '',
   breastMilkAmount: '',
-  formulaAmount: ''
+  formulaAmount: '',
+  solidFoodName: '',
+  solidFoodAmount: '',
 }
 
 function invalidateRecordRelatedCaches(babyId: string) {
@@ -77,7 +83,7 @@ export default function FeedingForm({
 
   const [babyId, setBabyId] = useState('')
   const [type, setType] = useState<FeedingType>(
-    initialType === 'formula' ? 'FORMULA' : initialType === 'breast_bottle' ? 'BREAST_MILK_BOTTLE' : 'BREAST_MILK'
+    initialType === 'formula' ? 'FORMULA' : initialType === 'breast_bottle' ? 'BREAST_MILK_BOTTLE' : initialType === 'solid_food' ? 'SOLID_FOOD' : 'BREAST_MILK'
   )
   const [breastMode, setBreastMode] = useState<BreastMode>(
     initialType === 'breast_bottle' ? 'bottle' : 'direct'
@@ -86,6 +92,8 @@ export default function FeedingForm({
   const [rightBreastDuration, setRightBreastDuration] = useState('')
   const [breastMilkAmount, setBreastMilkAmount] = useState('')
   const [formulaAmount, setFormulaAmount] = useState('')
+  const [solidFoodName, setSolidFoodName] = useState('')
+  const [solidFoodAmount, setSolidFoodAmount] = useState('')
   const [startTime, setStartTime] = useState(initialSharedDraft?.eventTime || getBeijingNow())
   const [notes, setNotes] = useState(initialSharedDraft?.notes || '')
   const hasHydratedSharedDraft = useRef(false)
@@ -99,6 +107,7 @@ export default function FeedingForm({
     }
 
     fetchBabies()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialBabies, initialSharedDraft?.babyId])
 
   useEffect(() => {
@@ -111,6 +120,12 @@ export default function FeedingForm({
     if (initialType === 'breast_bottle') {
       setBreastMode('bottle')
       setType('BREAST_MILK_BOTTLE')
+      return
+    }
+
+    if (initialType === 'solid_food') {
+      setBreastMode('direct')
+      setType('SOLID_FOOD')
       return
     }
 
@@ -149,6 +164,9 @@ export default function FeedingForm({
 
     hasHydratedLocalDraft.current = true
 
+    // Skip draft restoration when a specific non-breast type is explicitly requested via URL
+    const isExplicitNonBreastType = initialType === 'solid_food' || initialType === 'formula'
+
     try {
       const rawDraft = window.sessionStorage.getItem(FEEDING_DRAFT_STORAGE_KEY)
       if (!rawDraft) {
@@ -156,7 +174,7 @@ export default function FeedingForm({
       }
 
       const parsedDraft = JSON.parse(rawDraft) as Partial<FeedingDraft>
-      if (parsedDraft.breastMode === 'direct' || parsedDraft.breastMode === 'bottle') {
+      if (!isExplicitNonBreastType && (parsedDraft.breastMode === 'direct' || parsedDraft.breastMode === 'bottle')) {
         setBreastMode(parsedDraft.breastMode)
         setType(parsedDraft.breastMode === 'bottle' ? 'BREAST_MILK_BOTTLE' : 'BREAST_MILK')
       }
@@ -175,6 +193,7 @@ export default function FeedingForm({
     } catch (error) {
       console.error('读取喂养草稿失败:', error)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -184,7 +203,9 @@ export default function FeedingForm({
         leftBreastDuration,
         rightBreastDuration,
         breastMilkAmount,
-        formulaAmount
+        formulaAmount,
+        solidFoodName,
+        solidFoodAmount
       }
 
       const isEmptyDraft =
@@ -203,7 +224,7 @@ export default function FeedingForm({
     } catch (error) {
       console.error('保存喂养草稿失败:', error)
     }
-  }, [breastMode, leftBreastDuration, rightBreastDuration, breastMilkAmount, formulaAmount])
+  }, [breastMode, leftBreastDuration, rightBreastDuration, breastMilkAmount, formulaAmount, solidFoodName, solidFoodAmount])
 
   useEffect(() => {
     if (!submitError) {
@@ -211,6 +232,7 @@ export default function FeedingForm({
     }
 
     setSubmitError('')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [babyId, type, breastMode, leftBreastDuration, rightBreastDuration, breastMilkAmount, formulaAmount, startTime, notes])
 
   const fetchBabies = async () => {
@@ -235,6 +257,8 @@ export default function FeedingForm({
     rightBreastDuration,
     breastMilkAmount,
     formulaAmount,
+    solidFoodName,
+    solidFoodAmount,
   }
 
   const getValidationMessage = () => {
@@ -270,6 +294,16 @@ export default function FeedingForm({
       activeClassName: 'border-blue-500 bg-blue-50/80 text-blue-700',
       inactiveClassName: 'border-blue-100 bg-blue-50/80 text-blue-700 hover:border-blue-200 hover:bg-blue-100/70',
       onClick: () => setType('FORMULA')
+    },
+    {
+      key: 'SOLID_FOOD',
+      title: '辅食',
+      icon: UtensilsCrossed,
+      iconClassName: 'text-orange-500',
+      active: type === 'SOLID_FOOD',
+      activeClassName: 'border-orange-500 bg-orange-50/80 text-orange-700',
+      inactiveClassName: 'border-orange-100 bg-orange-50/80 text-orange-700 hover:border-orange-200 hover:bg-orange-100/70',
+      onClick: () => setType('SOLID_FOOD')
     }
   ]
 
@@ -281,13 +315,16 @@ export default function FeedingForm({
     { href: '/add?type=medication', label: '服药', icon: Pill, iconClassName: 'text-purple-500' },
     { href: '/add?type=vaccine', label: '疫苗', icon: Syringe, iconClassName: 'text-teal-500' },
     { href: '/add?type=diaper', label: '大小便', icon: BabyIcon, iconClassName: 'text-amber-500' },
+    { href: '/add?type=sleep', label: '睡眠', icon: Moon, iconClassName: 'text-indigo-500' },
   ]
 
   const currentTypeMeta = type === 'FORMULA'
     ? { title: '奶粉', hint: '适合快速记录奶量，常用数值可以直接一键填写。', badgeClassName: 'bg-blue-50 text-blue-700', iconClassName: 'text-blue-500', icon: Milk }
-    : breastMode === 'bottle'
-      ? { title: '母乳瓶喂', hint: '可直接使用常用奶量捷径，减少重复输入。', badgeClassName: 'bg-pink-50 text-pink-700', iconClassName: 'text-pink-500', icon: Droplets }
-      : { title: '母乳亲喂', hint: '左右时长可分开记录，方便回顾本次喂养情况。', badgeClassName: 'bg-pink-50 text-pink-700', iconClassName: 'text-pink-500', icon: Droplets }
+    : type === 'SOLID_FOOD'
+      ? { title: '辅食', hint: '记录辅食种类和量，追踪宝宝辅食添加进度。', badgeClassName: 'bg-orange-50 text-orange-700', iconClassName: 'text-orange-500', icon: UtensilsCrossed }
+      : breastMode === 'bottle'
+        ? { title: '母乳瓶喂', hint: '可直接使用常用奶量捷径，减少重复输入。', badgeClassName: 'bg-pink-50 text-pink-700', iconClassName: 'text-pink-500', icon: Droplets }
+        : { title: '母乳亲喂', hint: '左右时长可分开记录，方便回顾本次喂养情况。', badgeClassName: 'bg-pink-50 text-pink-700', iconClassName: 'text-pink-500', icon: Droplets }
 
   const CurrentTypeIcon = currentTypeMeta.icon
 
@@ -375,7 +412,7 @@ export default function FeedingForm({
             {currentTypeMeta.title}
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-1.5">
           {feedingTypeCards.map(card => {
             const Icon = card.icon
             return (
@@ -383,10 +420,10 @@ export default function FeedingForm({
                 key={card.key}
                 type="button"
                 onClick={card.onClick}
-                className={`mobile-touch-target flex items-center justify-center gap-2 rounded-xl border py-2.5 transition ${card.active ? card.activeClassName : card.inactiveClassName}`}
+                className={`mobile-touch-target flex min-w-0 items-center justify-center gap-1 rounded-xl border py-2.5 transition ${card.active ? card.activeClassName : card.inactiveClassName}`}
               >
-                <Icon size={18} className={card.iconClassName} />
-                <span className="text-sm font-medium">{card.title}</span>
+                <Icon size={16} className={`shrink-0 ${card.iconClassName}`} />
+                <span className="truncate text-sm font-medium">{card.title}</span>
               </button>
             )
           })}
@@ -444,6 +481,8 @@ export default function FeedingForm({
             setRightBreastDuration,
             setBreastMilkAmount,
             setFormulaAmount,
+            setSolidFoodName,
+            setSolidFoodAmount,
           }}
         />
       </div>

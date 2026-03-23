@@ -15,6 +15,9 @@ interface HealthFieldSetters {
   setDiaperType: (value: DiaperType) => void
   setDiaperStatus: (value: string) => void
   setAdGiven: (value: boolean) => void
+  setSleepStartTime: (value: string) => void
+  setSleepEndTime: (value: string) => void
+  setSleepQuality: (value: string) => void
 }
 
 interface Props {
@@ -68,6 +71,10 @@ export function getHealthFieldValidationMessage(type: HealthType, values: Health
     if (parsedDoseNumber > parsedTotalDoses) {
       return '当前针次不能大于总针数'
     }
+  }
+
+  if (type === 'SLEEP' && !values.sleepStartTime) {
+    return '请填写入睡时间'
   }
 
   return ''
@@ -383,6 +390,167 @@ export default function HealthRecordFields({
             className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-transparent focus:ring-2 focus:ring-blue-500"
             placeholder="例如：正常、稀便等"
           />
+        </div>
+      </div>
+    )
+  }
+
+  if (type === 'SLEEP') {
+    const showSleepError = !!validationMessage
+
+    // Calculate current duration from start and end time
+    const currentDurationMinutes = (() => {
+      if (!values.sleepStartTime || !values.sleepEndTime) return 0
+      const start = new Date(values.sleepStartTime).getTime()
+      const end = new Date(values.sleepEndTime).getTime()
+      if (end <= start) return 0
+      return Math.round((end - start) / (60 * 1000))
+    })()
+
+    const durationPresets = [
+      { label: '30分钟', minutes: 30 },
+      { label: '1小时', minutes: 60 },
+      { label: '1.5小时', minutes: 90 },
+      { label: '2小时', minutes: 120 },
+      { label: '3小时', minutes: 180 },
+      { label: '整晚', minutes: 600 },
+    ]
+
+    const handleDurationSelect = (minutes: number) => {
+      if (!values.sleepStartTime) return
+      const start = new Date(values.sleepStartTime)
+      const end = new Date(start.getTime() + minutes * 60 * 1000)
+      // Format to datetime-local string (YYYY-MM-DDTHH:MM)
+      const pad = (n: number) => String(n).padStart(2, '0')
+      const endStr = `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}T${pad(end.getHours())}:${pad(end.getMinutes())}`
+      setters.setSleepEndTime(endStr)
+    }
+
+    const handleCustomDuration = (value: string) => {
+      const minutes = parseInt(value, 10)
+      if (minutes > 0 && values.sleepStartTime) {
+        handleDurationSelect(minutes)
+      } else if (!value) {
+        setters.setSleepEndTime('')
+      }
+    }
+
+    const formatDurationDisplay = (minutes: number) => {
+      if (minutes <= 0) return ''
+      const h = Math.floor(minutes / 60)
+      const m = minutes % 60
+      if (h === 0) return `${m}分钟`
+      if (m === 0) return `${h}小时`
+      return `${h}小时${m}分钟`
+    }
+
+    return (
+      <div className="space-y-2.5">
+        <div className={mode === 'create' ? 'rounded-2xl bg-gray-50/70 p-3' : ''}>
+          <label className="mb-1.5 block text-sm font-medium text-gray-700">
+            入睡时间
+          </label>
+          <input
+            type="datetime-local"
+            value={values.sleepStartTime}
+            onChange={(e) => {
+              setters.setSleepStartTime(e.target.value)
+              // If duration was set, recalculate end time based on new start
+              if (currentDurationMinutes > 0 && e.target.value) {
+                const start = new Date(e.target.value)
+                const end = new Date(start.getTime() + currentDurationMinutes * 60 * 1000)
+                const pad = (n: number) => String(n).padStart(2, '0')
+                const endStr = `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}T${pad(end.getHours())}:${pad(end.getMinutes())}`
+                setters.setSleepEndTime(endStr)
+              }
+            }}
+            aria-invalid={showSleepError}
+            className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-transparent focus:ring-2 focus:ring-blue-500"
+          />
+          {showSleepError ? (
+            <p className="mt-1.5 text-sm text-red-600">{validationMessage}</p>
+          ) : null}
+        </div>
+
+        <div className={mode === 'create' ? 'rounded-2xl bg-gray-50/70 p-3' : ''}>
+          <div className="mb-1.5 flex items-center justify-between">
+            <label className="block text-sm font-medium text-gray-700">
+              睡眠时长（可选）
+            </label>
+            {currentDurationMinutes > 0 ? (
+              <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                {formatDurationDisplay(currentDurationMinutes)}
+              </span>
+            ) : null}
+          </div>
+          <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
+            {durationPresets.map((preset) => (
+              <button
+                key={preset.minutes}
+                type="button"
+                disabled={!values.sleepStartTime}
+                onClick={() => handleDurationSelect(preset.minutes)}
+                className={`mobile-touch-target rounded-xl border-2 px-2 py-2 text-center text-xs font-medium transition ${
+                  currentDurationMinutes === preset.minutes
+                    ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                    : values.sleepStartTime
+                      ? 'border-gray-200 text-gray-600 hover:border-gray-300'
+                      : 'cursor-not-allowed border-gray-100 text-gray-300'
+                }`}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              type="number"
+              inputMode="numeric"
+              min="1"
+              disabled={!values.sleepStartTime}
+              placeholder="自定义分钟数"
+              value={currentDurationMinutes > 0 && !durationPresets.some(p => p.minutes === currentDurationMinutes) ? currentDurationMinutes : ''}
+              onChange={(e) => handleCustomDuration(e.target.value)}
+              className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-transparent focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-300"
+            />
+            <span className="shrink-0 text-xs text-gray-500">分钟</span>
+          </div>
+          {values.sleepStartTime && currentDurationMinutes > 0 ? (
+            <p className="mt-1.5 text-xs text-gray-500">
+              预计醒来：{new Date(values.sleepEndTime).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+            </p>
+          ) : !values.sleepStartTime ? (
+            <p className="mt-1.5 text-xs text-gray-400">请先填写入睡时间</p>
+          ) : null}
+        </div>
+
+        <div className={`${mode === 'create' ? 'rounded-2xl bg-gray-50/70 p-3' : ''}`}>
+          <label className="mb-1.5 block text-sm font-medium text-gray-700">
+            睡眠质量（可选）
+          </label>
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { value: 'GOOD', label: '好', emoji: '😊' },
+              { value: 'NORMAL', label: '一般', emoji: '😐' },
+              { value: 'POOR', label: '差', emoji: '😟' },
+            ].map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setters.setSleepQuality(values.sleepQuality === option.value ? '' : option.value)}
+                className={`mobile-touch-target rounded-xl border-2 px-2 py-2 text-center transition ${
+                  values.sleepQuality === option.value
+                    ? 'border-indigo-500 bg-indigo-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <span className="text-lg">{option.emoji}</span>
+                <p className={`mt-1 text-xs ${values.sleepQuality === option.value ? 'font-medium text-indigo-700' : 'text-gray-600'}`}>
+                  {option.label}
+                </p>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     )

@@ -107,6 +107,9 @@ export async function PUT(
       diaperType: diaperType === undefined ? existingRecord.diaperType : diaperType,
       diaperStatus: diaperStatus === undefined ? existingRecord.diaperStatus : diaperStatus,
       adGiven: adGiven === undefined ? existingRecord.adGiven : adGiven,
+      sleepStartTime: body.sleepStartTime === undefined ? (existingRecord.sleepStartTime ? existingRecord.sleepStartTime.toISOString() : null) : body.sleepStartTime,
+      sleepEndTime: body.sleepEndTime === undefined ? (existingRecord.sleepEndTime ? existingRecord.sleepEndTime.toISOString() : null) : body.sleepEndTime,
+      sleepQuality: body.sleepQuality === undefined ? existingRecord.sleepQuality : body.sleepQuality,
       recordedAt: nextRecordedAt,
       notes: notes === undefined ? existingRecord.notes : notes,
     }
@@ -130,6 +133,9 @@ export async function PUT(
       diaperType: null as string | null,
       diaperStatus: null as string | null,
       adGiven: null as boolean | null,
+      sleepStartTime: null as Date | null,
+      sleepEndTime: null as Date | null,
+      sleepQuality: null as string | null,
       recordedAt: new Date(nextRecordedAt),
       notes: normalizedBody.notes === undefined ? null : normalizedBody.notes as string | null,
     }
@@ -153,6 +159,10 @@ export async function PUT(
       normalizedData.diaperStatus = normalizedBody.diaperStatus === undefined ? null : normalizedBody.diaperStatus as string | null
     } else if (nextType === 'AD_VITAMIN') {
       normalizedData.adGiven = normalizedBody.adGiven === undefined ? null : normalizedBody.adGiven as boolean | null
+    } else if (nextType === 'SLEEP') {
+      normalizedData.sleepStartTime = normalizedBody.sleepStartTime ? new Date(normalizedBody.sleepStartTime as string) : null
+      normalizedData.sleepEndTime = normalizedBody.sleepEndTime ? new Date(normalizedBody.sleepEndTime as string) : null
+      normalizedData.sleepQuality = normalizedBody.sleepQuality === undefined ? null : normalizedBody.sleepQuality as string | null
     }
 
     const record = await prisma.healthRecord.update({

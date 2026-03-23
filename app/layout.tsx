@@ -66,7 +66,7 @@ export default async function RootLayout({
   const session = await getServerSession()
 
   return (
-    <html lang="zh-CN" style={{ colorScheme: 'light' }}>
+    <html lang="zh-CN" data-scroll-behavior="smooth" style={{ colorScheme: 'light' }}>
       <head>
         <meta name="color-scheme" content="light" />
       </head>

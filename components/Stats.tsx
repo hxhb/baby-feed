@@ -266,6 +266,67 @@ export default function StatsComponent({
     }
   })
 
+  // --- New trend chart data ---
+
+  // Diaper trend data
+  const diaperChartData = stats?.lastDays.map(day => {
+    const parts = day.date.split('-')
+    return {
+      date: `${parseInt(parts[1])}/${parseInt(parts[2])}`,
+      小便: day.peeCount,
+      大便: day.poopCount,
+    }
+  }) || []
+  const hasDiaperData = diaperChartData.some(day => day.小便 > 0 || day.大便 > 0)
+
+  // Feeding structure trend data
+  const feedingStructureData = stats?.lastDays.map(day => {
+    const parts = day.date.split('-')
+    return {
+      date: `${parseInt(parts[1])}/${parseInt(parts[2])}`,
+      亲喂: day.breastFeedingCount,
+      瓶喂: day.breastBottleCount,
+      奶粉: day.formulaCount,
+    }
+  }) || []
+  const hasFeedingStructureData = feedingStructureData.some(day => day.亲喂 > 0 || day.瓶喂 > 0 || day.奶粉 > 0)
+
+  // BMI trend data (combine weight + height records from same date)
+  const bmiData = (() => {
+    const heightByDate = new Map<string, number>()
+    for (const h of stats?.heightTrend || []) {
+      heightByDate.set(h.date, h.height)
+    }
+    const results: { timestamp: number; label: string; BMI: number }[] = []
+    let lastKnownHeight: number | null = null
+    for (const w of stats?.weightTrend || []) {
+      const h = heightByDate.get(w.date) ?? lastKnownHeight
+      if (h && h > 0) {
+        const heightM = h / 100
+        const bmi = Number((w.weight / (heightM * heightM)).toFixed(1))
+        results.push({
+          timestamp: new Date(w.recordedAt).getTime(),
+          label: formatTrendAxisDate(new Date(w.recordedAt).getTime()),
+          BMI: bmi,
+        })
+      }
+      const directHeight = heightByDate.get(w.date)
+      if (directHeight) lastKnownHeight = directHeight
+    }
+    return results
+  })()
+
+  // Left/right breast trend data
+  const breastSideData = stats?.lastDays.map(day => {
+    const parts = day.date.split('-')
+    return {
+      date: `${parseInt(parts[1])}/${parseInt(parts[2])}`,
+      左乳: day.leftBreastDuration,
+      右乳: day.rightBreastDuration,
+    }
+  }) || []
+  const hasBreastSideData = breastSideData.some(day => day.左乳 > 0 || day.右乳 > 0)
+
   const latestWeightRecord = stats?.weightTrend[stats.weightTrend.length - 1] || null
   const previousWeightRecord = stats && stats.weightTrend.length > 1 ? stats.weightTrend[stats.weightTrend.length - 2] : null
   const latestHeightRecord = stats?.heightTrend[stats.heightTrend.length - 1] || null
@@ -336,8 +397,6 @@ export default function StatsComponent({
     }
     return best
   }, null) || null
-  const latestDiaperDay = [...(stats?.lastDays || [])].reverse().find(day => day.peeCount > 0 || day.poopCount > 0) || null
-
   // --- New insight computations ---
 
   // Night feeding stats (22:00 - 06:00)
@@ -441,32 +500,6 @@ export default function StatsComponent({
     return '波动较大'
   })()
 
-  const chartTabs = [
-    {
-      key: 'breastfeeding' as const,
-      label: '母乳',
-      description: '亲喂时长 + 瓶喂母乳量',
-      empty: false,
-    },
-    {
-      key: 'formula' as const,
-      label: '奶粉',
-      description: '查看每日奶粉摄入量',
-      empty: chartData.every(day => day.奶粉量 === 0),
-    },
-    {
-      key: 'weight' as const,
-      label: '体重',
-      description: '按记录时间查看增长轨迹',
-      empty: weightData.length === 0,
-    },
-    {
-      key: 'height' as const,
-      label: '身高',
-      description: '按记录时间查看身高变化',
-      empty: heightData.length === 0,
-    },
-  ]
   const subpageTabs = [
     {
       key: 'dashboard',
@@ -663,7 +696,7 @@ export default function StatsComponent({
                     <h3 className="text-base font-bold text-gray-900">趋势工作台</h3>
                   </div>
                   <p className="mt-1 text-sm text-gray-500">
-                    当前周期内的母乳、奶粉、体重、身高数据，便于对比查看。
+                    当前周期内的母乳、奶粉、体重、身高、大小便、喂养结构、BMI、左右乳时长数据。
                   </p>
                 </div>
 
@@ -846,6 +879,66 @@ export default function StatsComponent({
                       />
                     )}
                   </div>
+
+                  {/* BMI trend */}
+                  <div className="min-w-0 rounded-2xl border border-emerald-100 bg-emerald-50/30 p-3">
+                    <div className="mb-3 flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">BMI 趋势</p>
+                        <p className="mt-1 text-xs text-emerald-700">体重(kg) ÷ 身高(m)² 综合评估</p>
+                      </div>
+                    </div>
+                    {bmiData.length > 0 ? (
+                      <StableResponsiveChart className="min-w-0 h-56 sm:h-64 -ml-2">
+                        <LineChart data={bmiData} margin={{ top: 10, right: 15, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#d1fae5" />
+                          <XAxis
+                            dataKey="timestamp"
+                            type="number"
+                            domain={['dataMin', 'dataMax']}
+                            scale="time"
+                            tick={{ fontSize: 11, fill: '#475569' }}
+                            tickFormatter={formatTrendAxisDate}
+                            axisLine={{ stroke: '#6ee7b7' }}
+                            tickLine={{ stroke: '#6ee7b7' }}
+                          />
+                          <YAxis
+                            domain={['dataMin - 1', 'dataMax + 1']}
+                            tick={{ fontSize: 11, fill: '#475569' }}
+                            axisLine={{ stroke: '#6ee7b7' }}
+                            tickLine={{ stroke: '#6ee7b7' }}
+                          />
+                          <Tooltip
+                            labelFormatter={(value) => formatTrendTooltipLabel(Number(value))}
+                            formatter={(value) => [`${value}`, 'BMI']}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="BMI"
+                            stroke={palette.emerald}
+                            strokeWidth={2.5}
+                            dot={{ fill: palette.emerald, r: 4 }}
+                            activeDot={{ r: 6 }}
+                          >
+                            <LabelList
+                              dataKey="BMI"
+                              position="top"
+                              fill={palette.emerald}
+                              fontSize={11}
+                              fontWeight={600}
+                            />
+                          </Line>
+                        </LineChart>
+                      </StableResponsiveChart>
+                    ) : (
+                      <StatsEmptyState
+                        icon={Scale}
+                        title="暂无 BMI 数据"
+                        description="需要同时有体重和身高记录才能计算 BMI"
+                      />
+                    )}
+                  </div>
+
                 </div>
               </StatsPanel>
 
@@ -1175,6 +1268,111 @@ export default function StatsComponent({
                       )}
                     </div>
                   </div>
+                </div>
+              </div>
+
+              {/* Trend charts moved from dashboard */}
+              <div className="grid gap-2.5 xl:grid-cols-2">
+                {/* Diaper trend */}
+                <div className="min-w-0 rounded-2xl border border-amber-100 bg-amber-50/30 p-3">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">大小便趋势</p>
+                      <p className="mt-1 text-xs text-amber-700">每日大小便次数变化</p>
+                    </div>
+                  </div>
+                  {hasDiaperData ? (
+                    <StableResponsiveChart className="min-w-0 h-56 sm:h-72 -ml-2">
+                      <BarChart data={diaperChartData} margin={{ top: 25, right: 5, left: -10, bottom: 0 }} barCategoryGap="25%" style={{ outline: 'none' }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#fef3c7" />
+                        <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#475569' }} axisLine={{ stroke: '#fcd34d' }} tickLine={{ stroke: '#fcd34d' }} />
+                        <YAxis tick={{ fontSize: 11, fill: '#475569' }} axisLine={{ stroke: '#fcd34d' }} tickLine={{ stroke: '#fcd34d' }} />
+                        <Tooltip formatter={(value, name) => [`${value}次`, name]} />
+                        <Legend wrapperStyle={{ fontSize: 12 }} />
+                        <Bar dataKey="小便" fill="#60a5fa" name="小便" radius={[2, 2, 0, 0]} stackId="diaper" maxBarSize={32}>
+                          <LabelList dataKey="小便" position="inside" fill="#fff" fontSize={10} fontWeight={600} />
+                        </Bar>
+                        <Bar dataKey="大便" fill="#d97706" name="大便" radius={[2, 2, 0, 0]} stackId="diaper" maxBarSize={32}>
+                          <LabelList dataKey="大便" position="top" fill="#d97706" fontSize={10} fontWeight={600} />
+                        </Bar>
+                      </BarChart>
+                    </StableResponsiveChart>
+                  ) : (
+                    <StatsEmptyState
+                      icon={Droplets}
+                      title="暂无大小便记录"
+                      description="添加大小便记录后，这里会展示趋势变化"
+                    />
+                  )}
+                </div>
+
+                {/* Feeding structure trend */}
+                <div className="min-w-0 rounded-2xl border border-purple-100 bg-purple-50/30 p-3">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">喂养结构趋势</p>
+                      <p className="mt-1 text-xs text-purple-700">亲喂 / 瓶喂 / 奶粉次数变化</p>
+                    </div>
+                  </div>
+                  {hasFeedingStructureData ? (
+                    <StableResponsiveChart className="min-w-0 h-56 sm:h-72 -ml-2">
+                      <BarChart data={feedingStructureData} margin={{ top: 25, right: 5, left: -10, bottom: 0 }} barCategoryGap="25%" style={{ outline: 'none' }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f3e8ff" />
+                        <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#475569' }} axisLine={{ stroke: '#d8b4fe' }} tickLine={{ stroke: '#d8b4fe' }} />
+                        <YAxis tick={{ fontSize: 11, fill: '#475569' }} axisLine={{ stroke: '#d8b4fe' }} tickLine={{ stroke: '#d8b4fe' }} />
+                        <Tooltip formatter={(value, name) => [`${value}次`, name]} />
+                        <Legend wrapperStyle={{ fontSize: 12 }} />
+                        <Bar dataKey="亲喂" fill="#f472b6" name="亲喂" radius={[2, 2, 0, 0]} stackId="feed" maxBarSize={32}>
+                          <LabelList dataKey="亲喂" position="inside" fill="#fff" fontSize={10} fontWeight={600} />
+                        </Bar>
+                        <Bar dataKey="瓶喂" fill="#a78bfa" name="瓶喂" radius={[2, 2, 0, 0]} stackId="feed" maxBarSize={32}>
+                          <LabelList dataKey="瓶喂" position="inside" fill="#fff" fontSize={10} fontWeight={600} />
+                        </Bar>
+                        <Bar dataKey="奶粉" fill="#60a5fa" name="奶粉" radius={[2, 2, 0, 0]} stackId="feed" maxBarSize={32}>
+                          <LabelList dataKey="奶粉" position="top" fill="#60a5fa" fontSize={10} fontWeight={600} />
+                        </Bar>
+                      </BarChart>
+                    </StableResponsiveChart>
+                  ) : (
+                    <StatsEmptyState
+                      icon={Milk}
+                      title="暂无喂养记录"
+                      description="添加喂养记录后，这里会展示喂养结构变化"
+                    />
+                  )}
+                </div>
+
+                {/* Left/right breast duration trend */}
+                <div className="min-w-0 rounded-2xl border border-rose-100 bg-rose-50/30 p-3">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">左右乳时长趋势</p>
+                      <p className="mt-1 text-xs text-rose-700">每日左右侧亲喂时长(分钟)</p>
+                    </div>
+                  </div>
+                  {hasBreastSideData ? (
+                    <StableResponsiveChart className="min-w-0 h-56 sm:h-72 -ml-2">
+                      <BarChart data={breastSideData} margin={{ top: 25, right: 5, left: -10, bottom: 0 }} barGap={4} barCategoryGap="30%" style={{ outline: 'none' }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#ffe4e6" />
+                        <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#475569' }} axisLine={{ stroke: '#fda4af' }} tickLine={{ stroke: '#fda4af' }} />
+                        <YAxis tick={{ fontSize: 11, fill: '#475569' }} tickFormatter={(v) => `${v}分`} axisLine={{ stroke: '#fda4af' }} tickLine={{ stroke: '#fda4af' }} />
+                        <Tooltip formatter={(value, name) => [`${value}分钟`, name]} />
+                        <Legend wrapperStyle={{ fontSize: 12 }} />
+                        <Bar dataKey="左乳" fill="#fb7185" name="左乳(分钟)" radius={[3, 3, 0, 0]} maxBarSize={28}>
+                          <LabelList dataKey="左乳" position="top" fill="#e11d48" fontSize={10} fontWeight={600} />
+                        </Bar>
+                        <Bar dataKey="右乳" fill="#fb923c" name="右乳(分钟)" radius={[3, 3, 0, 0]} maxBarSize={28}>
+                          <LabelList dataKey="右乳" position="top" fill="#ea580c" fontSize={10} fontWeight={600} />
+                        </Bar>
+                      </BarChart>
+                    </StableResponsiveChart>
+                  ) : (
+                    <StatsEmptyState
+                      icon={Droplets}
+                      title="暂无亲喂记录"
+                      description="添加母乳亲喂记录后，这里会展示左右侧时长趋势"
+                    />
+                  )}
                 </div>
               </div>
 

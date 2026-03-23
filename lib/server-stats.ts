@@ -17,10 +17,13 @@ export interface PreloadedStatsDay {
   totalBreastMilkAmount: number
   formulaCount: number
   totalFormulaAmount: number
+  solidFoodCount: number
   adGiven: boolean
   peeCount: number
   poopCount: number
   nightFeedingCount: number
+  sleepDurationMinutes: number
+  sleepCount: number
   weight?: number
   height?: number
   temperature?: number
@@ -103,10 +106,13 @@ function createEmptyStatsDay(date: string): PreloadedStatsDay {
     totalBreastMilkAmount: 0,
     formulaCount: 0,
     totalFormulaAmount: 0,
+    solidFoodCount: 0,
     adGiven: false,
     peeCount: 0,
     poopCount: 0,
     nightFeedingCount: 0,
+    sleepDurationMinutes: 0,
+    sleepCount: 0,
     weight: undefined,
     height: undefined,
     temperature: undefined,
@@ -252,6 +258,8 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
     } else if (record.type === 'FORMULA') {
       dayStats.formulaCount += 1
       dayStats.totalFormulaAmount += record.formulaAmount || 0
+    } else if (record.type === 'SOLID_FOOD') {
+      dayStats.solidFoodCount += 1
     }
 
     // Night feeding detection (22:00 - 06:00 Beijing time)
@@ -289,6 +297,15 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
       dayStats.temperature = record.temperature
     } else if (record.type === 'AD_VITAMIN' && record.adGiven) {
       dayStats.adGiven = true
+    } else if (record.type === 'SLEEP' && record.sleepStartTime) {
+      dayStats.sleepCount += 1
+      if (record.sleepEndTime) {
+        const startMs = new Date(record.sleepStartTime).getTime()
+        const endMs = new Date(record.sleepEndTime).getTime()
+        if (endMs > startMs) {
+          dayStats.sleepDurationMinutes += Math.round((endMs - startMs) / (60 * 1000))
+        }
+      }
     } else if (record.type === 'DIAPER') {
       if (record.diaperType === 'PEE' || record.diaperType === 'BOTH') {
         dayStats.peeCount += 1

@@ -9,6 +9,8 @@ interface FeedingFieldSetters {
   setRightBreastDuration: (value: string) => void
   setBreastMilkAmount: (value: string) => void
   setFormulaAmount: (value: string) => void
+  setSolidFoodName: (value: string) => void
+  setSolidFoodAmount: (value: string) => void
 }
 
 interface Props {
@@ -143,6 +145,37 @@ export default function FeedingRecordFields({
             />
           </div>
         )}
+      </div>
+    )
+  }
+
+  if (type === 'SOLID_FOOD') {
+    return (
+      <div className={mode === 'create' ? 'grid gap-2.5 sm:grid-cols-2' : 'space-y-3'}>
+        <div className={mode === 'create' ? 'rounded-2xl bg-gray-50/70 p-3' : ''}>
+          <label className="mb-1.5 block text-sm font-medium text-gray-700">
+            辅食名称
+          </label>
+          <input
+            type="text"
+            value={values.solidFoodName}
+            onChange={(e) => setters.setSolidFoodName(e.target.value)}
+            className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-transparent focus:ring-2 focus:ring-blue-500"
+            placeholder="例如：米粉、南瓜泥、蛋黄"
+          />
+        </div>
+        <div className={mode === 'create' ? 'rounded-2xl bg-gray-50/70 p-3' : ''}>
+          <label className="mb-1.5 block text-sm font-medium text-gray-700">
+            辅食量（可选）
+          </label>
+          <input
+            type="text"
+            value={values.solidFoodAmount}
+            onChange={(e) => setters.setSolidFoodAmount(e.target.value)}
+            className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-transparent focus:ring-2 focus:ring-blue-500"
+            placeholder="例如：半碗、30g"
+          />
+        </div>
       </div>
     )
   }

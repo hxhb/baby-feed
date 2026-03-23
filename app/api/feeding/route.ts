@@ -155,6 +155,8 @@ export async function POST(request: NextRequest) {
     const typedRightBreastDuration = typeof rightBreastDuration === 'number' ? rightBreastDuration : undefined
     const typedBreastMilkAmount = typeof breastMilkAmount === 'number' ? breastMilkAmount : undefined
     const typedFormulaAmount = typeof formulaAmount === 'number' ? formulaAmount : undefined
+    const typedSolidFoodName = typeof body.solidFoodName === 'string' ? body.solidFoodName : undefined
+    const typedSolidFoodAmount = typeof body.solidFoodAmount === 'string' ? body.solidFoodAmount : undefined
     const typedEndTime = typeof endTime === 'string' ? endTime : undefined
     const typedNotes = typeof notes === 'string' ? notes : undefined
 
@@ -177,6 +179,8 @@ export async function POST(request: NextRequest) {
         rightBreastDuration: typedType === 'BREAST_MILK' ? (typedRightBreastDuration ?? null) : null,
         breastMilkAmount: typedType === 'BREAST_MILK_BOTTLE' ? (typedBreastMilkAmount ?? null) : null,
         formulaAmount: typedType === 'FORMULA' ? (typedFormulaAmount ?? null) : null,
+        solidFoodName: typedType === 'SOLID_FOOD' ? (typedSolidFoodName ?? null) : null,
+        solidFoodAmount: typedType === 'SOLID_FOOD' ? (typedSolidFoodAmount ?? null) : null,
         adGiven: null,
         startTime: new Date(startTime),
         endTime: typedEndTime ? new Date(typedEndTime) : null,
