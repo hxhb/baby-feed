@@ -538,17 +538,17 @@ export default function StatsComponent({
   const completedVaccineTypes = vaccineProgressSummary.filter(v => v.isCompleted).length
   const recentVaccineCard = (
     <div className="rounded-2xl border border-teal-100 bg-gradient-to-br from-teal-50/80 to-white p-2.5 shadow-sm">
-      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 text-teal-600">
-          <Syringe size={13} />
-          <p className="text-[13px] font-bold">疫苗进度</p>
+          <Syringe size={14} />
+          <p className="text-sm font-bold">疫苗进度</p>
         </div>
         {totalVaccineTypes > 0 && (
           <div className="flex items-center gap-1.5">
             {pendingVaccines.length > 0 && (
-              <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">待完成{pendingVaccines.length}种</span>
+              <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[11px] font-bold text-amber-700">待完成{pendingVaccines.length}种</span>
             )}
-            <span className="rounded-full bg-teal-100 px-1.5 py-0.5 text-[9px] font-bold text-teal-700">{completedVaccineTypes}/{totalVaccineTypes}种</span>
+            <span className="rounded-full bg-teal-100 px-1.5 py-0.5 text-[11px] font-bold text-teal-700">{completedVaccineTypes}/{totalVaccineTypes}种</span>
           </div>
         )}
       </div>
@@ -557,13 +557,13 @@ export default function StatsComponent({
         <div className="mt-2 space-y-1">
           {/* Pending vaccines - highlighted */}
           {pendingVaccines.map(item => (
-            <div key={item.vaccineName} className="flex items-center gap-2 rounded-lg border border-amber-100 bg-amber-50/60 px-2 py-1.5">
+            <div key={item.vaccineName} className="flex items-center gap-2 rounded-lg border border-amber-100 bg-amber-50/60 px-2.5 py-2">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
-                  <p className="text-xs font-bold text-slate-900 truncate">{item.vaccineName}</p>
-                  <span className="shrink-0 rounded-full bg-amber-200 px-1.5 py-0.5 text-[8px] font-bold text-amber-800">差{item.remainingDoses}针</span>
+                  <p className="text-sm font-bold text-slate-900 truncate">{item.vaccineName}</p>
+                  <span className="shrink-0 rounded-full bg-amber-200 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">差{item.remainingDoses}针</span>
                 </div>
-                <div className="mt-0.5 flex items-center gap-1.5 text-[9px] text-slate-500">
+                <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-500">
                   <span className="font-medium text-teal-600">{formatVaccineProgress(item.latestDoseNumber, item.totalDoses) || '未标注'}</span>
                   <span>·</span>
                   <span>{item.latestDate}</span>
@@ -571,21 +571,21 @@ export default function StatsComponent({
               </div>
               {/* Mini progress bar */}
               {item.latestDoseNumber && item.totalDoses && (
-                <div className="shrink-0 w-10">
-                  <div className="flex h-1.5 overflow-hidden rounded-full bg-amber-100">
+                <div className="shrink-0 w-12">
+                  <div className="flex h-2 overflow-hidden rounded-full bg-amber-100">
                     <div className="bg-teal-500 rounded-full transition-all" style={{ width: `${Math.round((item.latestDoseNumber / item.totalDoses) * 100)}%` }} />
                   </div>
-                  <p className="mt-0.5 text-center text-[7px] text-slate-400">{item.latestDoseNumber}/{item.totalDoses}</p>
+                  <p className="mt-0.5 text-center text-[10px] text-slate-400">{item.latestDoseNumber}/{item.totalDoses}</p>
                 </div>
               )}
             </div>
           ))}
           {/* Completed vaccines - compact list */}
           {vaccineProgressSummary.filter(v => v.isCompleted).length > 0 && (
-            <div className="rounded-lg bg-emerald-50/60 px-2 py-1.5">
-              <div className="flex flex-wrap gap-x-2 gap-y-0.5">
+            <div className="rounded-lg bg-emerald-50/60 px-2.5 py-2">
+              <div className="flex flex-wrap gap-x-2.5 gap-y-1">
                 {vaccineProgressSummary.filter(v => v.isCompleted).map(item => (
-                  <span key={item.vaccineName} className="text-[9px] text-emerald-700">
+                  <span key={item.vaccineName} className="text-[11px] text-emerald-700">
                     ✓ <span className="font-medium">{item.vaccineName}</span>
                     {item.totalDoses && <span className="text-emerald-500">({item.totalDoses}针)</span>}
                   </span>
@@ -595,11 +595,11 @@ export default function StatsComponent({
           )}
           {/* Latest record timestamp */}
           {latestVaccineRecord && (
-            <p className="text-[8px] text-slate-400 pl-0.5">最近接种 {formatRecordedSummaryTime(latestVaccineRecord.recordedAt)}</p>
+            <p className="text-[11px] text-slate-400 pl-0.5">最近接种 {formatRecordedSummaryTime(latestVaccineRecord.recordedAt)}</p>
           )}
         </div>
       ) : (
-        <p className="mt-2 text-[11px] text-slate-400">暂无疫苗记录，添加后可查看接种进度</p>
+        <p className="mt-2 text-xs text-slate-400">暂无疫苗记录，添加后可查看接种进度</p>
       )}
     </div>
   )
@@ -858,26 +858,26 @@ export default function StatsComponent({
                   {vaccineProgressSummary.length > 0 && (
                     <div className="flex items-center gap-1.5">
                       {pendingVaccines.length > 0 && (
-                        <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">待完成{pendingVaccines.length}种</span>
+                        <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[11px] font-bold text-amber-700">待完成{pendingVaccines.length}种</span>
                       )}
-                      <span className="rounded-full bg-teal-100 px-1.5 py-0.5 text-[9px] font-bold text-teal-700">{completedVaccineTypes}/{totalVaccineTypes}种</span>
+                      <span className="rounded-full bg-teal-100 px-1.5 py-0.5 text-[11px] font-bold text-teal-700">{completedVaccineTypes}/{totalVaccineTypes}种</span>
                     </div>
                   )}
                 </div>
                 {stats.vaccineRecords.length > 0 ? (
-                  <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                  <div className="mt-2.5 grid gap-2 sm:grid-cols-2">
                     {vaccineProgressSummary.map(item => (
-                      <div key={item.vaccineName} className={`rounded-xl border p-2.5 ${item.isCompleted ? 'border-emerald-100 bg-emerald-50/30' : 'border-amber-100 bg-amber-50/20'}`}>
+                      <div key={item.vaccineName} className={`rounded-xl border p-3 ${item.isCompleted ? 'border-emerald-100 bg-emerald-50/30' : 'border-amber-100 bg-amber-50/20'}`}>
                         {/* Header row: name + status + progress bar */}
                         <div className="flex items-center gap-2">
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5">
-                              <p className="text-xs font-bold text-gray-900 truncate">{item.vaccineName}</p>
-                              <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-bold ${item.isCompleted ? 'bg-emerald-200 text-emerald-800' : 'bg-amber-200 text-amber-800'}`}>
+                              <p className="text-sm font-bold text-gray-900 truncate">{item.vaccineName}</p>
+                              <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${item.isCompleted ? 'bg-emerald-200 text-emerald-800' : 'bg-amber-200 text-amber-800'}`}>
                                 {item.isCompleted ? '已完成' : `差${item.remainingDoses}针`}
                               </span>
                             </div>
-                            <div className="mt-0.5 flex items-center gap-1 text-[9px] text-slate-500">
+                            <div className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-500">
                               <span className="font-medium text-teal-600">{formatVaccineProgress(item.latestDoseNumber, item.totalDoses) || '未标注'}</span>
                               <span>·</span>
                               <span>{item.latestDate}</span>
@@ -885,20 +885,20 @@ export default function StatsComponent({
                           </div>
                           {/* Mini progress indicator */}
                           {item.latestDoseNumber && item.totalDoses && (
-                            <div className="shrink-0 w-10">
-                              <div className="flex h-1.5 overflow-hidden rounded-full bg-gray-100">
+                            <div className="shrink-0 w-12">
+                              <div className="flex h-2 overflow-hidden rounded-full bg-gray-100">
                                 <div className={`rounded-full transition-all ${item.isCompleted ? 'bg-emerald-500' : 'bg-teal-500'}`} style={{ width: `${Math.round((item.latestDoseNumber / item.totalDoses) * 100)}%` }} />
                               </div>
-                              <p className="mt-0.5 text-center text-[7px] text-slate-400">{item.latestDoseNumber}/{item.totalDoses}</p>
+                              <p className="mt-0.5 text-center text-[10px] text-slate-400">{item.latestDoseNumber}/{item.totalDoses}</p>
                             </div>
                           )}
                         </div>
                         {/* Dose entries - compact inline */}
-                        <div className="mt-1.5 rounded-lg bg-white/70 px-2 py-1.5">
-                          <div className="space-y-0.5 text-[10px] leading-[14px] text-slate-600">
+                        <div className="mt-2 rounded-lg bg-white/70 px-2.5 py-2">
+                          <div className="space-y-1 text-xs leading-4 text-slate-600">
                             {item.doseEntries.map(doseEntry => (
                               <div key={doseEntry.id} className="flex items-start gap-1">
-                                <span className="shrink-0 text-slate-300 leading-[14px]">•</span>
+                                <span className="shrink-0 text-slate-300 leading-4">•</span>
                                 <p className="min-w-0 break-words">
                                   <span className="font-semibold text-slate-700">
                                     {formatVaccineProgress(doseEntry.doseNumber, doseEntry.totalDoses) || '未标注'}
@@ -932,9 +932,9 @@ export default function StatsComponent({
 
               {/* Baby age banner */}
               {babyAgeLabel && (
-                <div className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-pink-50 to-purple-50 border border-pink-100 px-3 py-2">
-                  <BabyIcon size={14} className="shrink-0 text-pink-500" />
-                  <p className="text-xs font-medium text-gray-700">
+                <div className="flex items-center gap-2.5 rounded-2xl bg-gradient-to-r from-pink-50 to-purple-50 border border-pink-100 px-3.5 py-2.5">
+                  <BabyIcon size={16} className="shrink-0 text-pink-500" />
+                  <p className="text-sm font-medium text-gray-700">
                     <span className="font-bold text-pink-600">{stats.baby.name}</span>
                     {' · '}当前月龄 <span className="font-bold text-purple-600">{babyAgeLabel}</span>
                     {babyAgeDays !== null && <span className="text-gray-400"> ({babyAgeDays}天)</span>}
@@ -946,91 +946,91 @@ export default function StatsComponent({
               <div className="rounded-2xl border border-blue-100 bg-gradient-to-br from-white via-blue-50/40 to-sky-50/60 p-3 shadow-sm">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 text-blue-700">
-                    <Milk size={14} />
-                    <p className="text-[13px] font-bold">喂养洞察</p>
+                    <Milk size={15} />
+                    <p className="text-sm font-bold">喂养洞察</p>
                   </div>
-                  <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">近{days}天</span>
+                  <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-bold text-blue-700">近{days}天</span>
                 </div>
 
                 {/* Core metrics - 4 col grid, compact */}
-                <div className="mt-2 grid grid-cols-4 gap-1.5">
-                  <div className="rounded-lg bg-white/80 border border-blue-50 px-2 py-1.5 text-center">
-                    <p className="text-[9px] text-slate-500">喂养次数</p>
-                    <p className="text-sm font-bold text-slate-900">{stats.totalStats.totalFeedings}</p>
+                <div className="mt-2.5 grid grid-cols-4 gap-1.5">
+                  <div className="rounded-lg bg-white/80 border border-blue-50 px-2 py-2 text-center">
+                    <p className="text-[11px] text-slate-500">喂养次数</p>
+                    <p className="text-base font-bold text-slate-900">{stats.totalStats.totalFeedings}</p>
                   </div>
-                  <div className="rounded-lg bg-white/80 border border-blue-50 px-2 py-1.5 text-center">
-                    <p className="text-[9px] text-slate-500">亲喂时长</p>
-                    <p className="text-sm font-bold text-slate-900">{formatMinutes(stats.totalStats.totalBreastDuration)}</p>
+                  <div className="rounded-lg bg-white/80 border border-blue-50 px-2 py-2 text-center">
+                    <p className="text-[11px] text-slate-500">亲喂时长</p>
+                    <p className="text-base font-bold text-slate-900">{formatMinutes(stats.totalStats.totalBreastDuration)}</p>
                   </div>
-                  <div className="rounded-lg bg-white/80 border border-blue-50 px-2 py-1.5 text-center">
-                    <p className="text-[9px] text-slate-500">奶量总计</p>
-                    <p className="text-sm font-bold text-slate-900">{totalMilkAmount}<span className="text-[10px] font-medium">ml</span></p>
+                  <div className="rounded-lg bg-white/80 border border-blue-50 px-2 py-2 text-center">
+                    <p className="text-[11px] text-slate-500">奶量总计</p>
+                    <p className="text-base font-bold text-slate-900">{totalMilkAmount}<span className="text-xs font-medium">ml</span></p>
                   </div>
-                  <div className="rounded-lg bg-white/80 border border-blue-50 px-2 py-1.5 text-center">
-                    <p className="text-[9px] text-slate-500">记录天数</p>
-                    <p className="text-sm font-bold text-slate-900">{activeFeedingDays}<span className="text-[10px] font-medium">/{days}</span></p>
+                  <div className="rounded-lg bg-white/80 border border-blue-50 px-2 py-2 text-center">
+                    <p className="text-[11px] text-slate-500">记录天数</p>
+                    <p className="text-base font-bold text-slate-900">{activeFeedingDays}<span className="text-xs font-medium">/{days}</span></p>
                   </div>
                 </div>
 
                 {/* Secondary metrics row */}
                 <div className="mt-1.5 grid grid-cols-3 gap-1.5">
-                  <div className="rounded-lg bg-blue-50/80 px-2 py-1.5 text-center">
-                    <p className="text-[9px] text-blue-600">日均奶量</p>
-                    <p className="text-[13px] font-bold text-slate-900">{averageMilkPerActiveDay}<span className="text-[10px] font-medium">ml</span></p>
+                  <div className="rounded-lg bg-blue-50/80 px-2 py-2 text-center">
+                    <p className="text-[11px] text-blue-600">日均奶量</p>
+                    <p className="text-sm font-bold text-slate-900">{averageMilkPerActiveDay}<span className="text-[11px] font-medium">ml</span></p>
                   </div>
-                  <div className="rounded-lg bg-sky-50/80 px-2 py-1.5 text-center">
-                    <p className="text-[9px] text-sky-600">日均频次</p>
-                    <p className="text-[13px] font-bold text-slate-900">{averageFeedingsPerActiveDay > 0 ? averageFeedingsPerActiveDay.toFixed(1) : '-'}<span className="text-[10px] font-medium">次</span></p>
+                  <div className="rounded-lg bg-sky-50/80 px-2 py-2 text-center">
+                    <p className="text-[11px] text-sky-600">日均频次</p>
+                    <p className="text-sm font-bold text-slate-900">{averageFeedingsPerActiveDay > 0 ? averageFeedingsPerActiveDay.toFixed(1) : '-'}<span className="text-[11px] font-medium">次</span></p>
                   </div>
-                  <div className="rounded-lg bg-indigo-50/80 px-2 py-1.5 text-center">
-                    <p className="text-[9px] text-indigo-600">喂养规律</p>
-                    <p className="text-[13px] font-bold text-slate-900">{feedingRegularity || '-'}</p>
+                  <div className="rounded-lg bg-indigo-50/80 px-2 py-2 text-center">
+                    <p className="text-[11px] text-indigo-600">喂养规律</p>
+                    <p className="text-sm font-bold text-slate-900">{feedingRegularity || '-'}</p>
                   </div>
                 </div>
 
                 {/* Feeding type tags */}
-                <div className="mt-1.5 flex flex-wrap gap-1 text-[10px]">
-                  <span className="rounded-full bg-slate-800 px-2 py-0.5 font-semibold text-white">亲喂{totalBreastfeedingSessions}次</span>
-                  <span className="rounded-full bg-blue-100 px-2 py-0.5 font-semibold text-blue-700">瓶喂{totalBreastMilkBottleSessions}次</span>
-                  <span className="rounded-full bg-sky-100 px-2 py-0.5 font-semibold text-sky-700">奶粉{totalFormulaSessions}次</span>
+                <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+                  <span className="rounded-full bg-slate-800 px-2.5 py-0.5 font-semibold text-white">亲喂{totalBreastfeedingSessions}次</span>
+                  <span className="rounded-full bg-blue-100 px-2.5 py-0.5 font-semibold text-blue-700">瓶喂{totalBreastMilkBottleSessions}次</span>
+                  <span className="rounded-full bg-sky-100 px-2.5 py-0.5 font-semibold text-sky-700">奶粉{totalFormulaSessions}次</span>
                   {totalNightFeedings > 0 && (
-                    <span className="rounded-full bg-violet-100 px-2 py-0.5 font-semibold text-violet-700">夜奶{totalNightFeedings}次</span>
+                    <span className="rounded-full bg-violet-100 px-2.5 py-0.5 font-semibold text-violet-700">夜奶{totalNightFeedings}次</span>
                   )}
                 </div>
 
                 {/* New insights: intervals + night + L/R ratio */}
                 <div className="mt-2 grid grid-cols-2 gap-1.5">
                   {avgFeedingInterval > 0 && (
-                    <div className="flex items-center gap-1.5 rounded-lg border border-blue-100 bg-white px-2 py-1.5">
-                      <Clock size={12} className="shrink-0 text-blue-500" />
+                    <div className="flex items-center gap-2 rounded-lg border border-blue-100 bg-white px-2.5 py-2">
+                      <Clock size={14} className="shrink-0 text-blue-500" />
                       <div className="min-w-0">
-                        <p className="text-[9px] text-slate-500">平均喂养间隔</p>
-                        <p className="text-xs font-bold text-slate-900">{formatMinutes(avgFeedingInterval)}</p>
-                        {maxFeedingInterval > 0 && <p className="text-[9px] text-slate-400">最长 {formatMinutes(maxFeedingInterval)}</p>}
+                        <p className="text-[11px] text-slate-500">平均喂养间隔</p>
+                        <p className="text-sm font-bold text-slate-900">{formatMinutes(avgFeedingInterval)}</p>
+                        {maxFeedingInterval > 0 && <p className="text-[11px] text-slate-400">最长 {formatMinutes(maxFeedingInterval)}</p>}
                       </div>
                     </div>
                   )}
                   {totalNightFeedings > 0 && (
-                    <div className="flex items-center gap-1.5 rounded-lg border border-violet-100 bg-white px-2 py-1.5">
-                      <Moon size={12} className="shrink-0 text-violet-500" />
+                    <div className="flex items-center gap-2 rounded-lg border border-violet-100 bg-white px-2.5 py-2">
+                      <Moon size={14} className="shrink-0 text-violet-500" />
                       <div className="min-w-0">
-                        <p className="text-[9px] text-slate-500">夜间喂养(22-06时)</p>
-                        <p className="text-xs font-bold text-slate-900">{totalNightFeedings}次 / {nightFeedingActiveDays}天</p>
-                        <p className="text-[9px] text-slate-400">日均 {nightFeedingActiveDays > 0 ? (totalNightFeedings / nightFeedingActiveDays).toFixed(1) : '0'}次</p>
+                        <p className="text-[11px] text-slate-500">夜间喂养(22-06时)</p>
+                        <p className="text-sm font-bold text-slate-900">{totalNightFeedings}次 / {nightFeedingActiveDays}天</p>
+                        <p className="text-[11px] text-slate-400">日均 {nightFeedingActiveDays > 0 ? (totalNightFeedings / nightFeedingActiveDays).toFixed(1) : '0'}次</p>
                       </div>
                     </div>
                   )}
                   {totalBreastTime > 0 && (
-                    <div className="col-span-2 rounded-lg border border-pink-100 bg-white px-2 py-1.5">
+                    <div className="col-span-2 rounded-lg border border-pink-100 bg-white px-2.5 py-2">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-[9px] text-slate-500">左右乳喂养比例</p>
-                        <p className="text-[10px] font-bold text-slate-600">{formatMinutes(totalLeftBreast)} / {formatMinutes(totalRightBreast)}</p>
+                        <p className="text-[11px] text-slate-500">左右乳喂养比例</p>
+                        <p className="text-xs font-bold text-slate-600">{formatMinutes(totalLeftBreast)} / {formatMinutes(totalRightBreast)}</p>
                       </div>
-                      <div className="mt-1 flex h-2 overflow-hidden rounded-full bg-gray-100">
+                      <div className="mt-1.5 flex h-2.5 overflow-hidden rounded-full bg-gray-100">
                         <div className="bg-pink-400 transition-all" style={{ width: `${leftBreastPct}%` }} />
                         <div className="bg-rose-200 transition-all" style={{ width: `${rightBreastPct}%` }} />
                       </div>
-                      <div className="mt-0.5 flex justify-between text-[9px]">
+                      <div className="mt-1 flex justify-between text-[11px]">
                         <span className="text-pink-600 font-medium">左 {leftBreastPct}%</span>
                         <span className="text-rose-400 font-medium">右 {rightBreastPct}%</span>
                       </div>
@@ -1039,7 +1039,7 @@ export default function StatsComponent({
                 </div>
 
                 {/* Peak days summary - compact text */}
-                <div className="mt-2 space-y-0.5 text-[11px] leading-4 text-slate-500">
+                <div className="mt-2 space-y-1 text-xs leading-[18px] text-slate-500">
                   {peakMilkIntakeDay && (peakMilkIntakeDay.totalBreastMilkAmount + peakMilkIntakeDay.totalFormulaAmount > 0) && (
                     <p>📈 {peakMilkIntakeDay.date} 奶量最高 <span className="font-semibold text-blue-700">{peakMilkIntakeDay.totalBreastMilkAmount + peakMilkIntakeDay.totalFormulaAmount}ml</span></p>
                   )}
@@ -1058,43 +1058,43 @@ export default function StatsComponent({
                 {/* Growth insight */}
                 <div className="col-span-2 lg:col-span-1 rounded-2xl border border-emerald-100 bg-white p-2.5 shadow-sm">
                   <div className="flex items-center gap-1.5 text-emerald-600">
-                    <TrendingUp size={13} />
-                    <p className="text-[13px] font-bold">成长洞察</p>
+                    <TrendingUp size={14} />
+                    <p className="text-sm font-bold">成长洞察</p>
                   </div>
                   <div className="mt-2 grid grid-cols-2 gap-1.5">
                     <div className="rounded-xl bg-teal-50/80 px-2.5 py-2">
-                      <p className="text-[9px] font-medium text-teal-600">体重</p>
-                      <p className="mt-0.5 text-base font-bold text-slate-900">
+                      <p className="text-[11px] font-medium text-teal-600">体重</p>
+                      <p className="mt-0.5 text-lg font-bold text-slate-900">
                         {latestWeightRecord ? `${latestWeightRecord.weight}kg` : '-'}
                       </p>
-                      <span className={`mt-1 inline-flex rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
+                      <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${
                         latestWeightChange === null ? 'bg-gray-100 text-slate-400'
                         : latestWeightChange >= 0 ? 'bg-teal-600 text-white' : 'bg-amber-500 text-white'
                       }`}>
                         {latestWeightChange !== null ? `${latestWeightChange >= 0 ? '+' : ''}${latestWeightChange}kg` : '暂无'}
                       </span>
                       {overallWeightChange !== null && overallWeightChange !== latestWeightChange && (
-                        <p className="mt-1 text-[9px] text-slate-400">整体 {overallWeightChange >= 0 ? '+' : ''}{overallWeightChange}kg</p>
+                        <p className="mt-1 text-[11px] text-slate-400">整体 {overallWeightChange >= 0 ? '+' : ''}{overallWeightChange}kg</p>
                       )}
                     </div>
                     <div className="rounded-xl bg-blue-50/80 px-2.5 py-2">
-                      <p className="text-[9px] font-medium text-blue-600">身高</p>
-                      <p className="mt-0.5 text-base font-bold text-slate-900">
+                      <p className="text-[11px] font-medium text-blue-600">身高</p>
+                      <p className="mt-0.5 text-lg font-bold text-slate-900">
                         {latestHeightRecord ? `${latestHeightRecord.height}cm` : '-'}
                       </p>
-                      <span className={`mt-1 inline-flex rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
+                      <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${
                         latestHeightChange === null ? 'bg-gray-100 text-slate-400'
                         : latestHeightChange >= 0 ? 'bg-blue-600 text-white' : 'bg-amber-500 text-white'
                       }`}>
                         {latestHeightChange !== null ? `${latestHeightChange >= 0 ? '+' : ''}${latestHeightChange}cm` : '暂无'}
                       </span>
                       {overallHeightChange !== null && overallHeightChange !== latestHeightChange && (
-                        <p className="mt-1 text-[9px] text-slate-400">整体 {overallHeightChange >= 0 ? '+' : ''}{overallHeightChange}cm</p>
+                        <p className="mt-1 text-[11px] text-slate-400">整体 {overallHeightChange >= 0 ? '+' : ''}{overallHeightChange}cm</p>
                       )}
                     </div>
                   </div>
                   {(latestWeightRecord || latestHeightRecord) && (
-                    <div className="mt-1.5 text-[9px] text-slate-400">
+                    <div className="mt-1.5 text-[11px] text-slate-400">
                       {latestWeightRecord && <p>体重记录于 {formatRecordedSummaryTime(latestWeightRecord.recordedAt)}</p>}
                       {latestHeightRecord && <p>身高记录于 {formatRecordedSummaryTime(latestHeightRecord.recordedAt)}</p>}
                     </div>
@@ -1104,29 +1104,29 @@ export default function StatsComponent({
                 {/* Diaper insight */}
                 <div className="rounded-2xl border border-violet-100 bg-white p-2.5 shadow-sm">
                   <div className="flex items-center gap-1.5 text-violet-600">
-                    <Droplets size={13} />
-                    <p className="text-[13px] font-bold">大小便</p>
+                    <Droplets size={14} />
+                    <p className="text-sm font-bold">大小便</p>
                   </div>
                   <div className="mt-2 space-y-1.5">
-                    <div className="grid grid-cols-2 gap-1">
-                      <div className="rounded-lg bg-sky-50 px-2 py-1.5 text-center">
-                        <p className="text-[9px] text-sky-600">小便</p>
-                        <p className="text-sm font-bold text-slate-900">{totalPeeCount}<span className="text-[10px]">次</span></p>
-                        <p className="text-[9px] text-slate-400">日均{diaperActiveDays > 0 ? averagePeePerActiveDay.toFixed(1) : '-'}</p>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <div className="rounded-lg bg-sky-50 px-2 py-2 text-center">
+                        <p className="text-[11px] text-sky-600">小便</p>
+                        <p className="text-base font-bold text-slate-900">{totalPeeCount}<span className="text-xs">次</span></p>
+                        <p className="text-[11px] text-slate-400">日均{diaperActiveDays > 0 ? averagePeePerActiveDay.toFixed(1) : '-'}</p>
                       </div>
-                      <div className="rounded-lg bg-amber-50 px-2 py-1.5 text-center">
-                        <p className="text-[9px] text-amber-600">大便</p>
-                        <p className="text-sm font-bold text-slate-900">{totalPoopCount}<span className="text-[10px]">次</span></p>
-                        <p className="text-[9px] text-slate-400">日均{diaperActiveDays > 0 ? averagePoopPerActiveDay.toFixed(1) : '-'}</p>
+                      <div className="rounded-lg bg-amber-50 px-2 py-2 text-center">
+                        <p className="text-[11px] text-amber-600">大便</p>
+                        <p className="text-base font-bold text-slate-900">{totalPoopCount}<span className="text-xs">次</span></p>
+                        <p className="text-[11px] text-slate-400">日均{diaperActiveDays > 0 ? averagePoopPerActiveDay.toFixed(1) : '-'}</p>
                       </div>
                     </div>
                     {consecutiveNoPoopDays >= 2 && (
-                      <div className="rounded-lg bg-red-50 border border-red-100 px-2 py-1.5">
-                        <p className="text-[10px] font-semibold text-red-600">⚠️ 已连续 {consecutiveNoPoopDays} 天未记录大便</p>
+                      <div className="rounded-lg bg-red-50 border border-red-100 px-2.5 py-2">
+                        <p className="text-xs font-semibold text-red-600">⚠️ 已连续 {consecutiveNoPoopDays} 天未记录大便</p>
                       </div>
                     )}
                     {peakDiaperDay && (peakDiaperDay.peeCount > 0 || peakDiaperDay.poopCount > 0) && (
-                      <p className="text-[9px] text-slate-400">高峰 {peakDiaperDay.date} 小便{peakDiaperDay.peeCount}+大便{peakDiaperDay.poopCount}</p>
+                      <p className="text-[11px] text-slate-400">高峰 {peakDiaperDay.date} 小便{peakDiaperDay.peeCount}+大便{peakDiaperDay.poopCount}</p>
                     )}
                   </div>
                 </div>
@@ -1134,44 +1134,44 @@ export default function StatsComponent({
                 {/* Health reminder */}
                 <div className="rounded-2xl border border-amber-100 bg-white p-2.5 shadow-sm">
                   <div className="flex items-center gap-1.5 text-amber-600">
-                    <Thermometer size={13} />
-                    <p className="text-[13px] font-bold">健康提醒</p>
+                    <Thermometer size={14} />
+                    <p className="text-sm font-bold">健康提醒</p>
                   </div>
                   <div className="mt-2 space-y-1.5">
                     {/* Temperature */}
-                    <div className="rounded-lg bg-amber-50 px-2 py-1.5">
+                    <div className="rounded-lg bg-amber-50 px-2.5 py-2">
                       <div className="flex items-center justify-between">
-                        <p className="text-[9px] text-amber-600">体温覆盖</p>
-                        <p className="text-[10px] font-bold text-slate-700">{temperatureRecordCount}/{days}天</p>
+                        <p className="text-[11px] text-amber-600">体温覆盖</p>
+                        <p className="text-xs font-bold text-slate-700">{temperatureRecordCount}/{days}天</p>
                       </div>
                       {temperatureRecordCount > 0 && (
-                        <div className="mt-1 flex gap-1">
+                        <div className="mt-1 flex gap-1.5">
                           {normalTempDays > 0 && (
-                            <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[8px] font-semibold text-emerald-700">正常{normalTempDays}天</span>
+                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">正常{normalTempDays}天</span>
                           )}
                           {abnormalTempDays > 0 && (
-                            <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[8px] font-semibold text-red-600">异常{abnormalTempDays}天</span>
+                            <span className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-600">异常{abnormalTempDays}天</span>
                           )}
                         </div>
                       )}
                       {latestTemperatureDay && (
-                        <p className="mt-1 text-[9px] text-slate-500">最近 <span className="font-semibold">{latestTemperatureDay.temperature}°C</span> ({latestTemperatureDay.date})</p>
+                        <p className="mt-1 text-[11px] text-slate-500">最近 <span className="font-semibold">{latestTemperatureDay.temperature}°C</span> ({latestTemperatureDay.date})</p>
                       )}
                       {maxTemperatureDay && typeof maxTemperatureDay.temperature === 'number' && maxTemperatureDay.temperature > 37.5 && (
-                        <p className="mt-0.5 text-[9px] text-red-500">⚠ 最高 {maxTemperatureDay.temperature}°C ({maxTemperatureDay.date})</p>
+                        <p className="mt-0.5 text-[11px] text-red-500">⚠ 最高 {maxTemperatureDay.temperature}°C ({maxTemperatureDay.date})</p>
                       )}
                     </div>
                     {/* AD */}
-                    <div className="rounded-lg bg-orange-50 px-2 py-1.5">
+                    <div className="rounded-lg bg-orange-50 px-2.5 py-2">
                       <div className="flex items-center justify-between">
-                        <p className="text-[9px] text-orange-600">AD补充</p>
-                        <p className="text-[10px] font-bold text-slate-700">{adGivenDays}/{days}天</p>
+                        <p className="text-[11px] text-orange-600">AD补充</p>
+                        <p className="text-xs font-bold text-slate-700">{adGivenDays}/{days}天</p>
                       </div>
                       {adConsecutiveStreak > 0 && (
-                        <p className="mt-1 text-[9px] text-emerald-600 font-medium">✅ 已连续服用 {adConsecutiveStreak} 天</p>
+                        <p className="mt-1 text-[11px] text-emerald-600 font-medium">✅ 已连续服用 {adConsecutiveStreak} 天</p>
                       )}
                       {adConsecutiveStreak === 0 && adMissedRecently > 0 && (
-                        <p className="mt-1 text-[9px] text-amber-600 font-medium">💊 已 {adMissedRecently} 天未服用</p>
+                        <p className="mt-1 text-[11px] text-amber-600 font-medium">💊 已 {adMissedRecently} 天未服用</p>
                       )}
                     </div>
                   </div>
@@ -1183,24 +1183,24 @@ export default function StatsComponent({
                 <div className="rounded-2xl border border-purple-100 bg-white p-2.5 shadow-sm">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5 text-purple-600">
-                      <Pill size={13} />
-                      <p className="text-[13px] font-bold">用药记录</p>
+                      <Pill size={14} />
+                      <p className="text-sm font-bold">用药记录</p>
                     </div>
-                    <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-700">{medicationRecords.length}条</span>
+                    <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[11px] font-bold text-purple-700">{medicationRecords.length}条</span>
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-1">
+                  <div className="mt-2 flex flex-wrap gap-1.5">
                     {uniqueMedications.map(name => {
                       const count = medicationRecords.filter(r => r.medicationName === name).length
                       return (
-                        <span key={name} className="rounded-full bg-purple-50 border border-purple-100 px-2 py-0.5 text-[10px] font-medium text-purple-700">
+                        <span key={name} className="rounded-full bg-purple-50 border border-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-700">
                           {name} ×{count}
                         </span>
                       )
                     })}
                   </div>
-                  <div className="mt-2 space-y-1">
+                  <div className="mt-2 space-y-1.5">
                     {medicationRecords.slice(0, 5).map(record => (
-                      <div key={record.id} className="flex items-start gap-1.5 text-[10px] text-slate-600">
+                      <div key={record.id} className="flex items-start gap-1.5 text-xs text-slate-600">
                         <span className="shrink-0 text-purple-300">•</span>
                         <p className="min-w-0">
                           <span className="font-semibold text-slate-700">{record.medicationName}</span>
@@ -1211,7 +1211,7 @@ export default function StatsComponent({
                       </div>
                     ))}
                     {medicationRecords.length > 5 && (
-                      <p className="text-[9px] text-slate-400 pl-3">还有 {medicationRecords.length - 5} 条记录</p>
+                      <p className="text-[11px] text-slate-400 pl-3">还有 {medicationRecords.length - 5} 条记录</p>
                     )}
                   </div>
                 </div>
