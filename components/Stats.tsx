@@ -291,27 +291,51 @@ export default function StatsComponent({
   }) || []
   const hasFeedingStructureData = feedingStructureData.some(day => day.亲喂 > 0 || day.瓶喂 > 0 || day.奶粉 > 0)
 
-  // BMI trend data (combine weight + height records from same date)
+  // BMI trend data (combine weight + height records within ±3 days, prefer latest)
   const bmiData = (() => {
-    const heightByDate = new Map<string, number>()
-    for (const h of stats?.heightTrend || []) {
-      heightByDate.set(h.date, h.height)
+    const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000
+
+    // Build a sorted array of height records with timestamps (ascending by time)
+    const sortedHeights = (stats?.heightTrend || [])
+      .map(h => ({ timestamp: new Date(h.recordedAt).getTime(), height: h.height }))
+      .filter(h => h.height > 0)
+      .sort((a, b) => a.timestamp - b.timestamp)
+
+    // Find the best height record within ±3 days of target, preferring the latest one
+    const findBestHeight = (targetTimestamp: number): number | null => {
+      if (sortedHeights.length === 0) return null
+
+      let bestHeight: number | null = null
+      let bestTimestamp = -Infinity
+
+      for (const h of sortedHeights) {
+        const diff = Math.abs(h.timestamp - targetTimestamp)
+        if (diff <= THREE_DAYS_MS) {
+          // Within ±3 days range, prefer the latest record
+          if (h.timestamp > bestTimestamp) {
+            bestTimestamp = h.timestamp
+            bestHeight = h.height
+          }
+        }
+      }
+      return bestHeight
     }
-    const results: { timestamp: number; label: string; BMI: number }[] = []
-    let lastKnownHeight: number | null = null
+
+    const results: { timestamp: number; label: string; BMI: number; weight: number; height: number }[] = []
     for (const w of stats?.weightTrend || []) {
-      const h = heightByDate.get(w.date) ?? lastKnownHeight
+      const wTimestamp = new Date(w.recordedAt).getTime()
+      const h = findBestHeight(wTimestamp)
       if (h && h > 0) {
         const heightM = h / 100
         const bmi = Number((w.weight / (heightM * heightM)).toFixed(1))
         results.push({
-          timestamp: new Date(w.recordedAt).getTime(),
-          label: formatTrendAxisDate(new Date(w.recordedAt).getTime()),
+          timestamp: wTimestamp,
+          label: formatTrendAxisDate(wTimestamp),
           BMI: bmi,
+          weight: w.weight,
+          height: h,
         })
       }
-      const directHeight = heightByDate.get(w.date)
-      if (directHeight) lastKnownHeight = directHeight
     }
     return results
   })()
@@ -909,8 +933,17 @@ export default function StatsComponent({
                             tickLine={{ stroke: '#6ee7b7' }}
                           />
                           <Tooltip
-                            labelFormatter={(value) => formatTrendTooltipLabel(Number(value))}
-                            formatter={(value) => [`${value}`, 'BMI']}
+                            content={({ active, payload }) => {
+                              if (!active || !payload?.length) return null
+                              const data = payload[0].payload as { timestamp: number; BMI: number; weight: number; height: number }
+                              return (
+                                <div className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs shadow-md">
+                                  <p className="mb-1 font-medium text-gray-700">{formatTrendTooltipLabel(data.timestamp)}</p>
+                                  <p className="text-emerald-600">BMI: <span className="font-semibold">{data.BMI}</span></p>
+                                  <p className="mt-0.5 text-gray-500">体重: {data.weight}kg · 身高: {data.height}cm</p>
+                                </div>
+                              )
+                            }}
                           />
                           <Line
                             type="monotone"
