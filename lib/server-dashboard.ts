@@ -29,6 +29,9 @@ export interface PreloadedDashboardHealthRecord {
   diaperType?: string | null
   diaperStatus?: string | null
   adGiven?: boolean
+  sleepStartTime?: string | null
+  sleepEndTime?: string | null
+  sleepQuality?: string | null
   notes?: string | null
   recordType: 'health'
 }
@@ -105,6 +108,9 @@ export async function getPreloadedDashboardData(): Promise<PreloadedDashboardDat
         diaperType: true,
         diaperStatus: true,
         adGiven: true,
+        sleepStartTime: true,
+        sleepEndTime: true,
+        sleepQuality: true,
         notes: true,
       },
     }),
@@ -137,6 +143,9 @@ export async function getPreloadedDashboardData(): Promise<PreloadedDashboardDat
       diaperType: record.diaperType,
       diaperStatus: record.diaperStatus,
       adGiven: record.adGiven ?? undefined,
+      sleepStartTime: record.sleepStartTime?.toISOString() ?? null,
+      sleepEndTime: record.sleepEndTime?.toISOString() ?? null,
+      sleepQuality: record.sleepQuality,
       notes: record.notes,
       recordType: 'health',
     })),

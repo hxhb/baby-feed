@@ -351,6 +351,17 @@ export default function StatsComponent({
   }) || []
   const hasBreastSideData = breastSideData.some(day => day.左乳 > 0 || day.右乳 > 0)
 
+  // Sleep trend data
+  const sleepChartData = stats?.lastDays.map(day => {
+    const parts = day.date.split('-')
+    return {
+      date: `${parseInt(parts[1])}/${parseInt(parts[2])}`,
+      睡眠时长: Math.round(day.sleepDurationMinutes / 60 * 10) / 10,
+      睡眠次数: day.sleepCount,
+    }
+  }) || []
+  const hasSleepData = sleepChartData.some(day => day.睡眠时长 > 0 || day.睡眠次数 > 0)
+
   const latestWeightRecord = stats?.weightTrend[stats.weightTrend.length - 1] || null
   const previousWeightRecord = stats && stats.weightTrend.length > 1 ? stats.weightTrend[stats.weightTrend.length - 2] : null
   const latestHeightRecord = stats?.heightTrend[stats.heightTrend.length - 1] || null
@@ -720,7 +731,7 @@ export default function StatsComponent({
                     <h3 className="text-base font-bold text-gray-900">趋势工作台</h3>
                   </div>
                   <p className="mt-1 text-sm text-gray-500">
-                    当前周期内的母乳、奶粉、体重、身高、大小便、喂养结构、BMI、左右乳时长数据。
+                    当前周期内的母乳、奶粉、体重、身高、大小便、喂养结构、BMI、左右乳时长、睡眠数据。
                   </p>
                 </div>
 
@@ -1404,6 +1415,53 @@ export default function StatsComponent({
                       icon={Droplets}
                       title="暂无亲喂记录"
                       description="添加母乳亲喂记录后，这里会展示左右侧时长趋势"
+                    />
+                  )}
+                </div>
+
+                {/* Sleep duration trend */}
+                <div className="min-w-0 rounded-2xl border border-indigo-100 bg-indigo-50/30 p-3">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">每日睡眠趋势</p>
+                      <p className="mt-1 text-xs text-indigo-700">每日睡眠时长（柱顶标注睡眠次数）</p>
+                    </div>
+                  </div>
+                  {hasSleepData ? (
+                    <StableResponsiveChart className="min-w-0 h-56 sm:h-72 -ml-2">
+                      <BarChart data={sleepChartData} margin={{ top: 25, right: 5, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
+                        <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#475569' }} axisLine={{ stroke: '#a5b4fc' }} tickLine={{ stroke: '#a5b4fc' }} />
+                        <YAxis tick={{ fontSize: 11, fill: '#475569' }} tickFormatter={(v) => `${v}h`} axisLine={{ stroke: '#a5b4fc' }} tickLine={{ stroke: '#a5b4fc' }} />
+                        <Tooltip content={({ active, payload, label }) => {
+                          if (!active || !payload?.length) return null
+                          const data = payload[0].payload
+                          return (
+                            <div className="rounded-lg border border-indigo-100 bg-white px-3 py-2 text-xs shadow-md">
+                              <p className="font-semibold text-gray-900">{label}</p>
+                              <p className="mt-1 text-indigo-600">睡眠时长：{data.睡眠时长}小时</p>
+                              <p className="text-purple-600">睡眠次数：{data.睡眠次数}次</p>
+                            </div>
+                          )
+                        }} />
+                        <Bar dataKey="睡眠时长" fill="#818cf8" name="睡眠时长(小时)" radius={[3, 3, 0, 0]} barSize={18}>
+                          <LabelList content={({ x, y, width, value, index }) => {
+                            const count = sleepChartData[index as number]?.睡眠次数
+                            if (!value && !count) return null
+                            return (
+                              <text x={(x as number) + (width as number) / 2} y={(y as number) - 6} textAnchor="middle" fontSize={10} fontWeight={600} fill="#4f46e5">
+                                {value}h{count ? ` ×${count}` : ''}
+                              </text>
+                            )
+                          }} />
+                        </Bar>
+                      </BarChart>
+                    </StableResponsiveChart>
+                  ) : (
+                    <StatsEmptyState
+                      icon={Moon}
+                      title="暂无睡眠记录"
+                      description="添加睡眠记录后，这里会展示每日睡眠趋势"
                     />
                   )}
                 </div>

@@ -9,21 +9,13 @@ import { dedupeRequest, invalidateRequestCache } from '@/lib/client-request-cach
 import type { PreloadedTimelineRecord } from '@/lib/server-timeline'
 import Link from 'next/link'
 import { 
-  Droplets, 
-  Milk, 
-  Pill,
-  Scale,
-  Thermometer,
   ChevronLeft,
   ChevronRight,
   Trash2,
-  Ruler,
-  Syringe,
-  Baby as BabyIcon,
   Pencil,
-  Moon,
-  UtensilsCrossed
 } from 'lucide-react'
+import { getRecordIcon, getRecordTitle } from '@/lib/record-display'
+import type { DisplayRecord } from '@/lib/record-display'
 
 interface Baby {
   id: string
@@ -142,116 +134,7 @@ function findAdjacentValidDate(validDates: string[], currentDateStr: string, dir
   return newerDates[0] ?? null
 }
 
-function formatBreastFeedingDetails(record: FeedingRecord) {
-  const parts = [
-    record.leftBreastDuration ? `左${record.leftBreastDuration}` : null,
-    record.rightBreastDuration ? `右${record.rightBreastDuration}` : null,
-  ].filter((part): part is string => Boolean(part))
-
-  if (parts.length === 0) {
-    return '母乳亲喂'
-  }
-
-  return `母乳亲喂 (${parts.join(' ')}分钟)`
-}
-
-function getRecordIcon(type: string) {
-  switch (type) {
-    case 'BREAST_MILK':
-    case 'BREAST_MILK_BOTTLE':
-      return <Droplets size={20} className="text-pink-500" />
-    case 'FORMULA':
-      return <Milk size={20} className="text-blue-500" />
-    case 'AD_VITAMIN':
-      return <Pill size={20} className="text-orange-500" />
-    case 'WEIGHT':
-      return <Scale size={20} className="text-green-500" />
-    case 'HEIGHT':
-      return <Ruler size={20} className="text-blue-500" />
-    case 'TEMPERATURE':
-      return <Thermometer size={20} className="text-red-500" />
-    case 'MEDICATION':
-      return <Pill size={20} className="text-purple-500" />
-    case 'VACCINE':
-      return <Syringe size={20} className="text-teal-500" />
-    case 'DIAPER':
-      return <BabyIcon size={20} className="text-amber-500" />
-    case 'SLEEP':
-      return <Moon size={20} className="text-indigo-500" />
-    case 'SOLID_FOOD':
-      return <UtensilsCrossed size={20} className="text-orange-500" />
-    default:
-      return null
-  }
-}
-
-function getRecordTitle(record: TimelineRecord) {
-  switch (record.type) {
-    case 'BREAST_MILK': {
-      const feeding = record as FeedingRecord
-      return formatBreastFeedingDetails(feeding)
-    }
-    case 'BREAST_MILK_BOTTLE': {
-      const feeding = record as FeedingRecord
-      return `母乳瓶喂 ${feeding.breastMilkAmount}ml`
-    }
-    case 'FORMULA': {
-      const feeding = record as FeedingRecord
-      return `奶粉喂养 ${feeding.formulaAmount}ml`
-    }
-    case 'AD_VITAMIN': {
-      const health = record as HealthRecord
-      return health.adGiven ? 'AD滴剂已服用' : 'AD滴剂未服用'
-    }
-    case 'WEIGHT': {
-      const health = record as HealthRecord
-      return `体重 ${health.weight}kg`
-    }
-    case 'HEIGHT': {
-      const health = record as HealthRecord
-      return `身高 ${health.height}cm`
-    }
-    case 'TEMPERATURE': {
-      const health = record as HealthRecord
-      return `体温 ${health.temperature}°C`
-    }
-    case 'MEDICATION': {
-      const health = record as HealthRecord
-      return `服药 ${health.medicationName} ${health.medicationDose || ''}`
-    }
-    case 'VACCINE': {
-      const health = record as HealthRecord
-      return `疫苗 ${health.vaccineName}`
-    }
-    case 'DIAPER': {
-      const health = record as HealthRecord
-      const typeText = health.diaperType === 'PEE' ? '小便' : health.diaperType === 'POOP' ? '大便' : '大小便'
-      return `${typeText}${health.diaperStatus ? ` (${health.diaperStatus})` : ''}`
-    }
-    case 'SLEEP': {
-      const health = record as HealthRecord
-      const sleepStart = health.sleepStartTime ? new Date(health.sleepStartTime) : null
-      const sleepEnd = health.sleepEndTime ? new Date(health.sleepEndTime) : null
-      if (sleepStart && sleepEnd) {
-        const durationMin = Math.round((sleepEnd.getTime() - sleepStart.getTime()) / (60 * 1000))
-        const hours = Math.floor(durationMin / 60)
-        const mins = durationMin % 60
-        return `睡眠 ${hours > 0 ? `${hours}小时` : ''}${mins > 0 ? `${mins}分钟` : ''}`
-      }
-      return '睡眠记录'
-    }
-    case 'SOLID_FOOD': {
-      const feeding = record as FeedingRecord
-      const name = feeding.solidFoodName || '辅食'
-      const amount = feeding.solidFoodAmount
-      return `${name}${amount ? ` ${amount}` : ''}`
-    }
-    default:
-      return '未知记录'
-  }
-}
-
-function DeleteConfirmDialog({ 
+function DeleteConfirmDialog({
   onConfirm, 
   onCancel 
 }: { 
@@ -303,7 +186,7 @@ const TimelineRecordItem = memo(function TimelineRecordItem({
           {getRecordIcon(record.type)}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="font-medium text-gray-900 text-sm truncate">{getRecordTitle(record)}</p>
+        <p className="font-medium text-gray-900 text-sm truncate">{getRecordTitle(record as DisplayRecord)}</p>
           <p className="text-xs text-gray-500">
             {formatBeijingTime(time)}
             {record.notes && <span className="ml-1 text-gray-400">· {record.notes}</span>}

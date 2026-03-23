@@ -96,8 +96,8 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
   const [diaperType, setDiaperType] = useState(healthRecord?.diaperType || 'PEE')
   const [diaperStatus, setDiaperStatus] = useState(healthRecord?.diaperStatus || '')
   const [adGiven, setAdGiven] = useState(healthRecord?.adGiven ?? true)
-  const [sleepStartTime, setSleepStartTime] = useState(healthRecord?.sleepStartTime ? new Date(healthRecord.sleepStartTime).toISOString().slice(0, 16) : '')
-  const [sleepEndTime, setSleepEndTime] = useState(healthRecord?.sleepEndTime ? new Date(healthRecord.sleepEndTime).toISOString().slice(0, 16) : '')
+  const [sleepStartTime, setSleepStartTime] = useState(healthRecord?.sleepStartTime ? toBeijingDatetimeLocal(healthRecord.sleepStartTime) : '')
+  const [sleepEndTime, setSleepEndTime] = useState(healthRecord?.sleepEndTime ? toBeijingDatetimeLocal(healthRecord.sleepEndTime) : '')
   const [sleepQuality, setSleepQuality] = useState(healthRecord?.sleepQuality || '')
 
   const fieldValues: HealthFieldValues = {

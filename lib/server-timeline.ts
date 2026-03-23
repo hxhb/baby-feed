@@ -41,6 +41,9 @@ export interface PreloadedTimelineHealthRecord {
   diaperType?: string | null
   diaperStatus?: string | null
   adGiven?: boolean | null
+  sleepStartTime?: string | null
+  sleepEndTime?: string | null
+  sleepQuality?: string | null
   notes?: string | null
   babyId: string
   baby?: PreloadedTimelineBaby
@@ -142,6 +145,9 @@ async function getPreloadedTimelineRecords(userId: string, babyId: string, dateS
         diaperType: true,
         diaperStatus: true,
         adGiven: true,
+        sleepStartTime: true,
+        sleepEndTime: true,
+        sleepQuality: true,
         notes: true,
         babyId: true,
       },
@@ -158,6 +164,8 @@ async function getPreloadedTimelineRecords(userId: string, babyId: string, dateS
     ...healthRecords.map((record) => ({
       ...record,
       recordedAt: record.recordedAt.toISOString(),
+      sleepStartTime: record.sleepStartTime?.toISOString() ?? null,
+      sleepEndTime: record.sleepEndTime?.toISOString() ?? null,
       recordType: 'health' as const,
     })),
   ].sort((a, b) => {

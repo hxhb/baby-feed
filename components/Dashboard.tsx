@@ -12,9 +12,10 @@ import {
   Scale,
   Thermometer,
   ChevronRight,
-  Ruler,
-  Syringe
+  Ruler
 } from 'lucide-react'
+import { getRecordIcon, getRecordTitle } from '@/lib/record-display'
+import type { DisplayRecord } from '@/lib/record-display'
 
 interface Baby {
   id: string
@@ -27,11 +28,13 @@ interface FeedingRecord {
   id: string
   type: string
   startTime: string
-  leftBreastDuration?: number
-  rightBreastDuration?: number
-  breastMilkAmount?: number
-  formulaAmount?: number
-  adGiven?: boolean
+  leftBreastDuration?: number | null
+  rightBreastDuration?: number | null
+  breastMilkAmount?: number | null
+  formulaAmount?: number | null
+  solidFoodName?: string | null
+  solidFoodAmount?: string | null
+  adGiven?: boolean | null
   notes?: string | null
   recordType: 'feeding'
 }
@@ -40,15 +43,21 @@ interface HealthRecord {
   id: string
   type: string
   recordedAt: string
-  weight?: number
-  height?: number
-  temperature?: number
+  weight?: number | null
+  height?: number | null
+  temperature?: number | null
   medicationName?: string | null
+  medicationDose?: string | null
   vaccineName?: string | null
   vaccineManufacturer?: string | null
+  vaccineDoseNumber?: number | null
+  vaccineTotalDoses?: number | null
   diaperType?: string | null
   diaperStatus?: string | null
-  adGiven?: boolean
+  adGiven?: boolean | null
+  sleepStartTime?: string | null
+  sleepEndTime?: string | null
+  sleepQuality?: string | null
   notes?: string | null
   recordType: 'health'
 }
@@ -76,18 +85,7 @@ interface Props {
   initialTodayHealthRecords?: HealthRecord[]
 }
 
-function formatBreastFeedingDetails(record: FeedingRecord) {
-  const parts = [
-    record.leftBreastDuration ? `左${record.leftBreastDuration}` : null,
-    record.rightBreastDuration ? `右${record.rightBreastDuration}` : null,
-  ].filter((part): part is string => Boolean(part))
 
-  if (parts.length === 0) {
-    return '母乳亲喂'
-  }
-
-  return `${parts.join(' ')}分钟`
-}
 
 function buildDailyStats(feedingData: FeedingRecord[], healthData: HealthRecord[]): DailyStats {
   const latestWeightRecord = healthData.find(r => r.type === 'WEIGHT' && typeof r.weight === 'number')
@@ -429,60 +427,27 @@ export default function Dashboard({
             {[...todayRecords, ...todayHealthRecords]
               .sort((a, b) => new Date(b.recordType === 'feeding' ? b.startTime : b.recordedAt).getTime() - new Date(a.recordType === 'feeding' ? a.startTime : a.recordedAt).getTime())
               .map((record) => {
-                const isFeeding = record.recordType === 'feeding'
-                const time = isFeeding ? (record as FeedingRecord).startTime : (record as HealthRecord).recordedAt
-                const feedingRecord = isFeeding ? (record as FeedingRecord) : null
-                const healthRecord = !isFeeding ? (record as HealthRecord) : null
+                const time = record.recordType === 'feeding' ? (record as FeedingRecord).startTime : (record as HealthRecord).recordedAt
                 
                 return (
                   <div
                     key={record.id}
                     className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                   >
-                    <div className="flex items-center space-x-3">
-                      {(record.type === 'BREAST_MILK' || record.type === 'BREAST_MILK_BOTTLE') && <Droplets size={20} className="text-pink-500" />}
-                      {record.type === 'FORMULA' && <Milk size={20} className="text-blue-500" />}
-                      {record.type === 'AD_VITAMIN' && <Pill size={20} className="text-orange-500" />}
-                      {record.type === 'WEIGHT' && <Scale size={20} className="text-green-500" />}
-                      {record.type === 'HEIGHT' && <Ruler size={20} className="text-blue-500" />}
-                      {record.type === 'TEMPERATURE' && <Thermometer size={20} className="text-red-500" />}
-                      {record.type === 'MEDICATION' && <Pill size={20} className="text-purple-500" />}
-                      {record.type === 'VACCINE' && <Syringe size={20} className="text-teal-500" />}
-                      {record.type === 'DIAPER' && <BabyIcon size={20} className="text-amber-500" />}
-                      
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          {record.type === 'BREAST_MILK' && '母乳亲喂'}
-                          {record.type === 'BREAST_MILK_BOTTLE' && `母乳瓶喂 ${feedingRecord?.breastMilkAmount}ml`}
-                          {record.type === 'FORMULA' && `奶粉 ${feedingRecord?.formulaAmount}ml`}
-                          {record.type === 'AD_VITAMIN' && 'AD滴剂'}
-                          {record.type === 'WEIGHT' && `体重 ${healthRecord?.weight}kg`}
-                          {record.type === 'HEIGHT' && `身高 ${healthRecord?.height}cm`}
-                          {record.type === 'TEMPERATURE' && `体温 ${healthRecord?.temperature}°C`}
-                          {record.type === 'MEDICATION' && `服药 ${healthRecord?.medicationName}`}
-                          {record.type === 'VACCINE' && `疫苗 ${healthRecord?.vaccineName}${healthRecord?.vaccineManufacturer ? `（${healthRecord.vaccineManufacturer}）` : ''}`}
-                          {record.type === 'DIAPER' && `${healthRecord?.diaperType === 'PEE' ? '小便' : healthRecord?.diaperType === 'POOP' ? '大便' : '大小便'}`}
-                          {record.notes && <span className="ml-1 text-gray-400">（{record.notes}）</span>}
+                    <div className="flex items-center space-x-3 min-w-0 flex-1">
+                      <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                        {getRecordIcon(record.type)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-gray-900 text-sm truncate">
+                          {getRecordTitle(record as DisplayRecord)}
                         </p>
                         <p className="text-xs text-gray-500">
                           {formatBeijingTime(time)}
+                          {record.notes && <span className="ml-1 text-gray-400">· {record.notes}</span>}
                         </p>
                       </div>
                     </div>
-                   
-                    {record.type === 'BREAST_MILK' && feedingRecord && (
-                      <span className="text-sm text-gray-600">
-                        {formatBreastFeedingDetails(feedingRecord)}
-                      </span>
-                    )}
-                    {record.type === 'BREAST_MILK_BOTTLE' && feedingRecord && (
-                      <span className="text-sm text-gray-600">
-                        {feedingRecord.breastMilkAmount}ml
-                      </span>
-                    )}
-                    {record.type === 'AD_VITAMIN' && healthRecord?.adGiven && (
-                      <span className="text-sm text-orange-600">已服用</span>
-                    )}
                   </div>
                 )
               })}
