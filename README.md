@@ -8,20 +8,24 @@
 - **母乳亲喂**：记录左右乳房喂养时长
 - **母乳瓶喂**：记录瓶喂毫升数
 - **奶粉喂养**：记录奶粉喂养量和时间
-- **AD 滴剂**：记录每日 AD 服用情况
+- **辅食记录**：记录辅食名称和用量
 
 ### 🏥 健康记录
 - **体重记录**：随时记录宝宝体重变化
 - **身高记录**：记录宝宝身高
 - **体温记录**：记录宝宝体温
 - **用药记录**：记录药物名称和剂量
-- **疫苗记录**：记录疫苗接种情况
-- **大小便记录**：记录小便/大便情况
+- **疫苗记录**：记录疫苗接种情况（含厂家、针次信息）
+- **大小便记录**：记录小便/大便情况及状态
+- **AD 滴剂**：记录每日 AD 服用情况
+- **睡眠记录**：记录睡眠起止时间和睡眠质量
 
 ### 📊 数据展示
 - **首页仪表盘**：今日概览、快捷记录入口
 - **时间轴视图**：按日期平铺展示所有记录
-- **统计图表**：喂养趋势、体重/体温变化曲线（基于 Recharts）
+- **统计图表**：喂养趋势、体重/身高/体温变化曲线（基于 Recharts）
+- **BMI 计算**：根据体重和身高自动计算 BMI
+- **每日睡眠趋势**：柱状图展示每日睡眠时长与次数
 - **AD 日历**：直观展示 AD 服用情况
 
 ### 👤 账户管理
@@ -31,9 +35,14 @@
 - **退出登录**：一键安全退出
 - **注销账户**：双重确认（密码 + 文本确认），永久删除账户及所有关联数据
 
+### 🔧 管理功能
+- **管理员面板**：管理所有用户、修改用户角色
+- **站点设置**：控制是否允许开放注册
+- **用户管理**：查看/删除用户及其所有数据
+
 ### 🎯 其他特性
 - 多用户账号系统
-- 支持多宝宝管理（增删改）
+- 支持多宝宝管理（增删改查）
 - 移动端响应式设计
 - **PWA 支持**：可安装到手机桌面，支持离线访问
 - **API Key 外部集成**：支持通过 HTTP API 从外部程序（iOS 快捷指令、自动化脚本等）读写数据
@@ -72,27 +81,52 @@ baby-feed/
 │   ├── stats/                  # 统计页面
 │   ├── timeline/               # 时间轴页面
 │   ├── api/                    # API 路由
+│   │   ├── admin/              # 管理员接口（身份检查/站点设置/用户管理）
 │   │   ├── auth/               # 认证（NextAuth + 注册 + 会话）
 │   │   ├── babies/             # 宝宝管理 CRUD
 │   │   ├── feeding/            # 喂养记录 CRUD
 │   │   ├── health/             # 健康记录 CRUD
+│   │   ├── site/               # 站点公开接口（注册状态查询）
 │   │   ├── stats/              # 统计数据（总览 + 按日）
+│   │   ├── timeline-dates/     # 时间轴有效日期
 │   │   └── user/               # 用户管理（资料/密码/注销/API Key）
 │   └── generated/prisma/       # Prisma 自动生成的客户端代码
 ├── components/                 # React 组件
+│   ├── AdminPanel.tsx           # 管理员面板
 │   ├── ApiKeyManager.tsx       # API Key 管理组件
 │   ├── Dashboard.tsx           # 首页仪表盘
 │   ├── FeedingForm.tsx         # 喂养记录表单
+│   ├── FeedingRecordFields.tsx # 喂养记录字段组件
 │   ├── HealthForm.tsx          # 健康记录表单
+│   ├── HealthRecordFields.tsx  # 健康记录字段组件
 │   ├── Navbar.tsx              # 响应式导航栏
 │   ├── Providers.tsx           # NextAuth SessionProvider 封装
+│   ├── RecordActionBar.tsx     # 记录操作栏组件
+│   ├── RecordMetaFields.tsx    # 记录元信息字段组件
 │   ├── Settings.tsx            # 设置组件（账户管理 + 宝宝管理）
 │   ├── Stats.tsx               # 统计图表组件
-│   └── Timeline.tsx            # 时间轴组件
+│   ├── StatsUi.tsx             # 统计 UI 辅助组件
+│   ├── Timeline.tsx            # 时间轴组件
+│   └── TimelineEditRecordModal.tsx # 时间轴编辑记录弹窗
 ├── lib/                        # 工具库
-│   ├── api-key.ts              # API Key 生成、验证、速率限制
+│   ├── admin.ts                # 管理员权限验证
+│   ├── api-helpers.ts          # API 响应辅助函数
+│   ├── api-key.ts              # API Key 生成、验证
+│   ├── auth.ts                 # NextAuth 认证配置（支持 Cookie + API Key）
+│   ├── client-request-cache.ts # 客户端请求缓存
+│   ├── feeding-records.ts      # 喂养记录工具函数
+│   ├── health-records.ts       # 健康记录工具函数
 │   ├── prisma.ts               # Prisma 客户端实例
-│   └── auth.ts                 # NextAuth 认证配置（支持 Cookie + API Key）
+│   ├── rate-limit.ts           # 速率限制
+│   ├── record-display.tsx      # 记录展示组件
+│   ├── server-auth.ts          # 服务端认证辅助
+│   ├── server-babies.ts        # 服务端宝宝数据
+│   ├── server-dashboard.ts     # 服务端仪表盘数据
+│   ├── server-stats.ts         # 服务端统计数据
+│   ├── server-timeline.ts      # 服务端时间轴数据
+│   ├── site-settings.ts        # 站点设置管理
+│   ├── time.ts                 # 时间处理工具
+│   └── validation.ts           # 输入验证
 ├── prisma/                     # 数据库配置
 │   ├── schema.prisma           # 数据库模型定义
 │   └── migrations/             # 数据库迁移文件
@@ -415,18 +449,23 @@ curl -H "Authorization: Bearer bfk_your_api_key_here" \
 | `/api/auth/[...nextauth]` | GET/POST | NextAuth 认证入口 |
 | `/api/auth/register` | POST | 用户注册 |
 | `/api/auth/session` | GET | 获取当前会话 |
+| `/api/site/registration-status` | GET | 查询是否允许注册（公开接口） |
 | `/api/user/profile` | GET/PUT | 获取/修改用户资料 |
 | `/api/user/password` | PUT | 修改密码 |
 | `/api/user/delete` | DELETE | 注销账户 |
 | `/api/user/api-keys` | GET/POST/DELETE | API Key 管理（列出/创建/吊销） |
 | `/api/babies` | GET/POST | 宝宝列表/添加宝宝 |
-| `/api/babies/[id]` | PUT/DELETE | 修改/删除宝宝 |
+| `/api/babies/[id]` | GET/PUT/DELETE | 获取/修改/删除宝宝 |
 | `/api/feeding` | GET/POST | 喂养记录列表/添加记录 |
 | `/api/feeding/[id]` | PUT/DELETE | 修改/删除喂养记录 |
 | `/api/health` | GET/POST | 健康记录列表/添加记录 |
 | `/api/health/[id]` | PUT/DELETE | 修改/删除健康记录 |
 | `/api/stats` | GET | 统计数据总览 |
 | `/api/stats/day` | GET | 按日统计数据 |
+| `/api/timeline-dates` | GET | 获取时间轴有效日期 |
+| `/api/admin/check` | GET | 检查管理员身份 |
+| `/api/admin/settings` | GET/PUT | 获取/修改站点设置 |
+| `/api/admin/users` | GET/PUT/DELETE | 用户管理（列出/修改角色/删除） |
 
 ---
 
@@ -473,6 +512,35 @@ curl -X POST -H "Authorization: Bearer bfk_xxx" \
 | `birthDate` | string | ✅ | 出生日期（ISO 格式） |
 | `gender` | string | ✅ | 性别，可选值：`MALE`、`FEMALE`、`UNKNOWN` |
 
+##### GET /api/babies/{id} — 获取宝宝详情
+
+```bash
+curl -H "Authorization: Bearer bfk_xxx" \
+  "https://your-domain/api/babies/baby_id"
+```
+
+##### PUT /api/babies/{id} — 修改宝宝信息
+
+```bash
+curl -X PUT -H "Authorization: Bearer bfk_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"新名字"}' \
+  "https://your-domain/api/babies/baby_id"
+```
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `name` | string | 否 | 宝宝名称 |
+| `birthDate` | string | 否 | 出生日期（ISO 格式） |
+| `gender` | string | 否 | 性别，可选值：`MALE`、`FEMALE`、`UNKNOWN` |
+
+##### DELETE /api/babies/{id} — 删除宝宝
+
+```bash
+curl -X DELETE -H "Authorization: Bearer bfk_xxx" \
+  "https://your-domain/api/babies/baby_id"
+```
+
 ---
 
 #### 🍼 喂养记录
@@ -513,7 +581,7 @@ curl -X POST -H "Authorization: Bearer bfk_xxx" \
   -H "Content-Type: application/json" \
   -d '{
     "babyId": "xxx",
-    "type": "BREAST",
+    "type": "BREAST_MILK",
     "startTime": "2026-03-16T10:00:00+08:00",
     "leftBreastDuration": 15,
     "rightBreastDuration": 10
@@ -524,12 +592,14 @@ curl -X POST -H "Authorization: Bearer bfk_xxx" \
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `babyId` | string | ✅ | 宝宝 ID |
-| `type` | string | ✅ | 喂养类型：`BREAST`（亲喂）、`BREAST_BOTTLE`（母乳瓶喂）、`FORMULA`（奶粉）、`AD`（AD 滴剂） |
+| `type` | string | ✅ | 喂养类型：`BREAST_MILK`（亲喂）、`BREAST_MILK_BOTTLE`（母乳瓶喂）、`FORMULA`（奶粉）、`SOLID_FOOD`（辅食） |
 | `startTime` | string | ✅ | 开始时间（ISO 格式） |
-| `leftBreastDuration` | number | 否 | 左乳喂养时长（分钟），亲喂时使用 |
-| `rightBreastDuration` | number | 否 | 右乳喂养时长（分钟），亲喂时使用 |
-| `breastMilkAmount` | number | 否 | 母乳瓶喂量（毫升） |
-| `formulaAmount` | number | 否 | 奶粉喂养量（毫升） |
+| `leftBreastDuration` | number | 否 | 左乳喂养时长（分钟），`BREAST_MILK` 类型时使用 |
+| `rightBreastDuration` | number | 否 | 右乳喂养时长（分钟），`BREAST_MILK` 类型时使用 |
+| `breastMilkAmount` | number | 否 | 母乳瓶喂量（毫升），`BREAST_MILK_BOTTLE` 类型时使用 |
+| `formulaAmount` | number | 否 | 奶粉喂养量（毫升），`FORMULA` 类型时使用 |
+| `solidFoodName` | string | 否 | 辅食名称，`SOLID_FOOD` 类型时使用 |
+| `solidFoodAmount` | string | 否 | 辅食用量，`SOLID_FOOD` 类型时使用 |
 | `endTime` | string | 否 | 结束时间（ISO 格式） |
 | `notes` | string | 否 | 备注 |
 
@@ -600,16 +670,23 @@ curl -X POST -H "Authorization: Bearer bfk_xxx" \
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `babyId` | string | ✅ | 宝宝 ID |
-| `type` | string | ✅ | 记录类型：`WEIGHT`、`HEIGHT`、`TEMPERATURE`、`MEDICATION`、`VACCINE`、`DIAPER` |
+| `type` | string | ✅ | 记录类型：`WEIGHT`、`HEIGHT`、`TEMPERATURE`、`MEDICATION`、`VACCINE`、`DIAPER`、`AD_VITAMIN`、`SLEEP` |
 | `recordedAt` | string | ✅ | 记录时间（ISO 格式） |
 | `weight` | number | 否 | 体重（kg），`WEIGHT` 类型时使用 |
 | `height` | number | 否 | 身高（cm），`HEIGHT` 类型时使用 |
 | `temperature` | number | 否 | 体温（°C），`TEMPERATURE` 类型时使用 |
 | `medicationName` | string | 否 | 药物名称，`MEDICATION` 类型时使用 |
 | `medicationDose` | string | 否 | 药物剂量，`MEDICATION` 类型时使用 |
-| `vaccineName` | string | 否 | 疫苗名称，`VACCINE` 类型时使用 |
-| `diaperType` | string | 否 | 大小便类型，`DIAPER` 类型时使用 |
+| `vaccineName` | string | 否 | 疫苗名称，`VACCINE` 类型时必填 |
+| `vaccineManufacturer` | string | 否 | 疫苗厂家，`VACCINE` 类型时使用 |
+| `vaccineDoseNumber` | number | 否 | 当前针次，`VACCINE` 类型时必填 |
+| `vaccineTotalDoses` | number | 否 | 总针数，`VACCINE` 类型时必填 |
+| `diaperType` | string | 否 | 大小便类型（`PEE`/`POOP`/`BOTH`），`DIAPER` 类型时使用 |
 | `diaperStatus` | string | 否 | 大小便状态，`DIAPER` 类型时使用 |
+| `adGiven` | boolean | 否 | 是否已服用 AD，`AD_VITAMIN` 类型时使用 |
+| `sleepStartTime` | string | 否 | 睡眠开始时间（ISO 格式），`SLEEP` 类型时使用 |
+| `sleepEndTime` | string | 否 | 睡眠结束时间（ISO 格式），`SLEEP` 类型时使用 |
+| `sleepQuality` | string | 否 | 睡眠质量，`SLEEP` 类型时使用 |
 | `notes` | string | 否 | 备注 |
 
 ##### PUT /api/health/{id} — 修改健康记录
@@ -627,6 +704,21 @@ curl -X PUT -H "Authorization: Bearer bfk_xxx" \
 curl -X DELETE -H "Authorization: Bearer bfk_xxx" \
   "https://your-domain/api/health/record_id"
 ```
+
+---
+
+#### 📅 时间轴
+
+##### GET /api/timeline-dates — 获取时间轴有效日期
+
+```bash
+curl -H "Authorization: Bearer bfk_xxx" \
+  "https://your-domain/api/timeline-dates?babyId=xxx"
+```
+
+| 查询参数 | 类型 | 必填 | 说明 |
+|----------|------|------|------|
+| `babyId` | string | ✅ | 宝宝 ID |
 
 ---
 
@@ -754,6 +846,117 @@ curl -X DELETE -H "Authorization: Bearer bfk_xxx" \
 
 ---
 
+#### 🌐 站点公开接口
+
+##### GET /api/site/registration-status — 查询注册开放状态
+
+此接口无需认证。
+
+```bash
+curl "https://your-domain/api/site/registration-status"
+```
+
+**响应：**
+```json
+{
+  "allowRegistration": true
+}
+```
+
+---
+
+#### 🛡️ 管理员接口
+
+> 以下接口仅限管理员（`role: ADMIN`）访问，非管理员返回 `403`。
+
+##### GET /api/admin/check — 检查管理员身份
+
+```bash
+curl -H "Authorization: Bearer bfk_xxx" \
+  "https://your-domain/api/admin/check"
+```
+
+**响应：**
+```json
+{
+  "isAdmin": true
+}
+```
+
+##### GET /api/admin/settings — 获取站点设置
+
+```bash
+curl -H "Authorization: Bearer bfk_xxx" \
+  "https://your-domain/api/admin/settings"
+```
+
+##### PUT /api/admin/settings — 修改站点设置
+
+```bash
+curl -X PUT -H "Authorization: Bearer bfk_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{"allowRegistration": false}' \
+  "https://your-domain/api/admin/settings"
+```
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `allowRegistration` | boolean | 否 | 是否允许新用户注册 |
+
+##### GET /api/admin/users — 获取用户列表
+
+```bash
+curl -H "Authorization: Bearer bfk_xxx" \
+  "https://your-domain/api/admin/users"
+```
+
+**响应示例：**
+```json
+[
+  {
+    "id": "...",
+    "email": "user@example.com",
+    "name": "用户名",
+    "role": "USER",
+    "createdAt": "...",
+    "_count": {
+      "babies": 1,
+      "feedingRecords": 42,
+      "healthRecords": 15
+    }
+  }
+]
+```
+
+##### PUT /api/admin/users — 修改用户角色
+
+```bash
+curl -X PUT -H "Authorization: Bearer bfk_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{"userId": "user_id", "role": "ADMIN"}' \
+  "https://your-domain/api/admin/users"
+```
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `userId` | string | ✅ | 用户 ID |
+| `role` | string | ✅ | 角色，可选值：`USER`、`ADMIN` |
+
+##### DELETE /api/admin/users — 删除用户
+
+```bash
+curl -X DELETE -H "Authorization: Bearer bfk_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{"userId": "user_id"}' \
+  "https://your-domain/api/admin/users"
+```
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `userId` | string | ✅ | 要删除的用户 ID（不能删除自己） |
+
+---
+
 ### 错误响应格式
 
 所有接口的错误响应统一为 JSON 格式：
@@ -772,8 +975,9 @@ curl -X DELETE -H "Authorization: Bearer bfk_xxx" \
 | `201` | 创建成功 |
 | `400` | 请求参数错误 |
 | `401` | 未授权（未登录或 API Key 无效/过期） |
+| `403` | 禁止访问（非管理员访问管理接口、注册功能已关闭等） |
 | `404` | 资源不存在 |
-| `429` | 请求过于频繁（API Key 验证失败次数过多） |
+| `429` | 请求过于频繁（触发速率限制） |
 | `500` | 服务器内部错误 |
 
 ## ❓ 常见问题
