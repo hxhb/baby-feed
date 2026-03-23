@@ -849,61 +849,64 @@ export default function StatsComponent({
                 </div>
               </StatsPanel>
 
-              <StatsPanel>
-                <div className="mb-3 flex items-center gap-2">
-                  <Syringe size={18} className="text-teal-500" />
-                  <h3 className="text-base font-bold text-gray-900">疫苗记录</h3>
+              <StatsPanel className="p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <Syringe size={15} className="text-teal-500" />
+                    <h3 className="text-sm font-bold text-gray-900">疫苗记录</h3>
+                  </div>
+                  {vaccineProgressSummary.length > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      {pendingVaccines.length > 0 && (
+                        <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">待完成{pendingVaccines.length}种</span>
+                      )}
+                      <span className="rounded-full bg-teal-100 px-1.5 py-0.5 text-[9px] font-bold text-teal-700">{completedVaccineTypes}/{totalVaccineTypes}种</span>
+                    </div>
+                  )}
                 </div>
                 {stats.vaccineRecords.length > 0 ? (
-                  <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
                     {vaccineProgressSummary.map(item => (
-                      <div key={item.vaccineName} className="rounded-2xl border border-teal-200 bg-white p-3 shadow-sm shadow-teal-50">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0 space-y-1">
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              <p className="text-[15px] font-bold leading-5 text-gray-900 break-words">{item.vaccineName}</p>
-                              <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${item.isCompleted ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                                {item.isCompleted ? '已完成' : '未完成'}
+                      <div key={item.vaccineName} className={`rounded-xl border p-2.5 ${item.isCompleted ? 'border-emerald-100 bg-emerald-50/30' : 'border-amber-100 bg-amber-50/20'}`}>
+                        {/* Header row: name + status + progress bar */}
+                        <div className="flex items-center gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-xs font-bold text-gray-900 truncate">{item.vaccineName}</p>
+                              <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-bold ${item.isCompleted ? 'bg-emerald-200 text-emerald-800' : 'bg-amber-200 text-amber-800'}`}>
+                                {item.isCompleted ? '已完成' : `差${item.remainingDoses}针`}
                               </span>
                             </div>
-                            <p className="text-[11px] font-medium text-gray-500">最近接种 {formatRecordedSummaryTime(item.latestRecordedAt)}</p>
+                            <div className="mt-0.5 flex items-center gap-1 text-[9px] text-slate-500">
+                              <span className="font-medium text-teal-600">{formatVaccineProgress(item.latestDoseNumber, item.totalDoses) || '未标注'}</span>
+                              <span>·</span>
+                              <span>{item.latestDate}</span>
+                            </div>
                           </div>
-                          <span className="shrink-0 rounded-xl bg-teal-50 px-2 py-1 text-[10px] font-semibold tracking-wide text-teal-700">
-                            {item.latestDate.replace(/-/g, '.')}
-                          </span>
+                          {/* Mini progress indicator */}
+                          {item.latestDoseNumber && item.totalDoses && (
+                            <div className="shrink-0 w-10">
+                              <div className="flex h-1.5 overflow-hidden rounded-full bg-gray-100">
+                                <div className={`rounded-full transition-all ${item.isCompleted ? 'bg-emerald-500' : 'bg-teal-500'}`} style={{ width: `${Math.round((item.latestDoseNumber / item.totalDoses) * 100)}%` }} />
+                              </div>
+                              <p className="mt-0.5 text-center text-[7px] text-slate-400">{item.latestDoseNumber}/{item.totalDoses}</p>
+                            </div>
+                          )}
                         </div>
-
-                        <div className="mt-3 flex flex-wrap gap-1.5">
-                          <span className="rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white">
-                            {formatVaccineProgress(item.latestDoseNumber, item.totalDoses) || '未标注针次'}
-                          </span>
-                          {!item.isCompleted && item.remainingDoses ? (
-                            <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
-                              待完成 {item.remainingDoses} 针
-                            </span>
-                          ) : null}
-                        </div>
-
-                        <div className="mt-3 rounded-xl bg-slate-50 px-2.5 py-2">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-[11px] font-semibold text-slate-500">接种记录</p>
-                            <span className="text-[10px] font-medium text-slate-400">{item.doseEntries.length} 次</span>
-                          </div>
-                          <div className="mt-1.5 space-y-1 text-[11px] leading-4 text-slate-600">
+                        {/* Dose entries - compact inline */}
+                        <div className="mt-1.5 rounded-lg bg-white/70 px-2 py-1.5">
+                          <div className="space-y-0.5 text-[10px] leading-[14px] text-slate-600">
                             {item.doseEntries.map(doseEntry => (
-                              <div key={doseEntry.id} className="flex items-start gap-2">
-                                <span className="shrink-0 text-slate-400">•</span>
+                              <div key={doseEntry.id} className="flex items-start gap-1">
+                                <span className="shrink-0 text-slate-300 leading-[14px]">•</span>
                                 <p className="min-w-0 break-words">
-                                  <span className="font-medium text-slate-700">
-                                    {formatVaccineProgress(doseEntry.doseNumber, doseEntry.totalDoses) || '未标注针次'}
+                                  <span className="font-semibold text-slate-700">
+                                    {formatVaccineProgress(doseEntry.doseNumber, doseEntry.totalDoses) || '未标注'}
                                   </span>
                                   {' · '}
-                                  <span>{formatRecordedSummaryTime(doseEntry.recordedAt)}</span>
+                                  <span className="text-slate-400">{formatRecordedSummaryTime(doseEntry.recordedAt)}</span>
                                   {doseEntry.note ? (
-                                    <>
-                                      {'：'}
-                                      <span>{doseEntry.note}</span>
-                                    </>
+                                    <span className="text-slate-500">：{doseEntry.note}</span>
                                   ) : null}
                                 </p>
                               </div>
