@@ -68,7 +68,9 @@ export interface PreloadedStatsData {
     notes: string | null
   }[]
   feedingIntervals: number[]
+  feedingHeatmap: { date: string; hour: number; count: number }[]
   babyBirthDate: string | null
+  babyGender: string | null
 }
 
 export interface PreloadedStatsPageData {
@@ -111,6 +113,7 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
       id: true,
       name: true,
       birthDate: true,
+      gender: true,
     },
   })
 
@@ -365,7 +368,22 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
       }
     }),
     feedingIntervals,
+    feedingHeatmap: (() => {
+      const heatmap = new Map<string, number>()
+      feedingRecords.forEach((record) => {
+        const bjTime = new Date(new Date(record.startTime).getTime() + 8 * 60 * 60 * 1000)
+        const date = getBeijingDateStr(new Date(record.startTime))
+        const hour = bjTime.getUTCHours()
+        const key = `${date}|${hour}`
+        heatmap.set(key, (heatmap.get(key) || 0) + 1)
+      })
+      return Array.from(heatmap.entries()).map(([key, count]) => {
+        const [date, hourStr] = key.split('|')
+        return { date, hour: Number(hourStr), count }
+      })
+    })(),
     babyBirthDate: baby.birthDate ? getBeijingDateStr(new Date(baby.birthDate)) : null,
+    babyGender: baby.gender || null,
   }
 }
 
