@@ -816,22 +816,21 @@ export default function StatsComponent({
                         )
                       }
 
-                      // Group hours into 3-hour time slots for cleaner display
+                      // Group hours into 3-hour time slots
                       const timeSlots = [
-                        { label: '凌晨', range: '0-3', hours: [0, 1, 2] },
-                        { label: '早晨', range: '3-6', hours: [3, 4, 5] },
-                        { label: '上午', range: '6-9', hours: [6, 7, 8] },
-                        { label: '午前', range: '9-12', hours: [9, 10, 11] },
-                        { label: '午后', range: '12-15', hours: [12, 13, 14] },
-                        { label: '下午', range: '15-18', hours: [15, 16, 17] },
-                        { label: '傍晚', range: '18-21', hours: [18, 19, 20] },
-                        { label: '夜间', range: '21-24', hours: [21, 22, 23] },
+                        { label: '凌晨', time: '0-3' },
+                        { label: '早晨', time: '3-6' },
+                        { label: '上午', time: '6-9' },
+                        { label: '午前', time: '9-12' },
+                        { label: '午后', time: '12-15' },
+                        { label: '下午', time: '15-18' },
+                        { label: '傍晚', time: '18-21' },
+                        { label: '夜间', time: '21-24' },
                       ]
 
-                      // Build date list from lastDays (sorted ascending)
                       const dates = (stats.lastDays || []).map(d => d.date)
 
-                      // Aggregate heatmap data into time slots: "date|slotIdx" -> count
+                      // Aggregate: "date|slotIdx" -> count
                       const slotCountMap = new Map<string, number>()
                       heatmapRaw.forEach(item => {
                         const slotIdx = Math.floor(item.hour / 3)
@@ -839,16 +838,34 @@ export default function StatsComponent({
                         slotCountMap.set(key, (slotCountMap.get(key) || 0) + item.count)
                       })
 
+                      // Row totals (per date)
+                      const rowTotals = new Map<string, number>()
+                      dates.forEach(date => {
+                        let rowSum = 0
+                        timeSlots.forEach((_, si) => {
+                          const c = slotCountMap.get(`${date}|${si}`) || 0
+                          rowSum += c
+                        })
+                        rowTotals.set(date, rowSum)
+                      })
+
                       const allCounts = Array.from(slotCountMap.values())
                       const maxCount = Math.max(...allCounts, 1)
 
                       const getCellStyle = (count: number): string => {
-                        if (count === 0) return 'bg-orange-50/60 text-transparent'
+                        if (count === 0) return 'bg-orange-50/50'
                         const ratio = count / maxCount
-                        if (ratio <= 0.25) return 'bg-orange-100 text-orange-700'
-                        if (ratio <= 0.5) return 'bg-orange-200 text-orange-800'
-                        if (ratio <= 0.75) return 'bg-orange-400 text-white'
-                        return 'bg-orange-600 text-white'
+                        if (ratio <= 0.2) return 'bg-orange-100'
+                        if (ratio <= 0.4) return 'bg-orange-200'
+                        if (ratio <= 0.6) return 'bg-orange-300'
+                        if (ratio <= 0.8) return 'bg-orange-400'
+                        return 'bg-orange-500'
+                      }
+
+                      const getCellText = (count: number): string => {
+                        if (count === 0) return ''
+                        const ratio = count / maxCount
+                        return ratio > 0.5 ? 'text-white' : 'text-orange-900'
                       }
 
                       const formatDateLabel = (dateStr: string) => {
@@ -856,48 +873,60 @@ export default function StatsComponent({
                         return `${parseInt(parts[1])}/${parseInt(parts[2])}`
                       }
 
+                      // Column template: date label (30px) | 8 slots (1fr each) | row total (30px) — symmetric padding
+                      const colTemplate = `30px repeat(${timeSlots.length}, 1fr) 30px`
+
                       return (
-                        <div className="space-y-1">
-                          {/* Header row - time slot labels */}
-                          <div className="grid gap-1" style={{ gridTemplateColumns: `42px repeat(${timeSlots.length}, 1fr)` }}>
+                        <div className="space-y-0.5">
+                          {/* Header row */}
+                          <div className="grid gap-[3px] items-end pb-1" style={{ gridTemplateColumns: colTemplate }}>
                             <div />
                             {timeSlots.map((slot, i) => (
-                              <div key={i} className="text-center text-[9px] leading-tight text-slate-500">
-                                <div className="font-medium">{slot.label}</div>
+                              <div key={i} className="text-center leading-tight">
+                                <div className="text-[9px] font-medium text-slate-600">{slot.label}</div>
+                                <div className="text-[8px] text-slate-400">{slot.time}</div>
                               </div>
                             ))}
+                            <div className="text-[8px] text-slate-400 text-center">合计</div>
                           </div>
-                          {/* Grid rows - one per date */}
+                          {/* Data rows */}
                           <div className="space-y-[3px]">
-                            {dates.map(date => (
-                              <div key={date} className="grid gap-1 items-center" style={{ gridTemplateColumns: `42px repeat(${timeSlots.length}, 1fr)` }}>
-                                <div className="text-[10px] text-slate-500 font-medium text-right pr-1 truncate">
-                                  {formatDateLabel(date)}
+                            {dates.map(date => {
+                              const dayTotal = rowTotals.get(date) || 0
+                              return (
+                                <div key={date} className="grid gap-[3px] items-center" style={{ gridTemplateColumns: colTemplate }}>
+                                  <div className="text-[10px] text-slate-600 font-medium text-right pr-0.5 truncate">
+                                    {formatDateLabel(date)}
+                                  </div>
+                                  {timeSlots.map((slot, slotIdx) => {
+                                    const count = slotCountMap.get(`${date}|${slotIdx}`) || 0
+                                    return (
+                                      <div
+                                        key={slotIdx}
+                                        className={`h-6 rounded-[4px] flex items-center justify-center text-[11px] font-bold transition-colors ${getCellStyle(count)} ${getCellText(count)}`}
+                                        title={`${formatDateLabel(date)} ${slot.label}(${slot.time}时) — ${count}次`}
+                                      >
+                                        {count > 0 ? count : <span className="text-[8px] text-slate-300">·</span>}
+                                      </div>
+                                    )
+                                  })}
+                                  <div className="text-center text-[10px] font-bold text-orange-600" title={`${formatDateLabel(date)} 全天共${dayTotal}次`}>
+                                    {dayTotal > 0 ? dayTotal : '-'}
+                                  </div>
                                 </div>
-                                {timeSlots.map((_, slotIdx) => {
-                                  const count = slotCountMap.get(`${date}|${slotIdx}`) || 0
-                                  return (
-                                    <div
-                                      key={slotIdx}
-                                      className={`h-6 rounded flex items-center justify-center text-[10px] font-bold ${getCellStyle(count)}`}
-                                      title={`${formatDateLabel(date)} ${timeSlots[slotIdx].label}(${timeSlots[slotIdx].range}时) — ${count}次`}
-                                    >
-                                      {count > 0 ? count : ''}
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                            ))}
+                              )
+                            })}
                           </div>
                           {/* Legend */}
-                          <div className="pt-1.5 flex items-center justify-center gap-2 text-[10px] text-slate-500">
+                          <div className="pt-1 flex items-center justify-center gap-1.5 text-[9px] text-slate-500">
                             <span>少</span>
-                            <div className="flex gap-[3px]">
-                              <div className="w-4 h-3 rounded-sm bg-orange-50 border border-orange-200" />
-                              <div className="w-4 h-3 rounded-sm bg-orange-100" />
-                              <div className="w-4 h-3 rounded-sm bg-orange-200" />
-                              <div className="w-4 h-3 rounded-sm bg-orange-400" />
-                              <div className="w-4 h-3 rounded-sm bg-orange-600" />
+                            <div className="flex gap-[2px]">
+                              <div className="w-3.5 h-2.5 rounded-sm bg-orange-50 border border-orange-200/60" />
+                              <div className="w-3.5 h-2.5 rounded-sm bg-orange-100" />
+                              <div className="w-3.5 h-2.5 rounded-sm bg-orange-200" />
+                              <div className="w-3.5 h-2.5 rounded-sm bg-orange-300" />
+                              <div className="w-3.5 h-2.5 rounded-sm bg-orange-400" />
+                              <div className="w-3.5 h-2.5 rounded-sm bg-orange-500" />
                             </div>
                             <span>多</span>
                           </div>
