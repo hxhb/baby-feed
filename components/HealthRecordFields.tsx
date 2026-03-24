@@ -17,7 +17,6 @@ interface HealthFieldSetters {
   setAdGiven: (value: boolean) => void
   setSleepStartTime: (value: string) => void
   setSleepEndTime: (value: string) => void
-  setSleepQuality: (value: string) => void
 }
 
 interface Props {
@@ -515,42 +514,27 @@ export default function HealthRecordFields({
             />
             <span className="shrink-0 text-xs text-gray-500">分钟</span>
           </div>
-          {values.sleepStartTime && currentDurationMinutes > 0 ? (
-            <p className="mt-1.5 text-xs text-gray-500">
-              预计醒来：{new Date(values.sleepEndTime).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-            </p>
-          ) : !values.sleepStartTime ? (
+          {!values.sleepStartTime ? (
             <p className="mt-1.5 text-xs text-gray-400">请先填写入睡时间</p>
           ) : null}
         </div>
 
-        <div className={`${mode === 'create' ? 'rounded-2xl bg-gray-50/70 p-3' : ''}`}>
+        <div className={mode === 'create' ? 'rounded-2xl bg-gray-50/70 p-3' : ''}>
           <label className="mb-1.5 block text-sm font-medium text-gray-700">
-            睡眠质量（可选）
+            睡醒时间（可选）
           </label>
-          <div className="grid grid-cols-3 gap-2">
-            {[
-              { value: 'GOOD', label: '好', emoji: '😊' },
-              { value: 'NORMAL', label: '一般', emoji: '😐' },
-              { value: 'POOR', label: '差', emoji: '😟' },
-            ].map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => setters.setSleepQuality(values.sleepQuality === option.value ? '' : option.value)}
-                className={`mobile-touch-target rounded-xl border-2 px-2 py-2 text-center transition ${
-                  values.sleepQuality === option.value
-                    ? 'border-indigo-500 bg-indigo-50'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <span className="text-lg">{option.emoji}</span>
-                <p className={`mt-1 text-xs ${values.sleepQuality === option.value ? 'font-medium text-indigo-700' : 'text-gray-600'}`}>
-                  {option.label}
-                </p>
-              </button>
-            ))}
-          </div>
+          <input
+            type="datetime-local"
+            value={values.sleepEndTime}
+            disabled={!values.sleepStartTime}
+            onChange={(e) => setters.setSleepEndTime(e.target.value)}
+            className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-transparent focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-300"
+          />
+          {values.sleepStartTime && currentDurationMinutes > 0 ? (
+            <p className="mt-1.5 text-xs text-gray-500">
+              睡眠时长：{formatDurationDisplay(currentDurationMinutes)}
+            </p>
+          ) : null}
         </div>
       </div>
     )

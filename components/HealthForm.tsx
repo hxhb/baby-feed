@@ -113,8 +113,15 @@ export default function HealthForm({
   const [adGiven, setAdGiven] = useState(true)
   const [sleepStartTime, setSleepStartTime] = useState('')
   const [sleepEndTime, setSleepEndTime] = useState('')
-  const [sleepQuality, setSleepQuality] = useState('')
   const [recordedAt, setRecordedAt] = useState(initialSharedDraft?.eventTime || getBeijingNow())
+
+  // When type is SLEEP, bind recordedAt to sleepEndTime
+  const handleSleepEndTimeChange = (value: string) => {
+    setSleepEndTime(value)
+    if (value) {
+      setRecordedAt(value)
+    }
+  }
   const [notes, setNotes] = useState(initialSharedDraft?.notes || '')
   const hasHydratedSharedDraft = useRef(false)
   const hasHydratedLocalDraft = useRef(false)
@@ -362,7 +369,7 @@ export default function HealthForm({
       adGiven,
       sleepStartTime,
       sleepEndTime,
-      sleepQuality,
+      sleepQuality: '',
     })
   }
 
@@ -381,7 +388,7 @@ export default function HealthForm({
     adGiven,
     sleepStartTime,
     sleepEndTime,
-    sleepQuality,
+    sleepQuality: '',
   }
 
   const handleApplyVaccineSuggestion = (suggestion: VaccineSuggestion) => {
@@ -597,17 +604,18 @@ export default function HealthForm({
             setDiaperStatus,
             setAdGiven,
             setSleepStartTime,
-            setSleepEndTime,
-            setSleepQuality,
+            setSleepEndTime: handleSleepEndTimeChange,
           }}
         />
       </div>
 
-      <RecordTimeField
-        mode="create"
-        value={recordedAt}
-        onChange={setRecordedAt}
-      />
+      {type !== 'SLEEP' ? (
+        <RecordTimeField
+          mode="create"
+          value={recordedAt}
+          onChange={setRecordedAt}
+        />
+      ) : null}
 
       <RecordNotesField
         mode="create"

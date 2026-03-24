@@ -98,7 +98,14 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
   const [adGiven, setAdGiven] = useState(healthRecord?.adGiven ?? true)
   const [sleepStartTime, setSleepStartTime] = useState(healthRecord?.sleepStartTime ? toBeijingDatetimeLocal(healthRecord.sleepStartTime) : '')
   const [sleepEndTime, setSleepEndTime] = useState(healthRecord?.sleepEndTime ? toBeijingDatetimeLocal(healthRecord.sleepEndTime) : '')
-  const [sleepQuality, setSleepQuality] = useState(healthRecord?.sleepQuality || '')
+
+  // When type is SLEEP, bind editTime to sleepEndTime
+  const handleSleepEndTimeChange = (value: string) => {
+    setSleepEndTime(value)
+    if (value) {
+      setEditTime(value)
+    }
+  }
 
   const fieldValues: HealthFieldValues = {
     weight,
@@ -115,7 +122,7 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
     adGiven,
     sleepStartTime,
     sleepEndTime,
-    sleepQuality,
+    sleepQuality: '',
   }
 
   const feedingFieldValues: FeedingFieldValues = {
@@ -272,11 +279,13 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
         </div>
 
         <div className="space-y-4">
-          <RecordTimeField
-            mode="edit"
-            value={editTime}
-            onChange={setEditTime}
-          />
+          {(!healthRecord || currentHealthType !== 'SLEEP') ? (
+            <RecordTimeField
+              mode="edit"
+              value={editTime}
+              onChange={setEditTime}
+            />
+          ) : null}
 
           {isFeeding ? (
             <FeedingRecordFields
@@ -322,8 +331,7 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
                 setDiaperStatus,
                 setAdGiven,
                 setSleepStartTime,
-                setSleepEndTime,
-                setSleepQuality,
+                setSleepEndTime: handleSleepEndTimeChange,
               }}
             />
           )}

@@ -734,7 +734,7 @@ export default function StatsComponent({
                     <h3 className="text-base font-bold text-gray-900">趋势工作台</h3>
                   </div>
                   <p className="mt-1 text-sm text-gray-500">
-                    当前周期内的母乳、奶粉、喂养热力图、体重、身高、大小便、喂养结构、BMI、WHO 成长曲线、左右乳时长、睡眠数据。
+                    当前周期内的母乳、奶粉、喂养热力图、体重、身高、大小便、喂养结构、BMI、左右乳时长、睡眠数据。
                   </p>
                 </div>
 
@@ -1093,331 +1093,6 @@ export default function StatsComponent({
                       />
                     )}
                   </div>
-
-                  {/* WHO Growth Curve - Weight */}
-                  {stats.babyBirthDate && (() => {
-                    const gender = stats.babyGender || 'MALE'
-                    const birthDate = new Date(stats.babyBirthDate!)
-
-                    // Convert weight records to age-in-months data points
-                    const weightAgeData = (stats.weightTrend || []).map(p => {
-                      const recordDate = new Date(p.recordedAt)
-                      const ageMonths = (recordDate.getTime() - birthDate.getTime()) / (1000 * 60 * 60 * 24 * 30.4375)
-                      return {
-                        ageMonths: Number(ageMonths.toFixed(2)),
-                        value: p.weight,
-                        date: p.date,
-                      }
-                    }).filter(p => p.ageMonths >= 0 && p.ageMonths <= 24)
-
-                    if (weightAgeData.length === 0) return null
-
-                    const minMonth = Math.max(0, Math.floor(Math.min(...weightAgeData.map(p => p.ageMonths))) - 1)
-                    const maxMonth = Math.min(24, Math.ceil(Math.max(...weightAgeData.map(p => p.ageMonths))) + 1)
-                    const whoCurve = generateWHOCurve(gender, 'weight', minMonth, maxMonth)
-
-                    // Merge WHO curve and baby data
-                    const mergedData = whoCurve.map(who => ({
-                      ageMonths: who.ageMonths,
-                      label: who.label,
-                      P3: who.P3,
-                      P15: who.P15,
-                      P50: who.P50,
-                      P85: who.P85,
-                      P97: who.P97,
-                      宝宝体重: undefined as number | undefined,
-                    }))
-
-                    // Insert baby data points into the merged array
-                    weightAgeData.forEach(p => {
-                      mergedData.push({
-                        ageMonths: p.ageMonths,
-                        label: `${p.ageMonths.toFixed(1)}月龄`,
-                        P3: 0, P15: 0, P50: 0, P85: 0, P97: 0,
-                        宝宝体重: p.value,
-                      })
-                    })
-
-                    // Sort and interpolate WHO values for baby data points
-                    mergedData.sort((a, b) => a.ageMonths - b.ageMonths)
-
-                    // Re-interpolate WHO values for all points to ensure smooth areas
-                    const whoFull = generateWHOCurve(gender, 'weight', minMonth, maxMonth)
-                    mergedData.forEach(point => {
-                      // Find surrounding WHO points for interpolation
-                      const lower = whoFull.filter(w => w.ageMonths <= point.ageMonths).pop()
-                      const upper = whoFull.find(w => w.ageMonths >= point.ageMonths)
-                      if (lower && upper && lower.ageMonths !== upper.ageMonths) {
-                        const t = (point.ageMonths - lower.ageMonths) / (upper.ageMonths - lower.ageMonths)
-                        point.P3 = Number((lower.P3 + t * (upper.P3 - lower.P3)).toFixed(2))
-                        point.P15 = Number((lower.P15 + t * (upper.P15 - lower.P15)).toFixed(2))
-                        point.P50 = Number((lower.P50 + t * (upper.P50 - lower.P50)).toFixed(2))
-                        point.P85 = Number((lower.P85 + t * (upper.P85 - lower.P85)).toFixed(2))
-                        point.P97 = Number((lower.P97 + t * (upper.P97 - lower.P97)).toFixed(2))
-                      } else if (lower) {
-                        point.P3 = lower.P3; point.P15 = lower.P15; point.P50 = lower.P50
-                        point.P85 = lower.P85; point.P97 = lower.P97
-                      }
-                    })
-
-                    const genderLabel = gender === 'FEMALE' ? '女' : '男'
-
-                    return (
-                      <div className="min-w-0 rounded-2xl border border-cyan-100 bg-gradient-to-br from-cyan-50/40 to-teal-50/30 p-3">
-                        <div className="mb-3">
-                          <p className="text-sm font-semibold text-gray-900">📏 体重-月龄 WHO 成长曲线（{genderLabel}）</p>
-                          <p className="mt-1 text-xs text-cyan-700">宝宝体重与 WHO 标准百分位（P3–P97）对比</p>
-                        </div>
-                        <StableResponsiveChart className="min-w-0 h-64 sm:h-80 -ml-2">
-                          <ComposedChart data={mergedData} margin={{ top: 10, right: 15, left: -5, bottom: 0 }} style={{ outline: 'none' }}>
-                            <defs>
-                              <linearGradient id="whoWeightOuter" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.08} />
-                                <stop offset="100%" stopColor="#06b6d4" stopOpacity={0.03} />
-                              </linearGradient>
-                              <linearGradient id="whoWeightInner" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.18} />
-                                <stop offset="100%" stopColor="#06b6d4" stopOpacity={0.08} />
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#cffafe" />
-                            <XAxis
-                              dataKey="ageMonths"
-                              type="number"
-                              domain={[minMonth, maxMonth]}
-                              tick={{ fontSize: 11, fill: '#475569' }}
-                              tickFormatter={(v) => `${v}月`}
-                              axisLine={{ stroke: '#a5f3fc' }}
-                              tickLine={{ stroke: '#a5f3fc' }}
-                            />
-                            <YAxis
-                              tick={{ fontSize: 11, fill: '#475569' }}
-                              tickFormatter={(v) => `${v}kg`}
-                              axisLine={{ stroke: '#a5f3fc' }}
-                              tickLine={{ stroke: '#a5f3fc' }}
-                            />
-                            <Tooltip
-                              content={({ active, payload }) => {
-                                if (!active || !payload?.length) return null
-                                const data = payload[0]?.payload
-                                if (!data) return null
-                                return (
-                                  <div className="rounded-lg border border-cyan-200 bg-white px-3 py-2 text-xs shadow-md">
-                                    <p className="mb-1 font-medium text-gray-700">{data.label || `${data.ageMonths}月龄`}</p>
-                                    {data.宝宝体重 !== undefined && (
-                                      <p className="text-teal-600 font-bold">宝宝: {data.宝宝体重} kg</p>
-                                    )}
-                                    <div className="mt-1 space-y-0.5 text-gray-500">
-                                      <p>P97: {data.P97}kg</p>
-                                      <p>P85: {data.P85}kg</p>
-                                      <p className="font-medium text-cyan-600">P50: {data.P50}kg（中位数）</p>
-                                      <p>P15: {data.P15}kg</p>
-                                      <p>P3: {data.P3}kg</p>
-                                    </div>
-                                  </div>
-                                )
-                              }}
-                            />
-                            {/* WHO percentile areas - outer band P3-P97 */}
-                            <Area type="monotone" dataKey="P97" stroke="none" fill="url(#whoWeightOuter)" connectNulls />
-                            <Area type="monotone" dataKey="P3" stroke="none" fill="#fff" connectNulls />
-                            {/* WHO percentile areas - inner band P15-P85 */}
-                            <Area type="monotone" dataKey="P85" stroke="none" fill="url(#whoWeightInner)" connectNulls />
-                            <Area type="monotone" dataKey="P15" stroke="none" fill="#fff" connectNulls />
-                            {/* WHO percentile lines */}
-                            <Line type="monotone" dataKey="P3" stroke="#67e8f9" strokeWidth={1} strokeDasharray="4 3" dot={false} connectNulls />
-                            <Line type="monotone" dataKey="P15" stroke="#22d3ee" strokeWidth={1} strokeDasharray="4 3" dot={false} connectNulls />
-                            <Line type="monotone" dataKey="P50" stroke="#06b6d4" strokeWidth={1.5} strokeDasharray="6 3" dot={false} connectNulls />
-                            <Line type="monotone" dataKey="P85" stroke="#22d3ee" strokeWidth={1} strokeDasharray="4 3" dot={false} connectNulls />
-                            <Line type="monotone" dataKey="P97" stroke="#67e8f9" strokeWidth={1} strokeDasharray="4 3" dot={false} connectNulls />
-                            {/* Baby's actual data */}
-                            <Line
-                              type="monotone"
-                              dataKey="宝宝体重"
-                              stroke={palette.teal}
-                              strokeWidth={2.5}
-                              dot={{ fill: palette.teal, r: 5, strokeWidth: 2, stroke: '#fff' }}
-                              activeDot={{ r: 7 }}
-                              connectNulls
-                            >
-                              <LabelList
-                                dataKey="宝宝体重"
-                                position="top"
-                                fill={palette.teal}
-                                fontSize={11}
-                                fontWeight={700}
-                                formatter={(v) => v != null ? `${v}kg` : ''}
-                              />
-                            </Line>
-                          </ComposedChart>
-                        </StableResponsiveChart>
-                        {/* Legend */}
-                        <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-slate-500">
-                          <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: palette.teal }} />宝宝实际</span>
-                          <span className="flex items-center gap-1"><span className="inline-block h-0.5 w-4 border-t-2 border-dashed" style={{ borderColor: '#06b6d4' }} />P50 中位数</span>
-                          <span className="flex items-center gap-1"><span className="inline-block h-3 w-4 rounded" style={{ backgroundColor: 'rgba(6,182,212,0.15)' }} />P15–P85</span>
-                          <span className="flex items-center gap-1"><span className="inline-block h-3 w-4 rounded" style={{ backgroundColor: 'rgba(6,182,212,0.06)' }} />P3–P97</span>
-                        </div>
-                      </div>
-                    )
-                  })()}
-
-                  {/* WHO Growth Curve - Height */}
-                  {stats.babyBirthDate && (() => {
-                    const gender = stats.babyGender || 'MALE'
-                    const birthDate = new Date(stats.babyBirthDate!)
-
-                    const heightAgeData = (stats.heightTrend || []).map(p => {
-                      const recordDate = new Date(p.recordedAt)
-                      const ageMonths = (recordDate.getTime() - birthDate.getTime()) / (1000 * 60 * 60 * 24 * 30.4375)
-                      return {
-                        ageMonths: Number(ageMonths.toFixed(2)),
-                        value: p.height,
-                        date: p.date,
-                      }
-                    }).filter(p => p.ageMonths >= 0 && p.ageMonths <= 24)
-
-                    if (heightAgeData.length === 0) return null
-
-                    const minMonth = Math.max(0, Math.floor(Math.min(...heightAgeData.map(p => p.ageMonths))) - 1)
-                    const maxMonth = Math.min(24, Math.ceil(Math.max(...heightAgeData.map(p => p.ageMonths))) + 1)
-                    const whoCurve = generateWHOCurve(gender, 'height', minMonth, maxMonth)
-
-                    const mergedData = whoCurve.map(who => ({
-                      ageMonths: who.ageMonths,
-                      label: who.label,
-                      P3: who.P3,
-                      P15: who.P15,
-                      P50: who.P50,
-                      P85: who.P85,
-                      P97: who.P97,
-                      宝宝身高: undefined as number | undefined,
-                    }))
-
-                    heightAgeData.forEach(p => {
-                      mergedData.push({
-                        ageMonths: p.ageMonths,
-                        label: `${p.ageMonths.toFixed(1)}月龄`,
-                        P3: 0, P15: 0, P50: 0, P85: 0, P97: 0,
-                        宝宝身高: p.value,
-                      })
-                    })
-
-                    mergedData.sort((a, b) => a.ageMonths - b.ageMonths)
-
-                    const whoFull = generateWHOCurve(gender, 'height', minMonth, maxMonth)
-                    mergedData.forEach(point => {
-                      const lower = whoFull.filter(w => w.ageMonths <= point.ageMonths).pop()
-                      const upper = whoFull.find(w => w.ageMonths >= point.ageMonths)
-                      if (lower && upper && lower.ageMonths !== upper.ageMonths) {
-                        const t = (point.ageMonths - lower.ageMonths) / (upper.ageMonths - lower.ageMonths)
-                        point.P3 = Number((lower.P3 + t * (upper.P3 - lower.P3)).toFixed(2))
-                        point.P15 = Number((lower.P15 + t * (upper.P15 - lower.P15)).toFixed(2))
-                        point.P50 = Number((lower.P50 + t * (upper.P50 - lower.P50)).toFixed(2))
-                        point.P85 = Number((lower.P85 + t * (upper.P85 - lower.P85)).toFixed(2))
-                        point.P97 = Number((lower.P97 + t * (upper.P97 - lower.P97)).toFixed(2))
-                      } else if (lower) {
-                        point.P3 = lower.P3; point.P15 = lower.P15; point.P50 = lower.P50
-                        point.P85 = lower.P85; point.P97 = lower.P97
-                      }
-                    })
-
-                    const genderLabel = gender === 'FEMALE' ? '女' : '男'
-
-                    return (
-                      <div className="min-w-0 rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50/40 to-indigo-50/30 p-3">
-                        <div className="mb-3">
-                          <p className="text-sm font-semibold text-gray-900">📏 身高-月龄 WHO 成长曲线（{genderLabel}）</p>
-                          <p className="mt-1 text-xs text-violet-700">宝宝身高与 WHO 标准百分位（P3–P97）对比</p>
-                        </div>
-                        <StableResponsiveChart className="min-w-0 h-64 sm:h-80 -ml-2">
-                          <ComposedChart data={mergedData} margin={{ top: 10, right: 15, left: -5, bottom: 0 }} style={{ outline: 'none' }}>
-                            <defs>
-                              <linearGradient id="whoHeightOuter" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.08} />
-                                <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.03} />
-                              </linearGradient>
-                              <linearGradient id="whoHeightInner" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.18} />
-                                <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.08} />
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#ede9fe" />
-                            <XAxis
-                              dataKey="ageMonths"
-                              type="number"
-                              domain={[minMonth, maxMonth]}
-                              tick={{ fontSize: 11, fill: '#475569' }}
-                              tickFormatter={(v) => `${v}月`}
-                              axisLine={{ stroke: '#c4b5fd' }}
-                              tickLine={{ stroke: '#c4b5fd' }}
-                            />
-                            <YAxis
-                              tick={{ fontSize: 11, fill: '#475569' }}
-                              tickFormatter={(v) => `${v}cm`}
-                              axisLine={{ stroke: '#c4b5fd' }}
-                              tickLine={{ stroke: '#c4b5fd' }}
-                            />
-                            <Tooltip
-                              content={({ active, payload }) => {
-                                if (!active || !payload?.length) return null
-                                const data = payload[0]?.payload
-                                if (!data) return null
-                                return (
-                                  <div className="rounded-lg border border-violet-200 bg-white px-3 py-2 text-xs shadow-md">
-                                    <p className="mb-1 font-medium text-gray-700">{data.label || `${data.ageMonths}月龄`}</p>
-                                    {data.宝宝身高 !== undefined && (
-                                      <p className="text-indigo-600 font-bold">宝宝: {data.宝宝身高} cm</p>
-                                    )}
-                                    <div className="mt-1 space-y-0.5 text-gray-500">
-                                      <p>P97: {data.P97}cm</p>
-                                      <p>P85: {data.P85}cm</p>
-                                      <p className="font-medium text-violet-600">P50: {data.P50}cm（中位数）</p>
-                                      <p>P15: {data.P15}cm</p>
-                                      <p>P3: {data.P3}cm</p>
-                                    </div>
-                                  </div>
-                                )
-                              }}
-                            />
-                            <Area type="monotone" dataKey="P97" stroke="none" fill="url(#whoHeightOuter)" connectNulls />
-                            <Area type="monotone" dataKey="P3" stroke="none" fill="#fff" connectNulls />
-                            <Area type="monotone" dataKey="P85" stroke="none" fill="url(#whoHeightInner)" connectNulls />
-                            <Area type="monotone" dataKey="P15" stroke="none" fill="#fff" connectNulls />
-                            <Line type="monotone" dataKey="P3" stroke="#c4b5fd" strokeWidth={1} strokeDasharray="4 3" dot={false} connectNulls />
-                            <Line type="monotone" dataKey="P15" stroke="#a78bfa" strokeWidth={1} strokeDasharray="4 3" dot={false} connectNulls />
-                            <Line type="monotone" dataKey="P50" stroke="#8b5cf6" strokeWidth={1.5} strokeDasharray="6 3" dot={false} connectNulls />
-                            <Line type="monotone" dataKey="P85" stroke="#a78bfa" strokeWidth={1} strokeDasharray="4 3" dot={false} connectNulls />
-                            <Line type="monotone" dataKey="P97" stroke="#c4b5fd" strokeWidth={1} strokeDasharray="4 3" dot={false} connectNulls />
-                            <Line
-                              type="monotone"
-                              dataKey="宝宝身高"
-                              stroke={palette.indigo}
-                              strokeWidth={2.5}
-                              dot={{ fill: palette.indigo, r: 5, strokeWidth: 2, stroke: '#fff' }}
-                              activeDot={{ r: 7 }}
-                              connectNulls
-                            >
-                              <LabelList
-                                dataKey="宝宝身高"
-                                position="top"
-                                fill={palette.indigo}
-                                fontSize={11}
-                                fontWeight={700}
-                                formatter={(v) => v != null ? `${v}cm` : ''}
-                              />
-                            </Line>
-                          </ComposedChart>
-                        </StableResponsiveChart>
-                        <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-slate-500">
-                          <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: palette.indigo }} />宝宝实际</span>
-                          <span className="flex items-center gap-1"><span className="inline-block h-0.5 w-4 border-t-2 border-dashed" style={{ borderColor: '#8b5cf6' }} />P50 中位数</span>
-                          <span className="flex items-center gap-1"><span className="inline-block h-3 w-4 rounded" style={{ backgroundColor: 'rgba(139,92,246,0.15)' }} />P15–P85</span>
-                          <span className="flex items-center gap-1"><span className="inline-block h-3 w-4 rounded" style={{ backgroundColor: 'rgba(139,92,246,0.06)' }} />P3–P97</span>
-                        </div>
-                      </div>
-                    )
-                  })()}
 
                 </div>
               </StatsPanel>
@@ -1941,6 +1616,334 @@ export default function StatsComponent({
                   </div>
                 </div>
               )}
+
+              {/* WHO Growth Curves */}
+              <div className="grid gap-2.5 xl:grid-cols-2">
+                {/* WHO Growth Curve - Weight */}
+                {stats.babyBirthDate && (() => {
+                  const gender = stats.babyGender || 'MALE'
+                  const birthDate = new Date(stats.babyBirthDate!)
+
+                  // Convert weight records to age-in-months data points
+                  const weightAgeData = (stats.weightTrend || []).map(p => {
+                    const recordDate = new Date(p.recordedAt)
+                    const ageMonths = (recordDate.getTime() - birthDate.getTime()) / (1000 * 60 * 60 * 24 * 30.4375)
+                    return {
+                      ageMonths: Number(ageMonths.toFixed(2)),
+                      value: p.weight,
+                      date: p.date,
+                    }
+                  }).filter(p => p.ageMonths >= 0 && p.ageMonths <= 24)
+
+                  if (weightAgeData.length === 0) return null
+
+                  const minMonth = Math.max(0, Math.floor(Math.min(...weightAgeData.map(p => p.ageMonths))) - 1)
+                  const maxMonth = Math.min(24, Math.ceil(Math.max(...weightAgeData.map(p => p.ageMonths))) + 1)
+                  const whoCurve = generateWHOCurve(gender, 'weight', minMonth, maxMonth)
+
+                  // Merge WHO curve and baby data
+                  const mergedData = whoCurve.map(who => ({
+                    ageMonths: who.ageMonths,
+                    label: who.label,
+                    P3: who.P3,
+                    P15: who.P15,
+                    P50: who.P50,
+                    P85: who.P85,
+                    P97: who.P97,
+                    宝宝体重: undefined as number | undefined,
+                  }))
+
+                  // Insert baby data points into the merged array
+                  weightAgeData.forEach(p => {
+                    mergedData.push({
+                      ageMonths: p.ageMonths,
+                      label: `${p.ageMonths.toFixed(1)}月龄`,
+                      P3: 0, P15: 0, P50: 0, P85: 0, P97: 0,
+                      宝宝体重: p.value,
+                    })
+                  })
+
+                  // Sort and interpolate WHO values for baby data points
+                  mergedData.sort((a, b) => a.ageMonths - b.ageMonths)
+
+                  // Re-interpolate WHO values for all points to ensure smooth areas
+                  const whoFull = generateWHOCurve(gender, 'weight', minMonth, maxMonth)
+                  mergedData.forEach(point => {
+                    // Find surrounding WHO points for interpolation
+                    const lower = whoFull.filter(w => w.ageMonths <= point.ageMonths).pop()
+                    const upper = whoFull.find(w => w.ageMonths >= point.ageMonths)
+                    if (lower && upper && lower.ageMonths !== upper.ageMonths) {
+                      const t = (point.ageMonths - lower.ageMonths) / (upper.ageMonths - lower.ageMonths)
+                      point.P3 = Number((lower.P3 + t * (upper.P3 - lower.P3)).toFixed(2))
+                      point.P15 = Number((lower.P15 + t * (upper.P15 - lower.P15)).toFixed(2))
+                      point.P50 = Number((lower.P50 + t * (upper.P50 - lower.P50)).toFixed(2))
+                      point.P85 = Number((lower.P85 + t * (upper.P85 - lower.P85)).toFixed(2))
+                      point.P97 = Number((lower.P97 + t * (upper.P97 - lower.P97)).toFixed(2))
+                    } else if (lower) {
+                      point.P3 = lower.P3; point.P15 = lower.P15; point.P50 = lower.P50
+                      point.P85 = lower.P85; point.P97 = lower.P97
+                    }
+                  })
+
+                  const genderLabel = gender === 'FEMALE' ? '女' : '男'
+
+                  return (
+                    <div className="min-w-0 rounded-2xl border border-cyan-100 bg-gradient-to-br from-cyan-50/40 to-teal-50/30 p-3">
+                      <div className="mb-3">
+                        <p className="text-sm font-semibold text-gray-900">📏 体重-月龄 WHO 成长曲线（{genderLabel}）</p>
+                        <p className="mt-1 text-xs text-cyan-700">宝宝体重与 WHO 标准百分位（P3–P97）对比</p>
+                      </div>
+                      <StableResponsiveChart className="min-w-0 h-64 sm:h-80 -ml-2">
+                        <ComposedChart data={mergedData} margin={{ top: 10, right: 15, left: -5, bottom: 0 }} style={{ outline: 'none' }}>
+                          <defs>
+                            <linearGradient id="whoWeightOuter" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.08} />
+                              <stop offset="100%" stopColor="#06b6d4" stopOpacity={0.03} />
+                            </linearGradient>
+                            <linearGradient id="whoWeightInner" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.18} />
+                              <stop offset="100%" stopColor="#06b6d4" stopOpacity={0.08} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#cffafe" />
+                          <XAxis
+                            dataKey="ageMonths"
+                            type="number"
+                            domain={[minMonth, maxMonth]}
+                            tick={{ fontSize: 11, fill: '#475569' }}
+                            tickFormatter={(v) => `${v}月`}
+                            axisLine={{ stroke: '#a5f3fc' }}
+                            tickLine={{ stroke: '#a5f3fc' }}
+                          />
+                          <YAxis
+                            tick={{ fontSize: 11, fill: '#475569' }}
+                            tickFormatter={(v) => `${v}kg`}
+                            axisLine={{ stroke: '#a5f3fc' }}
+                            tickLine={{ stroke: '#a5f3fc' }}
+                          />
+                          <Tooltip
+                            content={({ active, payload }) => {
+                              if (!active || !payload?.length) return null
+                              const data = payload[0]?.payload
+                              if (!data) return null
+                              return (
+                                <div className="rounded-lg border border-cyan-200 bg-white px-3 py-2 text-xs shadow-md">
+                                  <p className="mb-1 font-medium text-gray-700">{data.label || `${data.ageMonths}月龄`}</p>
+                                  {data.宝宝体重 !== undefined && (
+                                    <p className="text-teal-600 font-bold">宝宝: {data.宝宝体重} kg</p>
+                                  )}
+                                  <div className="mt-1 space-y-0.5 text-gray-500">
+                                    <p>P97: {data.P97}kg</p>
+                                    <p>P85: {data.P85}kg</p>
+                                    <p className="font-medium text-cyan-600">P50: {data.P50}kg（中位数）</p>
+                                    <p>P15: {data.P15}kg</p>
+                                    <p>P3: {data.P3}kg</p>
+                                  </div>
+                                </div>
+                              )
+                            }}
+                          />
+                          {/* WHO percentile areas - outer band P3-P97 */}
+                          <Area type="monotone" dataKey="P97" stroke="none" fill="url(#whoWeightOuter)" connectNulls />
+                          <Area type="monotone" dataKey="P3" stroke="none" fill="#fff" connectNulls />
+                          {/* WHO percentile areas - inner band P15-P85 */}
+                          <Area type="monotone" dataKey="P85" stroke="none" fill="url(#whoWeightInner)" connectNulls />
+                          <Area type="monotone" dataKey="P15" stroke="none" fill="#fff" connectNulls />
+                          {/* WHO percentile lines */}
+                          <Line type="monotone" dataKey="P3" stroke="#67e8f9" strokeWidth={1} strokeDasharray="4 3" dot={false} connectNulls />
+                          <Line type="monotone" dataKey="P15" stroke="#22d3ee" strokeWidth={1} strokeDasharray="4 3" dot={false} connectNulls />
+                          <Line type="monotone" dataKey="P50" stroke="#06b6d4" strokeWidth={1.5} strokeDasharray="6 3" dot={false} connectNulls />
+                          <Line type="monotone" dataKey="P85" stroke="#22d3ee" strokeWidth={1} strokeDasharray="4 3" dot={false} connectNulls />
+                          <Line type="monotone" dataKey="P97" stroke="#67e8f9" strokeWidth={1} strokeDasharray="4 3" dot={false} connectNulls />
+                          {/* Baby's actual data */}
+                          <Line
+                            type="monotone"
+                            dataKey="宝宝体重"
+                            stroke={palette.teal}
+                            strokeWidth={2.5}
+                            dot={{ fill: palette.teal, r: 5, strokeWidth: 2, stroke: '#fff' }}
+                            activeDot={{ r: 7 }}
+                            connectNulls
+                          >
+                            <LabelList
+                              dataKey="宝宝体重"
+                              position="top"
+                              fill={palette.teal}
+                              fontSize={11}
+                              fontWeight={700}
+                              formatter={(v) => v != null ? `${v}kg` : ''}
+                            />
+                          </Line>
+                        </ComposedChart>
+                      </StableResponsiveChart>
+                      {/* Legend */}
+                      <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-slate-500">
+                        <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: palette.teal }} />宝宝实际</span>
+                        <span className="flex items-center gap-1"><span className="inline-block h-0.5 w-4 border-t-2 border-dashed" style={{ borderColor: '#06b6d4' }} />P50 中位数</span>
+                        <span className="flex items-center gap-1"><span className="inline-block h-3 w-4 rounded" style={{ backgroundColor: 'rgba(6,182,212,0.15)' }} />P15–P85</span>
+                        <span className="flex items-center gap-1"><span className="inline-block h-3 w-4 rounded" style={{ backgroundColor: 'rgba(6,182,212,0.06)' }} />P3–P97</span>
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                {/* WHO Growth Curve - Height */}
+                {stats.babyBirthDate && (() => {
+                  const gender = stats.babyGender || 'MALE'
+                  const birthDate = new Date(stats.babyBirthDate!)
+
+                  const heightAgeData = (stats.heightTrend || []).map(p => {
+                    const recordDate = new Date(p.recordedAt)
+                    const ageMonths = (recordDate.getTime() - birthDate.getTime()) / (1000 * 60 * 60 * 24 * 30.4375)
+                    return {
+                      ageMonths: Number(ageMonths.toFixed(2)),
+                      value: p.height,
+                      date: p.date,
+                    }
+                  }).filter(p => p.ageMonths >= 0 && p.ageMonths <= 24)
+
+                  if (heightAgeData.length === 0) return null
+
+                  const minMonth = Math.max(0, Math.floor(Math.min(...heightAgeData.map(p => p.ageMonths))) - 1)
+                  const maxMonth = Math.min(24, Math.ceil(Math.max(...heightAgeData.map(p => p.ageMonths))) + 1)
+                  const whoCurve = generateWHOCurve(gender, 'height', minMonth, maxMonth)
+
+                  const mergedData = whoCurve.map(who => ({
+                    ageMonths: who.ageMonths,
+                    label: who.label,
+                    P3: who.P3,
+                    P15: who.P15,
+                    P50: who.P50,
+                    P85: who.P85,
+                    P97: who.P97,
+                    宝宝身高: undefined as number | undefined,
+                  }))
+
+                  heightAgeData.forEach(p => {
+                    mergedData.push({
+                      ageMonths: p.ageMonths,
+                      label: `${p.ageMonths.toFixed(1)}月龄`,
+                      P3: 0, P15: 0, P50: 0, P85: 0, P97: 0,
+                      宝宝身高: p.value,
+                    })
+                  })
+
+                  mergedData.sort((a, b) => a.ageMonths - b.ageMonths)
+
+                  const whoFull = generateWHOCurve(gender, 'height', minMonth, maxMonth)
+                  mergedData.forEach(point => {
+                    const lower = whoFull.filter(w => w.ageMonths <= point.ageMonths).pop()
+                    const upper = whoFull.find(w => w.ageMonths >= point.ageMonths)
+                    if (lower && upper && lower.ageMonths !== upper.ageMonths) {
+                      const t = (point.ageMonths - lower.ageMonths) / (upper.ageMonths - lower.ageMonths)
+                      point.P3 = Number((lower.P3 + t * (upper.P3 - lower.P3)).toFixed(2))
+                      point.P15 = Number((lower.P15 + t * (upper.P15 - lower.P15)).toFixed(2))
+                      point.P50 = Number((lower.P50 + t * (upper.P50 - lower.P50)).toFixed(2))
+                      point.P85 = Number((lower.P85 + t * (upper.P85 - lower.P85)).toFixed(2))
+                      point.P97 = Number((lower.P97 + t * (upper.P97 - lower.P97)).toFixed(2))
+                    } else if (lower) {
+                      point.P3 = lower.P3; point.P15 = lower.P15; point.P50 = lower.P50
+                      point.P85 = lower.P85; point.P97 = lower.P97
+                    }
+                  })
+
+                  const genderLabel = gender === 'FEMALE' ? '女' : '男'
+
+                  return (
+                    <div className="min-w-0 rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50/40 to-indigo-50/30 p-3">
+                      <div className="mb-3">
+                        <p className="text-sm font-semibold text-gray-900">📏 身高-月龄 WHO 成长曲线（{genderLabel}）</p>
+                        <p className="mt-1 text-xs text-violet-700">宝宝身高与 WHO 标准百分位（P3–P97）对比</p>
+                      </div>
+                      <StableResponsiveChart className="min-w-0 h-64 sm:h-80 -ml-2">
+                        <ComposedChart data={mergedData} margin={{ top: 10, right: 15, left: -5, bottom: 0 }} style={{ outline: 'none' }}>
+                          <defs>
+                            <linearGradient id="whoHeightOuter" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.08} />
+                              <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.03} />
+                            </linearGradient>
+                            <linearGradient id="whoHeightInner" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.18} />
+                              <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.08} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#ede9fe" />
+                          <XAxis
+                            dataKey="ageMonths"
+                            type="number"
+                            domain={[minMonth, maxMonth]}
+                            tick={{ fontSize: 11, fill: '#475569' }}
+                            tickFormatter={(v) => `${v}月`}
+                            axisLine={{ stroke: '#c4b5fd' }}
+                            tickLine={{ stroke: '#c4b5fd' }}
+                          />
+                          <YAxis
+                            tick={{ fontSize: 11, fill: '#475569' }}
+                            tickFormatter={(v) => `${v}cm`}
+                            axisLine={{ stroke: '#c4b5fd' }}
+                            tickLine={{ stroke: '#c4b5fd' }}
+                          />
+                          <Tooltip
+                            content={({ active, payload }) => {
+                              if (!active || !payload?.length) return null
+                              const data = payload[0]?.payload
+                              if (!data) return null
+                              return (
+                                <div className="rounded-lg border border-violet-200 bg-white px-3 py-2 text-xs shadow-md">
+                                  <p className="mb-1 font-medium text-gray-700">{data.label || `${data.ageMonths}月龄`}</p>
+                                  {data.宝宝身高 !== undefined && (
+                                    <p className="text-indigo-600 font-bold">宝宝: {data.宝宝身高} cm</p>
+                                  )}
+                                  <div className="mt-1 space-y-0.5 text-gray-500">
+                                    <p>P97: {data.P97}cm</p>
+                                    <p>P85: {data.P85}cm</p>
+                                    <p className="font-medium text-violet-600">P50: {data.P50}cm（中位数）</p>
+                                    <p>P15: {data.P15}cm</p>
+                                    <p>P3: {data.P3}cm</p>
+                                  </div>
+                                </div>
+                              )
+                            }}
+                          />
+                          <Area type="monotone" dataKey="P97" stroke="none" fill="url(#whoHeightOuter)" connectNulls />
+                          <Area type="monotone" dataKey="P3" stroke="none" fill="#fff" connectNulls />
+                          <Area type="monotone" dataKey="P85" stroke="none" fill="url(#whoHeightInner)" connectNulls />
+                          <Area type="monotone" dataKey="P15" stroke="none" fill="#fff" connectNulls />
+                          <Line type="monotone" dataKey="P3" stroke="#c4b5fd" strokeWidth={1} strokeDasharray="4 3" dot={false} connectNulls />
+                          <Line type="monotone" dataKey="P15" stroke="#a78bfa" strokeWidth={1} strokeDasharray="4 3" dot={false} connectNulls />
+                          <Line type="monotone" dataKey="P50" stroke="#8b5cf6" strokeWidth={1.5} strokeDasharray="6 3" dot={false} connectNulls />
+                          <Line type="monotone" dataKey="P85" stroke="#a78bfa" strokeWidth={1} strokeDasharray="4 3" dot={false} connectNulls />
+                          <Line type="monotone" dataKey="P97" stroke="#c4b5fd" strokeWidth={1} strokeDasharray="4 3" dot={false} connectNulls />
+                          <Line
+                            type="monotone"
+                            dataKey="宝宝身高"
+                            stroke={palette.indigo}
+                            strokeWidth={2.5}
+                            dot={{ fill: palette.indigo, r: 5, strokeWidth: 2, stroke: '#fff' }}
+                            activeDot={{ r: 7 }}
+                            connectNulls
+                          >
+                            <LabelList
+                              dataKey="宝宝身高"
+                              position="top"
+                              fill={palette.indigo}
+                              fontSize={11}
+                              fontWeight={700}
+                              formatter={(v) => v != null ? `${v}cm` : ''}
+                            />
+                          </Line>
+                        </ComposedChart>
+                      </StableResponsiveChart>
+                      <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-slate-500">
+                        <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: palette.indigo }} />宝宝实际</span>
+                        <span className="flex items-center gap-1"><span className="inline-block h-0.5 w-4 border-t-2 border-dashed" style={{ borderColor: '#8b5cf6' }} />P50 中位数</span>
+                        <span className="flex items-center gap-1"><span className="inline-block h-3 w-4 rounded" style={{ backgroundColor: 'rgba(139,92,246,0.15)' }} />P15–P85</span>
+                        <span className="flex items-center gap-1"><span className="inline-block h-3 w-4 rounded" style={{ backgroundColor: 'rgba(139,92,246,0.06)' }} />P3–P97</span>
+                      </div>
+                    </div>
+                  )
+                })()}
+              </div>
 
               {recentVaccineCard}
             </div>

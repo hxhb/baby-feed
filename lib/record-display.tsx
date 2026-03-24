@@ -10,6 +10,7 @@ import {
   Moon,
   UtensilsCrossed,
 } from 'lucide-react'
+import { formatBeijingTime } from '@/lib/time'
 
 // Shared interfaces for record display
 export interface FeedingRecordDisplay {
@@ -155,7 +156,10 @@ export function getRecordTitle(record: DisplayRecord): string {
         const durationMin = Math.round((sleepEnd.getTime() - sleepStart.getTime()) / (60 * 1000))
         const hours = Math.floor(durationMin / 60)
         const mins = durationMin % 60
-        return `睡眠 (${hours > 0 ? `${hours}小时` : ''}${mins > 0 ? `${mins}分钟` : ''})`
+        const startStr = formatBeijingTime(health.sleepStartTime!)
+        const endStr = formatBeijingTime(health.sleepEndTime!)
+        const durationStr = `${hours > 0 ? `${hours}小时` : ''}${mins > 0 ? `${mins}分钟` : ''}`
+        return `睡眠 (${startStr}-${endStr} ${durationStr})`
       }
       return '睡眠记录'
     }
