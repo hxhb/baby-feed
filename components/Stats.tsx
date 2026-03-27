@@ -370,11 +370,15 @@ export default function StatsComponent({
     const totalMinutes = day.sleepDurationMinutes
     const hours = Math.floor(totalMinutes / 60)
     const minutes = totalMinutes % 60
+    const sleepLabel = totalMinutes > 0
+      ? (hours > 0 ? (minutes > 0 ? `${hours}h${minutes}m` : `${hours}h`) : `${minutes}m`)
+      : ''
     return {
       date: `${parseInt(parts[1])}/${parseInt(parts[2])}`,
       rawDate: day.date,
       睡眠时长: Math.round(totalMinutes / 60 * 10) / 10,
       睡眠次数: day.sleepCount,
+      sleepLabel,
       totalMinutes,
       hours,
       minutes,
@@ -1619,10 +1623,10 @@ export default function StatsComponent({
                         </div>
                       </div>
                       <StableResponsiveChart className="min-w-0 h-56 sm:h-64 -ml-2">
-                        <BarChart data={sleepChartData} margin={{ top: 28, right: 5, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
+                        <BarChart data={sleepChartData} margin={{ top: 22, right: 5, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
                           <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#475569' }} axisLine={{ stroke: '#a5b4fc' }} tickLine={{ stroke: '#a5b4fc' }} />
-                          <YAxis tick={{ fontSize: 11, fill: '#475569' }} tickFormatter={(v) => `${v}h`} axisLine={{ stroke: '#a5b4fc' }} tickLine={{ stroke: '#a5b4fc' }} />
+                          <YAxis tick={{ fontSize: 11, fill: '#475569' }} tickFormatter={(v) => `${v}h`} axisLine={{ stroke: '#a5b4fc' }} tickLine={{ stroke: '#a5b4fc' }} domain={[0, (dataMax: number) => Math.ceil(dataMax) + 1]} />
                           <Tooltip content={({ active, payload, label }) => {
                             if (!active || !payload?.length) return null
                             const d = payload[0].payload as typeof sleepChartData[number]
@@ -1638,25 +1642,7 @@ export default function StatsComponent({
                             )
                           }} />
                           <Bar dataKey="睡眠时长" fill="#818cf8" name="睡眠时长(小时)" radius={[3, 3, 0, 0]} barSize={18}>
-                            <LabelList content={({ x, y, width, index }) => {
-                              const d = sleepChartData[index as number]
-                              if (!d || d.totalMinutes === 0) return null
-                              const durationLabel = d.hours > 0
-                                ? (d.minutes > 0 ? `${d.hours}h${d.minutes}m` : `${d.hours}h`)
-                                : `${d.minutes}m`
-                              return (
-                                <text
-                                  x={(x as number) + (width as number) / 2}
-                                  y={(y as number) - 6}
-                                  textAnchor="middle"
-                                  fontSize={10}
-                                  fontWeight={600}
-                                  fill="#4f46e5"
-                                >
-                                  {durationLabel}
-                                </text>
-                              )
-                            }} />
+                            <LabelList dataKey="sleepLabel" position="top" fill="#4f46e5" fontSize={10} fontWeight={600} />
                           </Bar>
                         </BarChart>
                       </StableResponsiveChart>
