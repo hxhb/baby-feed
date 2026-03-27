@@ -430,6 +430,7 @@ export default function HealthForm({
       if (response.ok) {
         invalidateRecordRelatedCaches(babyId)
         window.sessionStorage.removeItem(HEALTH_DRAFT_STORAGE_KEY)
+        window.sessionStorage.setItem('record_saved', '1')
         onRecordSaved?.()
         router.replace('/')
         router.refresh()

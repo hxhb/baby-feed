@@ -142,10 +142,23 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
       where: {
         babyId,
         createdBy: userId,
-        recordedAt: {
-          gte: rangeStart,
-          lte: rangeEnd,
-        },
+        // Include records where recordedAt is in range
+        // OR sleep records whose sleepStartTime is in range (cross-midnight sleep)
+        OR: [
+          {
+            recordedAt: {
+              gte: rangeStart,
+              lte: rangeEnd,
+            },
+          },
+          {
+            type: 'SLEEP',
+            sleepStartTime: {
+              gte: rangeStart,
+              lte: rangeEnd,
+            },
+          },
+        ],
       },
       orderBy: { recordedAt: 'asc' },
     }),
@@ -264,33 +277,50 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
     const date = getBeijingDateStr(new Date(record.recordedAt))
     const dayStats = statsMap.get(date)
 
-    if (!dayStats) {
-      return
-    }
-
-    if (record.type === 'WEIGHT' && record.weight) {
-      dayStats.weight = record.weight
-    } else if (record.type === 'HEIGHT' && record.height) {
-      dayStats.height = record.height
-    } else if (record.type === 'TEMPERATURE' && record.temperature) {
-      dayStats.temperature = record.temperature
-    } else if (record.type === 'AD_VITAMIN' && record.adGiven) {
-      dayStats.adGiven = true
-    } else if (record.type === 'SLEEP' && record.sleepStartTime) {
-      dayStats.sleepCount += 1
-      if (record.sleepEndTime) {
-        const startMs = new Date(record.sleepStartTime).getTime()
-        const endMs = new Date(record.sleepEndTime).getTime()
-        if (endMs > startMs) {
-          dayStats.sleepDurationMinutes += Math.round((endMs - startMs) / (60 * 1000))
+    if (dayStats) {
+      if (record.type === 'WEIGHT' && record.weight) {
+        dayStats.weight = record.weight
+      } else if (record.type === 'HEIGHT' && record.height) {
+        dayStats.height = record.height
+      } else if (record.type === 'TEMPERATURE' && record.temperature) {
+        dayStats.temperature = record.temperature
+      } else if (record.type === 'AD_VITAMIN' && record.adGiven) {
+        dayStats.adGiven = true
+      } else if (record.type === 'DIAPER') {
+        if (record.diaperType === 'PEE' || record.diaperType === 'BOTH') {
+          dayStats.peeCount += 1
+        }
+        if (record.diaperType === 'POOP' || record.diaperType === 'BOTH') {
+          dayStats.poopCount += 1
         }
       }
-    } else if (record.type === 'DIAPER') {
-      if (record.diaperType === 'PEE' || record.diaperType === 'BOTH') {
-        dayStats.peeCount += 1
-      }
-      if (record.diaperType === 'POOP' || record.diaperType === 'BOTH') {
-        dayStats.poopCount += 1
+    }
+
+    // SLEEP: split duration across natural day boundaries (Beijing time)
+    if (record.type === 'SLEEP' && record.sleepStartTime && record.sleepEndTime) {
+      const startMs = new Date(record.sleepStartTime).getTime()
+      const endMs = new Date(record.sleepEndTime).getTime()
+      if (endMs > startMs) {
+        let cursor = startMs
+        while (cursor < endMs) {
+          const dayStr = getBeijingDateStr(new Date(cursor))
+          const { end: dayEnd } = getBeijingDayRange(dayStr)
+          const segmentEnd = Math.min(endMs, dayEnd.getTime() + 1) // +1 to include 23:59:59.999
+          const segmentMin = Math.round((segmentEnd - cursor) / (60 * 1000))
+          if (segmentMin > 0) {
+            const targetStats = statsMap.get(dayStr)
+            if (targetStats) {
+              targetStats.sleepDurationMinutes += segmentMin
+              // Count the sleep session only on the day it started
+              if (cursor === startMs) {
+                targetStats.sleepCount += 1
+              }
+            }
+          }
+          // Advance to the start of the next Beijing day
+          const { end: thisDayEnd } = getBeijingDayRange(dayStr)
+          cursor = thisDayEnd.getTime() + 1
+        }
       }
     }
   })

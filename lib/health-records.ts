@@ -1,3 +1,5 @@
+import { toBeijingISO } from '@/lib/time'
+
 export type HealthType = 'WEIGHT' | 'HEIGHT' | 'TEMPERATURE' | 'MEDICATION' | 'VACCINE' | 'DIAPER' | 'AD_VITAMIN' | 'SLEEP'
 export type DiaperType = 'PEE' | 'POOP' | 'BOTH'
 
@@ -123,11 +125,11 @@ export function buildHealthRecordPayload(type: HealthType, values: HealthFieldVa
     }
   }
 
-  // SLEEP
+  // SLEEP — convert datetime-local values to Beijing timezone ISO strings
   return {
     ...basePayload,
-    sleepStartTime: values.sleepStartTime || null,
-    sleepEndTime: values.sleepEndTime || null,
+    sleepStartTime: values.sleepStartTime ? toBeijingISO(values.sleepStartTime) : null,
+    sleepEndTime: values.sleepEndTime ? toBeijingISO(values.sleepEndTime) : null,
     sleepQuality: values.sleepQuality.trim() || null,
   }
 }

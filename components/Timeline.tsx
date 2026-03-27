@@ -89,6 +89,29 @@ function dateStringToBeijingDate(dateStr: string) {
   return new Date(`${dateStr}T12:00:00+08:00`)
 }
 
+/**
+ * Returns the time to use when displaying or sorting a SLEEP health record,
+ * taking into account whether the record is being viewed from the sleep-start
+ * date or the wake-up date (cross-midnight scenario).
+ *
+ * - If sleepStartTime falls within `viewingDateStr` → use sleepStartTime
+ *   (the record started on this day, show when it began)
+ * - Otherwise (cross-midnight: viewed from the wake-up date) → use
+ *   sleepEndTime ?? recordedAt (show the wake-up time)
+ */
+function getSleepRecordDisplayTime(record: HealthRecord, viewingDateStr: string): string {
+  if (record.type !== 'SLEEP' || !record.sleepStartTime) {
+    return record.recordedAt
+  }
+  const dayStartMs = new Date(`${viewingDateStr}T00:00:00+08:00`).getTime()
+  const dayEndMs = new Date(`${viewingDateStr}T23:59:59.999+08:00`).getTime()
+  const startMs = new Date(record.sleepStartTime).getTime()
+  if (startMs >= dayStartMs && startMs <= dayEndMs) {
+    return record.sleepStartTime
+  }
+  return record.sleepEndTime ?? record.recordedAt
+}
+
 async function fetchTimelineRecords(babyId: string, dateStr: string) {
   const [feedingResponse, healthResponse] = await Promise.all([
     fetch(`/api/feeding?babyId=${babyId}&date=${dateStr}`),
@@ -104,9 +127,12 @@ async function fetchTimelineRecords(babyId: string, dateStr: string) {
     ...feedingData.map((r: FeedingRecord) => ({ ...r, recordType: 'feeding' as const })),
     ...healthData.map((r: HealthRecord) => ({ ...r, recordType: 'health' as const })),
   ].sort((a, b) => {
-    const timeA = new Date(a.recordType === 'feeding' ? a.startTime : a.recordedAt).getTime()
-    const timeB = new Date(b.recordType === 'feeding' ? b.startTime : b.recordedAt).getTime()
-    return timeB - timeA
+    const getTime = (rec: FeedingRecord | HealthRecord) => {
+      if (rec.recordType === 'feeding') return new Date(rec.startTime).getTime()
+      const hr = rec as HealthRecord
+      return new Date(getSleepRecordDisplayTime(hr, dateStr)).getTime()
+    }
+    return getTime(b) - getTime(a)
   })
 }
 
@@ -169,15 +195,22 @@ function DeleteConfirmDialog({
 
 const TimelineRecordItem = memo(function TimelineRecordItem({
   record,
+  viewingDateStr,
   onEdit,
   onDelete,
 }: {
   record: TimelineRecord
+  viewingDateStr: string
   onEdit: (record: TimelineRecord) => void
   onDelete: (id: string, type: 'feeding' | 'health') => void
 }) {
-  const time = record.recordType === 'feeding' ? record.startTime : record.recordedAt
   const isFeeding = record.recordType === 'feeding'
+  // For sleep records, show the contextually appropriate time:
+  // - sleepStartTime when viewing the date the sleep started
+  // - sleepEndTime (wake-up) when viewing a cross-midnight record from the wake-up date
+  const time = isFeeding
+    ? record.startTime
+    : getSleepRecordDisplayTime(record as HealthRecord, viewingDateStr)
 
   return (
     <div className="flex items-center justify-between p-3 sm:p-4 hover:bg-gray-50 transition">
@@ -208,11 +241,13 @@ const TimelineRecordItem = memo(function TimelineRecordItem({
 const TimelineRecordSection = memo(function TimelineRecordSection({
   label,
   records,
+  viewingDateStr,
   onEdit,
   onDelete,
 }: {
   label: string
   records: TimelineRecord[]
+  viewingDateStr: string
   onEdit: (record: TimelineRecord) => void
   onDelete: (id: string, type: 'feeding' | 'health') => void
 }) {
@@ -227,7 +262,7 @@ const TimelineRecordSection = memo(function TimelineRecordSection({
       </div>
       <div className="divide-y divide-gray-100">
         {records.map((record) => (
-          <TimelineRecordItem key={record.id} record={record} onEdit={onEdit} onDelete={onDelete} />
+          <TimelineRecordItem key={record.id} record={record} viewingDateStr={viewingDateStr} onEdit={onEdit} onDelete={onDelete} />
         ))}
       </div>
     </div>
@@ -258,9 +293,19 @@ export default function TimelineComponent({
   const latestRequestKeyRef = useRef<string | null>(null)
   const datePickerWrapperRef = useRef<HTMLDivElement | null>(null)
   const calendarInputRef = useRef<HTMLInputElement | null>(null)
+  const [freshFetch, setFreshFetch] = useState(false)
   const currentDateStr = format(currentDate, 'yyyy-MM-dd')
-  const hasInitialRecords = !!initialDate && selectedBabyId === initialSelectedBabyId && currentDateStr === initialDate
-  const hasInitialValidDates = selectedBabyId === initialSelectedBabyId
+  const hasInitialRecords = !freshFetch && !!initialDate && selectedBabyId === initialSelectedBabyId && currentDateStr === initialDate
+  const hasInitialValidDates = !freshFetch && selectedBabyId === initialSelectedBabyId
+
+  // If a record was just saved, bypass SSR initial data and force a fresh fetch
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.sessionStorage.getItem('record_saved')) {
+      window.sessionStorage.removeItem('record_saved')
+      invalidateRequestCache()
+      setFreshFetch(true)
+    }
+  }, [])
 
   const fetchBabies = useCallback(async () => {
     try {
@@ -588,9 +633,13 @@ export default function TimelineComponent({
     const afternoon: TimelineRecord[] = []
 
     records.forEach(record => {
-      const time = record.recordType === 'feeding'
-        ? (record as FeedingRecord).startTime
-        : (record as HealthRecord).recordedAt
+      let time: string
+      if (record.recordType === 'feeding') {
+        time = (record as FeedingRecord).startTime
+      } else {
+        const healthRecord = record as HealthRecord
+        time = getSleepRecordDisplayTime(healthRecord, currentDateStr)
+      }
       const hour = getBeijingHour(time)
       if (hour < 12) {
         morning.push(record)
@@ -600,7 +649,7 @@ export default function TimelineComponent({
     })
 
     return { morning, afternoon }
-  }, [records])
+  }, [records, currentDateStr])
 
   const timelineSummary = useMemo(() => {
     let breastFeedingCount = 0
@@ -878,8 +927,8 @@ export default function TimelineComponent({
             </div>
           ) : (
             <div>
-              <TimelineRecordSection label="下午" records={afternoon} onEdit={handleEditStart} onDelete={handleDeleteClick} />
-              <TimelineRecordSection label="上午" records={morning} onEdit={handleEditStart} onDelete={handleDeleteClick} />
+              <TimelineRecordSection label="下午" records={afternoon} viewingDateStr={currentDateStr} onEdit={handleEditStart} onDelete={handleDeleteClick} />
+              <TimelineRecordSection label="上午" records={morning} viewingDateStr={currentDateStr} onEdit={handleEditStart} onDelete={handleDeleteClick} />
             </div>
           )}
         </div>

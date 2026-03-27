@@ -79,6 +79,8 @@ export async function getTimelineValidDates(userId: string, babyId: string): Pro
       },
       select: {
         recordedAt: true,
+        type: true,
+        sleepStartTime: true,
       },
       orderBy: { recordedAt: 'desc' },
     }),
@@ -92,6 +94,10 @@ export async function getTimelineValidDates(userId: string, babyId: string): Pro
 
   healthDates.forEach((record) => {
     validDates.add(getBeijingDateStr(record.recordedAt))
+    // For cross-midnight sleep records, also mark the sleep start date as valid
+    if (record.type === 'SLEEP' && record.sleepStartTime) {
+      validDates.add(getBeijingDateStr(record.sleepStartTime))
+    }
   })
 
   return Array.from(validDates).sort((a, b) => b.localeCompare(a))
@@ -122,11 +128,19 @@ async function getPreloadedTimelineRecords(userId: string, babyId: string, dateS
         babyId: true,
       },
     }),
+    // Query health records: include records where recordedAt is in range
+    // OR sleep records whose sleepStartTime is in range (cross-midnight sleep)
     prisma.healthRecord.findMany({
       where: {
         babyId,
         createdBy: userId,
-        recordedAt: { gte: start, lte: end },
+        OR: [
+          { recordedAt: { gte: start, lte: end } },
+          {
+            type: 'SLEEP',
+            sleepStartTime: { gte: start, lte: end },
+          },
+        ],
       },
       orderBy: { recordedAt: 'desc' },
       select: {
@@ -154,6 +168,10 @@ async function getPreloadedTimelineRecords(userId: string, babyId: string, dateS
     }),
   ])
 
+  const { start: dayStart, end: dayEnd } = getBeijingDayRange(dateStr)
+  const dayStartMs = dayStart.getTime()
+  const dayEndMs = dayEnd.getTime()
+
   return [
     ...feedingRecords.map((record) => ({
       ...record,
@@ -169,9 +187,18 @@ async function getPreloadedTimelineRecords(userId: string, babyId: string, dateS
       recordType: 'health' as const,
     })),
   ].sort((a, b) => {
-    const timeA = new Date(a.recordType === 'feeding' ? a.startTime : a.recordedAt).getTime()
-    const timeB = new Date(b.recordType === 'feeding' ? b.startTime : b.recordedAt).getTime()
-    return timeB - timeA
+    const getTime = (rec: typeof a) => {
+      if (rec.recordType === 'feeding') return new Date(rec.startTime).getTime()
+      if (rec.type === 'SLEEP' && rec.sleepStartTime) {
+        const startMs = new Date(rec.sleepStartTime).getTime()
+        // If sleep started on this date, sort by start time;
+        // otherwise it's a cross-midnight record viewed from the end date — sort by wake time
+        if (startMs >= dayStartMs && startMs <= dayEndMs) return startMs
+        return new Date(rec.sleepEndTime ?? rec.recordedAt).getTime()
+      }
+      return new Date(rec.recordedAt).getTime()
+    }
+    return getTime(b) - getTime(a)
   })
 }
 

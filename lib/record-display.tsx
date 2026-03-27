@@ -154,12 +154,22 @@ export function getRecordTitle(record: DisplayRecord): string {
       const sleepEnd = health.sleepEndTime ? new Date(health.sleepEndTime) : null
       if (sleepStart && sleepEnd) {
         const durationMin = Math.round((sleepEnd.getTime() - sleepStart.getTime()) / (60 * 1000))
-        const hours = Math.floor(durationMin / 60)
-        const mins = durationMin % 60
         const startStr = formatBeijingTime(health.sleepStartTime!)
         const endStr = formatBeijingTime(health.sleepEndTime!)
-        const durationStr = `${hours > 0 ? `${hours}小时` : ''}${mins > 0 ? `${mins}分钟` : ''}`
-        return `睡眠 (${startStr}-${endStr} ${durationStr})`
+        if (durationMin > 0) {
+          const hours = Math.floor(durationMin / 60)
+          const mins = durationMin % 60
+          const parts: string[] = []
+          if (hours > 0) parts.push(`${hours}小时`)
+          if (mins > 0) parts.push(`${mins}分钟`)
+          const durationStr = parts.join('')
+          return `睡眠 (${startStr}-${endStr} ${durationStr})`
+        }
+        return `睡眠 (${startStr}-${endStr})`
+      }
+      if (sleepStart) {
+        const startStr = formatBeijingTime(health.sleepStartTime!)
+        return `睡眠 (${startStr}入睡)`
       }
       return '睡眠记录'
     }

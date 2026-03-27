@@ -131,10 +131,19 @@ export default function Dashboard({
       : null,
   )
   const [loading, setLoading] = useState(initialBabies.length === 0)
+  const [freshFetch, setFreshFetch] = useState(false)
   const preloadedBabyIdRef = useRef<string | null>(selectedBabyId ?? initialBabies[0]?.id ?? null)
 
   const resolvedSelectedBabyId = selectedBabyId ?? internalSelectedBabyId
-  const hasInitialTodayData = initialTodayRecords.length > 0 || initialTodayHealthRecords.length > 0
+  const hasInitialTodayData = !freshFetch && (initialTodayRecords.length > 0 || initialTodayHealthRecords.length > 0)
+
+  // If a record was just saved, bypass SSR initial data and force a fresh fetch
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.sessionStorage.getItem('record_saved')) {
+      window.sessionStorage.removeItem('record_saved')
+      setFreshFetch(true)
+    }
+  }, [])
 
   const handleSelectBaby = useCallback((id: string | null) => {
     if (onSelectBaby) {
@@ -425,9 +434,20 @@ export default function Dashboard({
         ) : (
           <div className="space-y-3">
             {[...todayRecords, ...todayHealthRecords]
-              .sort((a, b) => new Date(b.recordType === 'feeding' ? b.startTime : b.recordedAt).getTime() - new Date(a.recordType === 'feeding' ? a.startTime : a.recordedAt).getTime())
+              .sort((a, b) => {
+                const getTime = (rec: typeof a) => {
+                  if (rec.recordType === 'feeding') return new Date(rec.startTime).getTime()
+                  const hr = rec as HealthRecord
+                  return new Date((hr.type === 'SLEEP' && hr.sleepStartTime) ? hr.sleepStartTime : hr.recordedAt).getTime()
+                }
+                return getTime(b) - getTime(a)
+              })
               .map((record) => {
-                const time = record.recordType === 'feeding' ? (record as FeedingRecord).startTime : (record as HealthRecord).recordedAt
+                const time = record.recordType === 'feeding'
+                  ? (record as FeedingRecord).startTime
+                  : ((record as HealthRecord).type === 'SLEEP' && (record as HealthRecord).sleepStartTime)
+                    ? (record as HealthRecord).sleepStartTime!
+                    : (record as HealthRecord).recordedAt
                 
                 return (
                   <div

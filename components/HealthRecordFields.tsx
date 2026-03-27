@@ -76,6 +76,14 @@ export function getHealthFieldValidationMessage(type: HealthType, values: Health
     return '请填写入睡时间'
   }
 
+  if (type === 'SLEEP' && values.sleepStartTime && values.sleepEndTime) {
+    const start = new Date(values.sleepStartTime).getTime()
+    const end = new Date(values.sleepEndTime).getTime()
+    if (end <= start) {
+      return '醒来时间必须晚于入睡时间'
+    }
+  }
+
   return ''
 }
 

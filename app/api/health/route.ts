@@ -68,10 +68,16 @@ export async function GET(request: NextRequest) {
 
     if (date) {
       const { start, end } = getBeijingDayRange(date)
-      whereClause.recordedAt = {
-        gte: start,
-        lte: end
-      }
+      // For sleep records that cross midnight (e.g. 23:00 -> 06:00 next day),
+      // recordedAt = sleepEndTime (next day), so they won't appear on the start day.
+      // Use OR to also include records whose sleepStartTime falls within this day.
+      whereClause.OR = [
+        { recordedAt: { gte: start, lte: end } },
+        {
+          type: 'SLEEP',
+          sleepStartTime: { gte: start, lte: end },
+        },
+      ]
     }
 
     const records = await prisma.healthRecord.findMany({

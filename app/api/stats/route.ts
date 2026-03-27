@@ -94,10 +94,10 @@ export async function GET(request: NextRequest) {
         where: {
           babyId,
           createdBy: session.user.id,
-          recordedAt: {
-            gte: rangeStart,
-            lte: rangeEnd
-          }
+          OR: [
+            { recordedAt: { gte: rangeStart, lte: rangeEnd } },
+            { type: 'SLEEP', sleepStartTime: { gte: rangeStart, lte: rangeEnd } },
+          ],
         },
         orderBy: { recordedAt: 'asc' }
       })
@@ -121,6 +121,8 @@ export async function GET(request: NextRequest) {
         peeCount: 0,
         poopCount: 0,
         nightFeedingCount: 0,
+        sleepDurationMinutes: 0,
+        sleepCount: 0,
         weight: undefined,
         height: undefined,
         temperature: undefined
@@ -171,7 +173,7 @@ export async function GET(request: NextRequest) {
     healthRecords.forEach(record => {
       const date = getBeijingDateStr(new Date(record.recordedAt))
       const dayStats = statsMap.get(date)
-      
+
       if (dayStats) {
         if (record.type === 'WEIGHT' && record.weight) {
           dayStats.weight = record.weight
@@ -187,6 +189,35 @@ export async function GET(request: NextRequest) {
           }
           if (record.diaperType === 'POOP' || record.diaperType === 'BOTH') {
             dayStats.poopCount += 1
+          }
+        }
+      }
+
+      // SLEEP: split duration across natural day boundaries (Beijing time)
+      if (record.type === 'SLEEP' && record.sleepStartTime && record.sleepEndTime) {
+        const startMs = new Date(record.sleepStartTime).getTime()
+        const endMs = new Date(record.sleepEndTime).getTime()
+        if (endMs > startMs) {
+          // Walk day by day from sleep-start date to sleep-end date
+          let cursor = startMs
+          while (cursor < endMs) {
+            const dayStr = getBeijingDateStr(new Date(cursor))
+            const { end: dayEnd } = getBeijingDayRange(dayStr)
+            const segmentEnd = Math.min(endMs, dayEnd.getTime() + 1) // +1 to include 23:59:59.999
+            const segmentMin = Math.round((segmentEnd - cursor) / (60 * 1000))
+            if (segmentMin > 0) {
+              const targetStats = statsMap.get(dayStr)
+              if (targetStats) {
+                targetStats.sleepDurationMinutes += segmentMin
+                // Count the sleep session only on the day it started
+                if (cursor === startMs) {
+                  targetStats.sleepCount += 1
+                }
+              }
+            }
+            // Advance to the start of the next Beijing day
+            const { end: thisDayEnd } = getBeijingDayRange(dayStr)
+            cursor = thisDayEnd.getTime() + 1
           }
         }
       }

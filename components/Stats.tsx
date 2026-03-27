@@ -16,7 +16,7 @@ import {
   LabelList,
 } from 'recharts'
 import { Baby as BabyIcon, ChartColumn, Clock, Droplets, Milk, Moon, Pill, Ruler, Scale, Syringe, Thermometer, TrendingUp } from 'lucide-react'
-import { dedupeRequest } from '@/lib/client-request-cache'
+import { dedupeRequest, invalidateRequestCache } from '@/lib/client-request-cache'
 import type { PreloadedStatsData } from '@/lib/server-stats'
 import { StatsEmptyState, StatsPanel, StatsSegmentedTabs } from '@/components/StatsUi'
 import { generateWHOCurve } from '@/lib/who-growth-standards'
@@ -157,7 +157,17 @@ export default function StatsComponent({
   const [loading, setLoading] = useState(initialBabies.length === 0)
   const [days, setDays] = useState(7)
   const [activeSubpage, setActiveSubpage] = useState<'dashboard' | 'insights'>('dashboard')
-  const hasInitialStats = !!initialStats && selectedBabyId === initialStats.baby.id && days === 7
+  const [freshFetch, setFreshFetch] = useState(false)
+  const hasInitialStats = !freshFetch && !!initialStats && selectedBabyId === initialStats.baby.id && days === 7
+
+  // If a record was just saved, bypass SSR initial data and force a fresh fetch
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.sessionStorage.getItem('record_saved')) {
+      window.sessionStorage.removeItem('record_saved')
+      invalidateRequestCache()
+      setFreshFetch(true)
+    }
+  }, [])
 
   const fetchBabies = useCallback(async () => {
     try {
@@ -357,13 +367,31 @@ export default function StatsComponent({
   // Sleep trend data
   const sleepChartData = stats?.lastDays.map(day => {
     const parts = day.date.split('-')
+    const totalMinutes = day.sleepDurationMinutes
+    const hours = Math.floor(totalMinutes / 60)
+    const minutes = totalMinutes % 60
     return {
       date: `${parseInt(parts[1])}/${parseInt(parts[2])}`,
-      睡眠时长: Math.round(day.sleepDurationMinutes / 60 * 10) / 10,
+      rawDate: day.date,
+      睡眠时长: Math.round(totalMinutes / 60 * 10) / 10,
       睡眠次数: day.sleepCount,
+      totalMinutes,
+      hours,
+      minutes,
     }
   }) || []
   const hasSleepData = sleepChartData.some(day => day.睡眠时长 > 0 || day.睡眠次数 > 0)
+
+  // Sleep summary stats
+  const sleepActiveDays = sleepChartData.filter(d => d.totalMinutes > 0).length
+  const totalSleepMinutes = sleepChartData.reduce((sum, d) => sum + d.totalMinutes, 0)
+  const avgSleepMinutes = sleepActiveDays > 0 ? Math.round(totalSleepMinutes / sleepActiveDays) : 0
+  const avgSleepHours = Math.floor(avgSleepMinutes / 60)
+  const avgSleepMins = avgSleepMinutes % 60
+  const peakSleepDay = sleepChartData.reduce<typeof sleepChartData[number] | null>((best, d) => {
+    if (!best || d.totalMinutes > best.totalMinutes) return d
+    return best
+  }, null)
 
   const latestWeightRecord = stats?.weightTrend[stats.weightTrend.length - 1] || null
   const previousWeightRecord = stats && stats.weightTrend.length > 1 ? stats.weightTrend[stats.weightTrend.length - 2] : null
@@ -1564,39 +1592,75 @@ export default function StatsComponent({
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <div>
                       <p className="text-sm font-semibold text-gray-900">每日睡眠趋势</p>
-                      <p className="mt-1 text-xs text-indigo-700">每日睡眠时长（柱顶标注睡眠次数）</p>
+                      <p className="mt-1 text-xs text-indigo-700">按自然日统计睡眠时长与次数</p>
                     </div>
                   </div>
                   {hasSleepData ? (
-                    <StableResponsiveChart className="min-w-0 h-56 sm:h-72 -ml-2">
-                      <BarChart data={sleepChartData} margin={{ top: 25, right: 5, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
-                        <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#475569' }} axisLine={{ stroke: '#a5b4fc' }} tickLine={{ stroke: '#a5b4fc' }} />
-                        <YAxis tick={{ fontSize: 11, fill: '#475569' }} tickFormatter={(v) => `${v}h`} axisLine={{ stroke: '#a5b4fc' }} tickLine={{ stroke: '#a5b4fc' }} />
-                        <Tooltip content={({ active, payload, label }) => {
-                          if (!active || !payload?.length) return null
-                          const data = payload[0].payload
-                          return (
-                            <div className="rounded-lg border border-indigo-100 bg-white px-3 py-2 text-xs shadow-md">
-                              <p className="font-semibold text-gray-900">{label}</p>
-                              <p className="mt-1 text-indigo-600">睡眠时长：{data.睡眠时长}小时</p>
-                              <p className="text-purple-600">睡眠次数：{data.睡眠次数}次</p>
-                            </div>
-                          )
-                        }} />
-                        <Bar dataKey="睡眠时长" fill="#818cf8" name="睡眠时长(小时)" radius={[3, 3, 0, 0]} barSize={18}>
-                          <LabelList content={({ x, y, width, value, index }) => {
-                            const count = sleepChartData[index as number]?.睡眠次数
-                            if (!value && !count) return null
+                    <>
+                      {/* Summary row */}
+                      <div className="mb-2 flex items-stretch gap-1.5">
+                        <div className="flex flex-1 items-center gap-1.5 rounded-lg bg-indigo-100/60 px-2 py-1.5">
+                          <p className="shrink-0 text-[10px] text-indigo-500">日均</p>
+                          <p className="text-xs font-bold text-indigo-800 tabular-nums">
+                            {avgSleepHours > 0 ? `${avgSleepHours}h` : ''}{avgSleepMins > 0 ? `${avgSleepMins}m` : ''}{avgSleepMinutes === 0 ? '—' : ''}
+                          </p>
+                        </div>
+                        <div className="flex flex-1 items-center gap-1.5 rounded-lg bg-indigo-100/60 px-2 py-1.5">
+                          <p className="shrink-0 text-[10px] text-indigo-500">最长</p>
+                          <p className="text-xs font-bold text-indigo-800 tabular-nums">
+                            {peakSleepDay && peakSleepDay.totalMinutes > 0
+                              ? `${Math.floor(peakSleepDay.totalMinutes / 60)}h${peakSleepDay.totalMinutes % 60 > 0 ? `${peakSleepDay.totalMinutes % 60}m` : ''}`
+                              : '—'}
+                          </p>
+                        </div>
+                        <div className="flex flex-1 items-center gap-1.5 rounded-lg bg-indigo-100/60 px-2 py-1.5">
+                          <p className="shrink-0 text-[10px] text-indigo-500">天数</p>
+                          <p className="text-xs font-bold text-indigo-800 tabular-nums">{sleepActiveDays}天</p>
+                        </div>
+                      </div>
+                      <StableResponsiveChart className="min-w-0 h-56 sm:h-64 -ml-2">
+                        <BarChart data={sleepChartData} margin={{ top: 28, right: 5, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
+                          <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#475569' }} axisLine={{ stroke: '#a5b4fc' }} tickLine={{ stroke: '#a5b4fc' }} />
+                          <YAxis tick={{ fontSize: 11, fill: '#475569' }} tickFormatter={(v) => `${v}h`} axisLine={{ stroke: '#a5b4fc' }} tickLine={{ stroke: '#a5b4fc' }} />
+                          <Tooltip content={({ active, payload, label }) => {
+                            if (!active || !payload?.length) return null
+                            const d = payload[0].payload as typeof sleepChartData[number]
+                            const durationStr = d.hours > 0
+                              ? (d.minutes > 0 ? `${d.hours}h ${d.minutes}m` : `${d.hours}h`)
+                              : (d.minutes > 0 ? `${d.minutes}m` : '无记录')
                             return (
-                              <text x={(x as number) + (width as number) / 2} y={(y as number) - 6} textAnchor="middle" fontSize={10} fontWeight={600} fill="#4f46e5">
-                                {value}h{count ? ` ×${count}` : ''}
-                              </text>
+                              <div className="rounded-lg border border-indigo-100 bg-white px-3 py-2 text-xs shadow-md">
+                                <p className="font-semibold text-gray-900">{label}</p>
+                                <p className="mt-1 text-indigo-600">时长：{durationStr}</p>
+                                <p className="text-purple-600">次数：{d.睡眠次数}次</p>
+                              </div>
                             )
                           }} />
-                        </Bar>
-                      </BarChart>
-                    </StableResponsiveChart>
+                          <Bar dataKey="睡眠时长" fill="#818cf8" name="睡眠时长(小时)" radius={[3, 3, 0, 0]} barSize={18}>
+                            <LabelList content={({ x, y, width, index }) => {
+                              const d = sleepChartData[index as number]
+                              if (!d || d.totalMinutes === 0) return null
+                              const durationLabel = d.hours > 0
+                                ? (d.minutes > 0 ? `${d.hours}h${d.minutes}m` : `${d.hours}h`)
+                                : `${d.minutes}m`
+                              return (
+                                <text
+                                  x={(x as number) + (width as number) / 2}
+                                  y={(y as number) - 6}
+                                  textAnchor="middle"
+                                  fontSize={10}
+                                  fontWeight={600}
+                                  fill="#4f46e5"
+                                >
+                                  {durationLabel}
+                                </text>
+                              )
+                            }} />
+                          </Bar>
+                        </BarChart>
+                      </StableResponsiveChart>
+                    </>
                   ) : (
                     <StatsEmptyState
                       icon={Moon}

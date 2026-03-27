@@ -284,6 +284,7 @@ export function validateHealthInput(body: Record<string, unknown>) {
     validateBoolean(body.adGiven, 'AD补充'),
     validateDateString(body.sleepStartTime, '入睡时间'),
     validateDateString(body.sleepEndTime, '醒来时间'),
+    validateDateOrder(body.sleepStartTime, body.sleepEndTime, '入睡时间', '醒来时间'),
     validateString(body.sleepQuality, '睡眠质量', 200),
     validateDateString(body.recordedAt, '记录时间'),
     validateString(body.notes, '备注', 1000)
