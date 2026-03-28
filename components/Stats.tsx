@@ -116,12 +116,10 @@ function makeSparseLabel(
   const step = totalPoints > THRESHOLD ? Math.max(2, Math.floor(totalPoints / 4)) : 1
 
   return function SparseLabel(props: LabelProps) {
-    const { x, y, width, index } = props as LabelProps & {
+    const { x, y, width, index, value } = props as LabelProps & {
       x: number; y: number; width?: number; index: number
     }
-    const payload = (props as LabelProps & { payload?: Record<string, unknown> }).payload
-    const value = payload?.[dataKey]
-    if (value == null) return null
+    if (value == null || value === '') return null
 
     const isFirst = index === 0
     const isLast = index === totalPoints - 1
@@ -163,10 +161,8 @@ function makeWHOSparseLabel(
   let seenIndex = -1
 
   return function WHOSparseLabel(props: LabelProps) {
-    const { x, y } = props as LabelProps & { x: number; y: number }
-    const payload = (props as LabelProps & { payload?: Record<string, unknown> }).payload
-    const value = payload?.[dataKey]
-    if (value == null) return null
+    const { x, y, value } = props as LabelProps & { x: number; y: number }
+    if (value == null || value === '') return null
 
     seenIndex++
     const localIdx = seenIndex
@@ -207,6 +203,40 @@ export default function StatsComponent({
   const formatTrendTooltipLabel = (value: number) => {
     const date = new Date(value)
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+  }
+
+  /**
+   * 根据日期字符串或时间戳，计算宝宝在该日的月龄和天数。
+   * 返回如 "3月12天" 或 "25天"，无出生日期时返回 null。
+   */
+  const formatBabyAge = (dateInput: string | number): string | null => {
+    if (!stats?.babyBirthDate) return null
+    const birth = new Date(stats.babyBirthDate)
+    const target = typeof dateInput === 'number' ? new Date(dateInput) : new Date(dateInput)
+    const totalDays = Math.floor((target.getTime() - birth.getTime()) / (1000 * 60 * 60 * 24))
+    if (totalDays < 0) return null
+    const months = Math.floor(totalDays / 30.4375)
+    const days = Math.floor(totalDays - months * 30.4375)
+    if (months <= 0) return `${totalDays}天`
+    return `${months}月${days}天`
+  }
+
+  /** 通用 tooltip 渲染：自动从 payload[0].payload.rawDate 或 timestamp 计算月龄 */
+  const renderTooltipWithAge = (
+    { active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; payload?: Record<string, unknown> }>; label?: string | number },
+    formatItems: (items: Array<{ name: string; value: number }>) => React.ReactNode,
+  ) => {
+    if (!active || !payload?.length) return null
+    const raw = payload[0].payload as Record<string, unknown> | undefined
+    const rawDate = raw?.rawDate as string | undefined
+    const timestamp = raw?.timestamp as number | undefined
+    const ageStr = rawDate ? formatBabyAge(rawDate) : timestamp ? formatBabyAge(timestamp) : null
+    return (
+      <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs shadow-md">
+        <p className="font-semibold text-gray-900">{label}{ageStr ? <span className="ml-1.5 font-normal text-gray-400">({ageStr})</span> : null}</p>
+        {formatItems(payload.map(p => ({ name: p.name, value: p.value })))}
+      </div>
+    )
   }
 
   const formatMinutes = (minutes: number) => {
@@ -350,6 +380,7 @@ export default function StatsComponent({
     const parts = day.date.split('-')
     return {
       date: `${parseInt(parts[1])}/${parseInt(parts[2])}`,
+      rawDate: day.date,
       母乳时长: day.totalBreastDuration,
       母乳瓶喂量: day.totalBreastMilkAmount,
       奶粉量: day.totalFormulaAmount,
@@ -379,6 +410,7 @@ export default function StatsComponent({
     const parts = day.date.split('-')
     return {
       date: `${parseInt(parts[1])}/${parseInt(parts[2])}`,
+      rawDate: day.date,
       小便: day.peeCount,
       大便: day.poopCount,
     }
@@ -390,6 +422,7 @@ export default function StatsComponent({
     const parts = day.date.split('-')
     return {
       date: `${parseInt(parts[1])}/${parseInt(parts[2])}`,
+      rawDate: day.date,
       亲喂: day.breastFeedingCount,
       瓶喂: day.breastBottleCount,
       奶粉: day.formulaCount,
@@ -451,6 +484,7 @@ export default function StatsComponent({
     const parts = day.date.split('-')
     return {
       date: `${parseInt(parts[1])}/${parseInt(parts[2])}`,
+      rawDate: day.date,
       左乳: day.leftBreastDuration,
       右乳: day.rightBreastDuration,
     }
@@ -876,12 +910,13 @@ export default function StatsComponent({
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                         <YAxis tick={{ fontSize: 11 }} />
-                        <Tooltip formatter={(value, name) => {
-                          if (name === '亲喂时长(分钟)') {
-                            return [`${value}分钟`, name]
-                          }
-                          return [`${value}ml`, name]
-                        }} />
+                        <Tooltip content={(props) => renderTooltipWithAge(props as unknown as Parameters<typeof renderTooltipWithAge>[0], (items) => (
+                          <>
+                            {items.map(({ name, value }) => (
+                              <p key={name} className="mt-0.5 text-gray-600">{name}：{name.includes('分钟') ? `${value}分钟` : `${value}ml`}</p>
+                            ))}
+                          </>
+                        ))} />
                         <Legend wrapperStyle={{ fontSize: 12 }} />
                         <Bar dataKey="母乳时长" fill="#ec4899" name="亲喂时长(分钟)" radius={[2, 2, 0, 0]}>
                           <LabelList dataKey="母乳时长" position="top" fill="#ec4899" fontSize={10} fontWeight={600} />
@@ -913,7 +948,9 @@ export default function StatsComponent({
                           <CartesianGrid strokeDasharray="3 3" stroke="#dbeafe" />
                           <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#475569' }} axisLine={{ stroke: '#bfdbfe' }} tickLine={{ stroke: '#bfdbfe' }} />
                           <YAxis tick={{ fontSize: 11, fill: '#475569' }} axisLine={{ stroke: '#bfdbfe' }} tickLine={{ stroke: '#bfdbfe' }} />
-                          <Tooltip formatter={(value) => [`${value}ml`, '奶粉量']} />
+                          <Tooltip content={(props) => renderTooltipWithAge(props as unknown as Parameters<typeof renderTooltipWithAge>[0], (items) => (
+                            <p className="mt-0.5 text-gray-600">奶粉量：{items[0]?.value}ml</p>
+                          ))} />
                           <Legend wrapperStyle={{ fontSize: 12 }} />
                           <Bar dataKey="奶粉量" fill={palette.blue} name="奶粉量(ml)" radius={[2, 2, 0, 0]} barSize={18}>
                             <LabelList dataKey="奶粉量" position="top" fill={palette.blue} fontSize={10} fontWeight={600} />
@@ -1088,10 +1125,18 @@ export default function StatsComponent({
                             axisLine={{ stroke: '#99f6e4' }}
                             tickLine={{ stroke: '#99f6e4' }}
                           />
-                          <Tooltip
-                            labelFormatter={(value) => formatTrendTooltipLabel(Number(value))}
-                            formatter={(value) => [`${value} kg`, '体重']}
-                          />
+                          <Tooltip content={(props) => {
+                            const p = props as unknown as Parameters<typeof renderTooltipWithAge>[0]
+                            if (!p.active || !p.payload?.length) return null
+                            const ts = (p.payload[0].payload as Record<string, unknown>)?.timestamp as number
+                            const ageStr = ts ? formatBabyAge(ts) : null
+                            return (
+                              <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs shadow-md">
+                                <p className="font-semibold text-gray-900">{formatTrendTooltipLabel(ts)}{ageStr ? <span className="ml-1.5 font-normal text-gray-400">({ageStr})</span> : null}</p>
+                                <p className="mt-0.5 text-teal-600">体重：{p.payload[0].value} kg</p>
+                              </div>
+                            )
+                          }} />
                           <Line
                             type="monotone"
                             dataKey="体重"
@@ -1144,10 +1189,18 @@ export default function StatsComponent({
                             axisLine={{ stroke: '#c7d2fe' }}
                             tickLine={{ stroke: '#c7d2fe' }}
                           />
-                          <Tooltip
-                            labelFormatter={(value) => formatTrendTooltipLabel(Number(value))}
-                            formatter={(value) => [`${value} cm`, '身高']}
-                          />
+                          <Tooltip content={(props) => {
+                            const p = props as unknown as Parameters<typeof renderTooltipWithAge>[0]
+                            if (!p.active || !p.payload?.length) return null
+                            const ts = (p.payload[0].payload as Record<string, unknown>)?.timestamp as number
+                            const ageStr = ts ? formatBabyAge(ts) : null
+                            return (
+                              <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs shadow-md">
+                                <p className="font-semibold text-gray-900">{formatTrendTooltipLabel(ts)}{ageStr ? <span className="ml-1.5 font-normal text-gray-400">({ageStr})</span> : null}</p>
+                                <p className="mt-0.5 text-indigo-600">身高：{p.payload[0].value} cm</p>
+                              </div>
+                            )
+                          }} />
                           <Line
                             type="monotone"
                             dataKey="身高"
@@ -1204,9 +1257,10 @@ export default function StatsComponent({
                             content={({ active, payload }) => {
                               if (!active || !payload?.length) return null
                               const data = payload[0].payload as { timestamp: number; BMI: number; weight: number; height: number }
+                              const ageStr = formatBabyAge(data.timestamp)
                               return (
                                 <div className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs shadow-md">
-                                  <p className="mb-1 font-medium text-gray-700">{formatTrendTooltipLabel(data.timestamp)}</p>
+                                  <p className="mb-1 font-medium text-gray-700">{formatTrendTooltipLabel(data.timestamp)}{ageStr ? <span className="ml-1.5 font-normal text-gray-400">({ageStr})</span> : null}</p>
                                   <p className="text-emerald-600">BMI: <span className="font-semibold">{data.BMI}</span></p>
                                   <p className="mt-0.5 text-gray-500">体重: {data.weight}kg · 身高: {data.height}cm</p>
                                 </div>
@@ -1585,7 +1639,13 @@ export default function StatsComponent({
                         <CartesianGrid strokeDasharray="3 3" stroke="#fef3c7" />
                         <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#475569' }} axisLine={{ stroke: '#fcd34d' }} tickLine={{ stroke: '#fcd34d' }} />
                         <YAxis tick={{ fontSize: 11, fill: '#475569' }} axisLine={{ stroke: '#fcd34d' }} tickLine={{ stroke: '#fcd34d' }} />
-                        <Tooltip formatter={(value, name) => [`${value}次`, name]} />
+                        <Tooltip content={(props) => renderTooltipWithAge(props as unknown as Parameters<typeof renderTooltipWithAge>[0], (items) => (
+                          <>
+                            {items.map(({ name, value }) => (
+                              <p key={name} className="mt-0.5 text-gray-600">{name}：{value}次</p>
+                            ))}
+                          </>
+                        ))} />
                         <Legend wrapperStyle={{ fontSize: 12 }} />
                         <Bar dataKey="小便" fill="#60a5fa" name="小便" radius={[2, 2, 0, 0]} stackId="diaper" maxBarSize={32}>
                           <LabelList dataKey="小便" position="inside" fill="#fff" fontSize={10} fontWeight={600} />
@@ -1618,7 +1678,13 @@ export default function StatsComponent({
                         <CartesianGrid strokeDasharray="3 3" stroke="#f3e8ff" />
                         <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#475569' }} axisLine={{ stroke: '#d8b4fe' }} tickLine={{ stroke: '#d8b4fe' }} />
                         <YAxis tick={{ fontSize: 11, fill: '#475569' }} axisLine={{ stroke: '#d8b4fe' }} tickLine={{ stroke: '#d8b4fe' }} />
-                        <Tooltip formatter={(value, name) => [`${value}次`, name]} />
+                        <Tooltip content={(props) => renderTooltipWithAge(props as unknown as Parameters<typeof renderTooltipWithAge>[0], (items) => (
+                          <>
+                            {items.map(({ name, value }) => (
+                              <p key={name} className="mt-0.5 text-gray-600">{name}：{value}次</p>
+                            ))}
+                          </>
+                        ))} />
                         <Legend wrapperStyle={{ fontSize: 12 }} />
                         <Bar dataKey="亲喂" fill="#f472b6" name="亲喂" radius={[2, 2, 0, 0]} stackId="feed" maxBarSize={32}>
                           <LabelList dataKey="亲喂" position="inside" fill="#fff" fontSize={10} fontWeight={600} />
@@ -1654,7 +1720,13 @@ export default function StatsComponent({
                         <CartesianGrid strokeDasharray="3 3" stroke="#ffe4e6" />
                         <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#475569' }} axisLine={{ stroke: '#fda4af' }} tickLine={{ stroke: '#fda4af' }} />
                         <YAxis tick={{ fontSize: 11, fill: '#475569' }} tickFormatter={(v) => `${v}分`} axisLine={{ stroke: '#fda4af' }} tickLine={{ stroke: '#fda4af' }} />
-                        <Tooltip formatter={(value, name) => [`${value}分钟`, name]} />
+                        <Tooltip content={(props) => renderTooltipWithAge(props as unknown as Parameters<typeof renderTooltipWithAge>[0], (items) => (
+                          <>
+                            {items.map(({ name, value }) => (
+                              <p key={name} className="mt-0.5 text-gray-600">{name}：{value}分钟</p>
+                            ))}
+                          </>
+                        ))} />
                         <Legend wrapperStyle={{ fontSize: 12 }} />
                         <Bar dataKey="左乳" fill="#fb7185" name="左乳(分钟)" radius={[3, 3, 0, 0]} maxBarSize={28}>
                           <LabelList dataKey="左乳" position="top" fill="#e11d48" fontSize={10} fontWeight={600} />
@@ -1715,9 +1787,10 @@ export default function StatsComponent({
                             const durationStr = d.hours > 0
                               ? (d.minutes > 0 ? `${d.hours}h ${d.minutes}m` : `${d.hours}h`)
                               : (d.minutes > 0 ? `${d.minutes}m` : '无记录')
+                            const ageStr = d.rawDate ? formatBabyAge(d.rawDate) : null
                             return (
                               <div className="rounded-lg border border-indigo-100 bg-white px-3 py-2 text-xs shadow-md">
-                                <p className="font-semibold text-gray-900">{label}</p>
+                                <p className="font-semibold text-gray-900">{label}{ageStr ? <span className="ml-1.5 font-normal text-gray-400">({ageStr})</span> : null}</p>
                                 <p className="mt-1 text-indigo-600">时长：{durationStr}</p>
                                 <p className="text-purple-600">次数：{d.睡眠次数}次</p>
                               </div>
@@ -1887,9 +1960,13 @@ export default function StatsComponent({
                               if (!active || !payload?.length) return null
                               const data = payload[0]?.payload
                               if (!data) return null
+                              const ageMonths = data.ageMonths as number
+                              const months = Math.floor(ageMonths)
+                              const days = Math.round((ageMonths - months) * 30.4375)
+                              const ageDisplay = months > 0 ? `${months}月${days}天` : `${Math.round(ageMonths * 30.4375)}天`
                               return (
                                 <div className="rounded-lg border border-cyan-200 bg-white px-3 py-2 text-xs shadow-md">
-                                  <p className="mb-1 font-medium text-gray-700">{data.label || `${data.ageMonths}月龄`}</p>
+                                  <p className="mb-1 font-medium text-gray-700">{data.label || `${ageMonths.toFixed(1)}月龄`}<span className="ml-1.5 font-normal text-gray-400">({ageDisplay})</span></p>
                                   {data.宝宝体重 !== undefined && (
                                     <p className="text-teal-600 font-bold">宝宝: {data.宝宝体重} kg</p>
                                   )}
@@ -2045,9 +2122,13 @@ export default function StatsComponent({
                               if (!active || !payload?.length) return null
                               const data = payload[0]?.payload
                               if (!data) return null
+                              const ageMonths = data.ageMonths as number
+                              const months = Math.floor(ageMonths)
+                              const days = Math.round((ageMonths - months) * 30.4375)
+                              const ageDisplay = months > 0 ? `${months}月${days}天` : `${Math.round(ageMonths * 30.4375)}天`
                               return (
                                 <div className="rounded-lg border border-violet-200 bg-white px-3 py-2 text-xs shadow-md">
-                                  <p className="mb-1 font-medium text-gray-700">{data.label || `${data.ageMonths}月龄`}</p>
+                                  <p className="mb-1 font-medium text-gray-700">{data.label || `${ageMonths.toFixed(1)}月龄`}<span className="ml-1.5 font-normal text-gray-400">({ageDisplay})</span></p>
                                   {data.宝宝身高 !== undefined && (
                                     <p className="text-indigo-600 font-bold">宝宝: {data.宝宝身高} cm</p>
                                   )}
