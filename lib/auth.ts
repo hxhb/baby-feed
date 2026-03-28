@@ -135,7 +135,7 @@ export const authOptions: AuthOptions = {
 // 用于检测已被管理员删除但JWT尚未过期的用户
 const userExistsCache = new Map<string, { exists: boolean; expiry: number }>()
 const USER_CACHE_TTL = 5 * 60 * 1000 // 5分钟
-const USER_CACHE_MAX_SIZE = 5000
+const USER_CACHE_MAX_SIZE = 100
 
 async function checkUserExists(userId: string): Promise<boolean> {
   const now = Date.now()

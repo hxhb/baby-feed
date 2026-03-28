@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { formatBeijingTime, getBeijingToday, extractDateStr, parseDateAsBeijing } from '@/lib/time'
 import Link from 'next/link'
 import { 
@@ -253,6 +253,18 @@ export default function Dashboard({
     return `${months}月${days}天·第${totalDays + 1}天`
   }
 
+  const sortedTodayRecords = useMemo(() => {
+    return [...todayRecords, ...todayHealthRecords]
+      .sort((a, b) => {
+        const getTime = (rec: typeof a) => {
+          if (rec.recordType === 'feeding') return new Date(rec.startTime).getTime()
+          const hr = rec as HealthRecord
+          return new Date((hr.type === 'SLEEP' && hr.sleepStartTime) ? hr.sleepStartTime : hr.recordedAt).getTime()
+        }
+        return getTime(b) - getTime(a)
+      })
+  }, [todayRecords, todayHealthRecords])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -433,15 +445,7 @@ export default function Dashboard({
           </div>
         ) : (
           <div className="space-y-3">
-            {[...todayRecords, ...todayHealthRecords]
-              .sort((a, b) => {
-                const getTime = (rec: typeof a) => {
-                  if (rec.recordType === 'feeding') return new Date(rec.startTime).getTime()
-                  const hr = rec as HealthRecord
-                  return new Date((hr.type === 'SLEEP' && hr.sleepStartTime) ? hr.sleepStartTime : hr.recordedAt).getTime()
-                }
-                return getTime(b) - getTime(a)
-              })
+            {sortedTodayRecords
               .map((record) => {
                 const time = record.recordType === 'feeding'
                   ? (record as FeedingRecord).startTime

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { getBeijingNow, toBeijingISO } from '@/lib/time'
-import { invalidateRequestCache } from '@/lib/client-request-cache'
+import { invalidateRecordRelatedCaches } from '@/lib/cache-helpers'
 import { buildHealthRecordPayload, buildVaccineSuggestions, findSelectedVaccineSuggestion, type HealthFieldValues, type HealthType, type VaccineSuggestion } from '@/lib/health-records'
 import HealthRecordFields, { getHealthFieldValidationMessage } from '@/components/HealthRecordFields'
 import RecordActionBar from '@/components/RecordActionBar'
@@ -74,13 +74,6 @@ const emptyHealthDraft: HealthDraft = {
   adGiven: true
 }
 
-function invalidateRecordRelatedCaches(babyId: string) {
-  invalidateRequestCache(`/api/babies`)
-  invalidateRequestCache(`/api/feeding?babyId=${babyId}`)
-  invalidateRequestCache(`/api/health?babyId=${babyId}`)
-  invalidateRequestCache(`stats:${babyId}:`)
-  invalidateRequestCache(`timeline:${babyId}:`)
-}
 
 export default function HealthForm({
   initialType,
@@ -412,6 +405,7 @@ export default function HealthForm({
 
     setLoading(true)
 
+    let saved = false
     try {
       const data: Record<string, unknown> = {
         babyId,
@@ -428,23 +422,31 @@ export default function HealthForm({
       })
 
       if (response.ok) {
-        invalidateRecordRelatedCaches(babyId)
-        window.sessionStorage.removeItem(HEALTH_DRAFT_STORAGE_KEY)
-        window.sessionStorage.setItem('record_saved', '1')
-        onRecordSaved?.()
-        router.replace('/')
-        router.refresh()
-        return
+        saved = true
+      } else {
+        const error = await response.json()
+        const message = error.error || '保存失败'
+        setSubmitError(message)
       }
-
-      const error = await response.json()
-      const message = error.error || '保存失败'
-      setSubmitError(message)
     } catch (error) {
       console.error('保存失败:', error)
       setSubmitError('保存失败，请重试')
     } finally {
       setLoading(false)
+    }
+
+    // 保存成功后的跳转操作放在 try 外部，避免 router 异常触发假失败
+    if (saved) {
+      invalidateRecordRelatedCaches(babyId)
+      window.sessionStorage.removeItem(HEALTH_DRAFT_STORAGE_KEY)
+      window.sessionStorage.setItem('record_saved', '1')
+      onRecordSaved?.()
+      try {
+        router.replace('/')
+        router.refresh()
+      } catch {
+        // 导航错误不影响已保存的结果
+      }
     }
   }
 

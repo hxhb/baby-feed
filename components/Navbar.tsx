@@ -134,6 +134,7 @@ export default function Navbar() {
                 <Link
                   key={item.href}
                   href={item.href}
+                  aria-label={item.label}
                   aria-current={isActive ? 'page' : undefined}
                   onMouseEnter={() => prefetchRoute(item.href)}
                   onFocus={() => prefetchRoute(item.href)}
@@ -156,6 +157,7 @@ export default function Navbar() {
               <Link
                 key={item.href}
                 href={item.href}
+                aria-label={item.label}
                 aria-current={isActive ? 'page' : undefined}
                 onMouseEnter={() => prefetchRoute(item.href)}
                 onFocus={() => prefetchRoute(item.href)}

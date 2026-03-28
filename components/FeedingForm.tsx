@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { getBeijingNow, toBeijingISO } from '@/lib/time'
-import { invalidateRequestCache } from '@/lib/client-request-cache'
+import { invalidateRecordRelatedCaches } from '@/lib/cache-helpers'
 import { buildFeedingRecordPayload, getFeedingValidationMessage, getBreastModeFromType, type BreastMode, type FeedingFieldValues, type FeedingType } from '@/lib/feeding-records'
 import FeedingRecordFields from '@/components/FeedingRecordFields'
 import RecordActionBar from '@/components/RecordActionBar'
@@ -61,13 +61,6 @@ const emptyFeedingDraft: FeedingDraft = {
   solidFoodAmount: '',
 }
 
-function invalidateRecordRelatedCaches(babyId: string) {
-  invalidateRequestCache(`/api/babies`)
-  invalidateRequestCache(`/api/feeding?babyId=${babyId}`)
-  invalidateRequestCache(`/api/health?babyId=${babyId}`)
-  invalidateRequestCache(`stats:${babyId}:`)
-  invalidateRequestCache(`timeline:${babyId}:`)
-}
 
 export default function FeedingForm({
   initialType,
@@ -339,6 +332,7 @@ export default function FeedingForm({
 
     setLoading(true)
 
+    let saved = false
     try {
       const data: Record<string, unknown> = {
         babyId,
@@ -355,22 +349,30 @@ export default function FeedingForm({
       })
 
       if (response.ok) {
-        invalidateRecordRelatedCaches(babyId)
-        window.sessionStorage.removeItem(FEEDING_DRAFT_STORAGE_KEY)
-        window.sessionStorage.setItem('record_saved', '1')
-        onRecordSaved?.()
-        router.replace('/')
-        router.refresh()
-        return
+        saved = true
+      } else {
+        const error = await response.json()
+        setSubmitError(error.error || '保存失败')
       }
-
-      const error = await response.json()
-      setSubmitError(error.error || '保存失败')
     } catch (error) {
       console.error('保存失败:', error)
       setSubmitError('保存失败，请重试')
     } finally {
       setLoading(false)
+    }
+
+    // 保存成功后的跳转操作放在 try 外部，避免 router 异常触发假失败
+    if (saved) {
+      invalidateRecordRelatedCaches(babyId)
+      window.sessionStorage.removeItem(FEEDING_DRAFT_STORAGE_KEY)
+      window.sessionStorage.setItem('record_saved', '1')
+      onRecordSaved?.()
+      try {
+        router.replace('/')
+        router.refresh()
+      } catch {
+        // 导航错误不影响已保存的结果
+      }
     }
   }
 

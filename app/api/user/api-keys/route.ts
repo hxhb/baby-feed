@@ -20,6 +20,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: '未授权' }, { status: 401, headers: noStoreHeaders })
     }
 
+    const listRateLimit = enforceRateLimit({
+      key: buildUserActionKey('user-api-key-list', session.user.id, request),
+      limit: 60,
+      windowMs: 60 * 1000,
+    })
+    if (!listRateLimit.allowed) {
+      return NextResponse.json(
+        { error: '请求过于频繁，请稍后再试' },
+        {
+          status: 429,
+          headers: {
+            ...noStoreHeaders,
+            'Retry-After': String(listRateLimit.retryAfterSeconds),
+          },
+        }
+      )
+    }
+
     const keys = await prisma.apiKey.findMany({
       where: { userId: session.user.id },
       select: {
@@ -107,15 +125,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 检查用户已有 Key 数量
-    const existingCount = await prisma.apiKey.count({
-      where: { userId: session.user.id }
-    })
-
-    if (existingCount >= MAX_KEYS_PER_USER) {
-      return NextResponse.json({ error: `最多只能创建 ${MAX_KEYS_PER_USER} 个 API Key` }, { status: 400, headers: noStoreHeaders })
-    }
-
     // 生成 Key
     const { plainKey, keyHash, prefix } = generateApiKey()
 
@@ -124,23 +133,41 @@ export async function POST(request: NextRequest) {
       ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000)
       : null
 
-    // 存入数据库
-    const apiKey = await prisma.apiKey.create({
-      data: {
-        name: name.trim(),
-        prefix,
-        keyHash,
-        userId: session.user.id,
-        expiresAt,
-      },
-      select: {
-        id: true,
-        name: true,
-        prefix: true,
-        expiresAt: true,
-        createdAt: true,
+    // 使用事务确保 count+create 原子性，防止并发突破数量限制
+    let apiKey
+    try {
+      apiKey = await prisma.$transaction(async (tx) => {
+        const existingCount = await tx.apiKey.count({
+          where: { userId: session.user.id }
+        })
+
+        if (existingCount >= MAX_KEYS_PER_USER) {
+          throw new Error('LIMIT_EXCEEDED')
+        }
+
+        return tx.apiKey.create({
+          data: {
+            name: name.trim(),
+            prefix,
+            keyHash,
+            userId: session.user.id,
+            expiresAt,
+          },
+          select: {
+            id: true,
+            name: true,
+            prefix: true,
+            expiresAt: true,
+            createdAt: true,
+          }
+        })
+      })
+    } catch (txError) {
+      if (txError instanceof Error && txError.message === 'LIMIT_EXCEEDED') {
+        return NextResponse.json({ error: `最多只能创建 ${MAX_KEYS_PER_USER} 个 API Key` }, { status: 400, headers: noStoreHeaders })
       }
-    })
+      throw txError
+    }
 
     // ⚠️ 明文 Key 仅在此处返回一次
     return NextResponse.json({

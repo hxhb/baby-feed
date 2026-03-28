@@ -15,6 +15,7 @@ import {
   Legend,
   LabelList,
 } from 'recharts'
+import type { Props as LabelProps } from 'recharts/types/component/Label'
 import { Baby as BabyIcon, ChartColumn, Clock, Droplets, Milk, Moon, Pill, Ruler, Scale, Syringe, Thermometer, TrendingUp } from 'lucide-react'
 import { dedupeRequest, invalidateRequestCache } from '@/lib/client-request-cache'
 import type { PreloadedStatsData } from '@/lib/server-stats'
@@ -98,6 +99,98 @@ function StableResponsiveChart({
         : <div className="h-full w-full rounded-xl bg-white/40" />}
     </div>
   )
+}
+
+/**
+ * 智能稀疏标签渲染器：数据点多时只显示首末点 + 均匀间隔点的标签，
+ * 并上下交替偏移防止相邻标签重叠。
+ */
+function makeSparseLabel(
+  dataKey: string,
+  color: string,
+  unit: string,
+  totalPoints: number,
+) {
+  // 数据点 ≤ 5 时全部显示，> 5 时按间隔稀疏
+  const THRESHOLD = 5
+  const step = totalPoints > THRESHOLD ? Math.max(2, Math.floor(totalPoints / 4)) : 1
+
+  return function SparseLabel(props: LabelProps) {
+    const { x, y, width, index } = props as LabelProps & {
+      x: number; y: number; width?: number; index: number
+    }
+    const payload = (props as LabelProps & { payload?: Record<string, unknown> }).payload
+    const value = payload?.[dataKey]
+    if (value == null) return null
+
+    const isFirst = index === 0
+    const isLast = index === totalPoints - 1
+    const isStepHit = index % step === 0
+    if (!isFirst && !isLast && !isStepHit) return null
+
+    // 交替偏移：偶数索引向上 14px，奇数向上 26px
+    const offsetY = (index % 2 === 0) ? -14 : -26
+    const cx = (width != null) ? x + width / 2 : x
+
+    return (
+      <text
+        x={cx}
+        y={Math.max(10, y + offsetY)}
+        textAnchor="middle"
+        fontSize={10}
+        fontWeight={600}
+        fill={color}
+      >
+        {String(value)}{unit}
+      </text>
+    )
+  }
+}
+
+/**
+ * WHO 图表专用稀疏标签渲染器：
+ * 合并数据中大部分行的宝宝值是 null，只有实际记录点有值。
+ * 对有值的点做稀疏+交替偏移。
+ */
+function makeWHOSparseLabel(
+  dataKey: string,
+  color: string,
+  unit: string,
+  babyPointCount: number,
+) {
+  const THRESHOLD = 5
+  const step = babyPointCount > THRESHOLD ? Math.max(2, Math.floor(babyPointCount / 4)) : 1
+  let seenIndex = -1
+
+  return function WHOSparseLabel(props: LabelProps) {
+    const { x, y } = props as LabelProps & { x: number; y: number }
+    const payload = (props as LabelProps & { payload?: Record<string, unknown> }).payload
+    const value = payload?.[dataKey]
+    if (value == null) return null
+
+    seenIndex++
+    const localIdx = seenIndex
+
+    const isFirst = localIdx === 0
+    const isLast = localIdx === babyPointCount - 1
+    const isStepHit = localIdx % step === 0
+    if (!isFirst && !isLast && !isStepHit) return null
+
+    const offsetY = (localIdx % 2 === 0) ? -14 : -26
+
+    return (
+      <text
+        x={x}
+        y={Math.max(10, y + offsetY)}
+        textAnchor="middle"
+        fontSize={10}
+        fontWeight={700}
+        fill={color}
+      >
+        {String(value)}{unit}
+      </text>
+    )
+  }
 }
 
 export default function StatsComponent({
@@ -976,7 +1069,7 @@ export default function StatsComponent({
                     </div>
                     {weightData.length > 0 ? (
                       <StableResponsiveChart className="min-w-0 h-56 sm:h-64 -ml-2">
-                        <LineChart data={weightData} margin={{ top: 10, right: 15, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
+                        <LineChart data={weightData} margin={{ top: 30, right: 15, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#ccfbf1" />
                           <XAxis
                             dataKey="timestamp"
@@ -1009,11 +1102,7 @@ export default function StatsComponent({
                           >
                             <LabelList
                               dataKey="体重"
-                              position="top"
-                              fill={palette.teal}
-                              fontSize={11}
-                              fontWeight={600}
-                              formatter={(v) => `${v}kg`}
+                              content={makeSparseLabel('体重', palette.teal, 'kg', weightData.length)}
                             />
                           </Line>
                         </LineChart>
@@ -1036,7 +1125,7 @@ export default function StatsComponent({
                     </div>
                     {heightData.length > 0 ? (
                       <StableResponsiveChart className="min-w-0 h-56 sm:h-64 -ml-2">
-                        <LineChart data={heightData} margin={{ top: 10, right: 15, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
+                        <LineChart data={heightData} margin={{ top: 30, right: 15, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
                           <XAxis
                             dataKey="timestamp"
@@ -1069,11 +1158,7 @@ export default function StatsComponent({
                           >
                             <LabelList
                               dataKey="身高"
-                              position="top"
-                              fill={palette.indigo}
-                              fontSize={11}
-                              fontWeight={600}
-                              formatter={(v) => `${v}cm`}
+                              content={makeSparseLabel('身高', palette.indigo, 'cm', heightData.length)}
                             />
                           </Line>
                         </LineChart>
@@ -1097,7 +1182,7 @@ export default function StatsComponent({
                     </div>
                     {bmiData.length > 0 ? (
                       <StableResponsiveChart className="min-w-0 h-56 sm:h-64 -ml-2">
-                        <LineChart data={bmiData} margin={{ top: 10, right: 15, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
+                        <LineChart data={bmiData} margin={{ top: 30, right: 15, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#d1fae5" />
                           <XAxis
                             dataKey="timestamp"
@@ -1138,10 +1223,7 @@ export default function StatsComponent({
                           >
                             <LabelList
                               dataKey="BMI"
-                              position="top"
-                              fill={palette.emerald}
-                              fontSize={11}
-                              fontWeight={600}
+                              content={makeSparseLabel('BMI', palette.emerald, '', bmiData.length)}
                             />
                           </Line>
                         </LineChart>
@@ -1846,11 +1928,7 @@ export default function StatsComponent({
                           >
                             <LabelList
                               dataKey="宝宝体重"
-                              position="top"
-                              fill={palette.teal}
-                              fontSize={11}
-                              fontWeight={700}
-                              formatter={(v) => v != null ? `${v}kg` : ''}
+                              content={makeWHOSparseLabel('宝宝体重', palette.teal, 'kg', weightAgeData.length)}
                             />
                           </Line>
                         </ComposedChart>
@@ -2004,11 +2082,7 @@ export default function StatsComponent({
                           >
                             <LabelList
                               dataKey="宝宝身高"
-                              position="top"
-                              fill={palette.indigo}
-                              fontSize={11}
-                              fontWeight={700}
-                              formatter={(v) => v != null ? `${v}cm` : ''}
+                              content={makeWHOSparseLabel('宝宝身高', palette.indigo, 'cm', heightAgeData.length)}
                             />
                           </Line>
                         </ComposedChart>
