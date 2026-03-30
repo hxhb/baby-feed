@@ -659,6 +659,8 @@ export default function TimelineComponent({
     let peeCount = 0
     let poopCount = 0
     let hasAdVitamin = false
+    let sleepTotalMinutes = 0
+    let sleepCount = 0
 
     records.forEach((record) => {
       if (record.type === 'BREAST_MILK') {
@@ -691,6 +693,18 @@ export default function TimelineComponent({
       if (record.type === 'AD_VITAMIN' && (record as HealthRecord).adGiven) {
         hasAdVitamin = true
       }
+
+      if (record.type === 'SLEEP') {
+        const hr = record as HealthRecord
+        sleepCount += 1
+        if (hr.sleepStartTime && hr.sleepEndTime) {
+          const start = new Date(hr.sleepStartTime).getTime()
+          const end = new Date(hr.sleepEndTime).getTime()
+          if (end > start) {
+            sleepTotalMinutes += Math.round((end - start) / 60000)
+          }
+        }
+      }
     })
 
     return {
@@ -701,6 +715,8 @@ export default function TimelineComponent({
       peeCount,
       poopCount,
       hasAdVitamin,
+      sleepTotalMinutes,
+      sleepCount,
     }
   }, [records])
 
@@ -881,7 +897,7 @@ export default function TimelineComponent({
 
       <div className="bg-white rounded-2xl p-3 shadow-sm">
         <h3 className="font-bold text-gray-900 mb-2 text-sm">当日统计</h3>
-        <div className="grid grid-cols-4 gap-2 text-center">
+        <div className="grid grid-cols-5 gap-1.5 text-center">
           <div>
             <p className="text-xl font-bold text-pink-600">{timelineSummary.breastFeedingCount + timelineSummary.breastBottleCount}</p>
             <p className="text-xs text-gray-500">母乳</p>
@@ -901,6 +917,19 @@ export default function TimelineComponent({
               {timelineSummary.poopCount}
             </p>
             <p className="text-xs text-gray-500">小便/大便</p>
+          </div>
+          <div>
+            <p className="text-xl font-bold text-indigo-600">
+              {timelineSummary.sleepTotalMinutes > 0
+                ? (timelineSummary.sleepTotalMinutes >= 60
+                    ? `${Math.floor(timelineSummary.sleepTotalMinutes / 60)}h${timelineSummary.sleepTotalMinutes % 60 > 0 ? `${timelineSummary.sleepTotalMinutes % 60}m` : ''}`
+                    : `${timelineSummary.sleepTotalMinutes}m`)
+                : '—'}
+            </p>
+            <p className="text-xs text-gray-500">睡眠</p>
+            {timelineSummary.sleepCount > 0 && (
+              <p className="text-[10px] text-gray-400 leading-tight mt-0.5">{timelineSummary.sleepCount}次</p>
+            )}
           </div>
           <div>
             <p className="text-xl font-bold text-orange-600">{timelineSummary.hasAdVitamin ? '✓' : '○'}</p>

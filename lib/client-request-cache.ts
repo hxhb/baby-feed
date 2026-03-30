@@ -4,7 +4,7 @@ interface CacheEntry<T> {
 }
 
 const requestCache = new Map<string, CacheEntry<unknown>>()
-const DEFAULT_TTL_MS = 10 * 1000
+const DEFAULT_TTL_MS = 3 * 1000
 const MAX_CACHE_ENTRIES = 200
 
 function cleanupExpiredEntries(now: number) {

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { formatBeijingTime, getBeijingToday, extractDateStr, parseDateAsBeijing } from '@/lib/time'
+import { invalidateRequestCache } from '@/lib/client-request-cache'
 import Link from 'next/link'
 import { 
   Baby as BabyIcon, 
@@ -142,8 +143,12 @@ export default function Dashboard({
     if (typeof window !== 'undefined' && window.sessionStorage.getItem('record_saved')) {
       window.sessionStorage.removeItem('record_saved')
       setFreshFetch(true)
+      // Immediately invalidate caches and trigger fetch in next tick
+      if (resolvedSelectedBabyId) {
+        invalidateRequestCache()
+      }
     }
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSelectBaby = useCallback((id: string | null) => {
     if (onSelectBaby) {
