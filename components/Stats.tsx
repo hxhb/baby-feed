@@ -386,6 +386,9 @@ export default function StatsComponent({
       母乳时长: day.totalBreastDuration,
       母乳瓶喂量: day.totalBreastMilkAmount,
       奶粉量: day.totalFormulaAmount,
+      亲喂次数: day.breastFeedingCount,
+      瓶喂次数: day.breastBottleCount,
+      奶粉次数: day.formulaCount,
     }
   }) || []
 
@@ -900,11 +903,11 @@ export default function StatsComponent({
                 </div>
 
                 <div className="mt-4 grid gap-4 xl:grid-cols-2">
-                  <div className="min-w-0 rounded-2xl border border-pink-100 bg-pink-50/30 p-3">
+                  <div className="min-w-0 rounded-2xl border border-pink-100 bg-gradient-to-br from-pink-50/30 to-blue-50/30 p-3 xl:col-span-2">
                     <div className="mb-3 flex items-center justify-between gap-2">
                       <div>
-                        <p className="text-sm font-semibold text-gray-900">母乳趋势</p>
-                        <p className="mt-1 text-xs text-gray-500">亲喂时长 + 瓶喂母乳量</p>
+                        <p className="text-sm font-semibold text-gray-900">喂养趋势</p>
+                        <p className="mt-1 text-xs text-gray-500">母乳亲喂 + 瓶喂母乳 + 奶粉</p>
                       </div>
                     </div>
                     <StableResponsiveChart className="min-w-0 h-56 sm:h-72 -ml-2">
@@ -914,9 +917,19 @@ export default function StatsComponent({
                         <YAxis tick={{ fontSize: 11 }} />
                         <Tooltip content={(props) => renderTooltipWithAge(props as unknown as Parameters<typeof renderTooltipWithAge>[0], (items) => (
                           <>
-                            {items.map(({ name, value }) => (
-                              <p key={name} className="mt-0.5 text-gray-600">{name}：{name.includes('分钟') ? `${value}分钟` : `${value}ml`}</p>
-                            ))}
+                            {items.map(({ name, value }) => {
+                              const d = (props as unknown as { payload?: Array<{ payload: typeof chartData[number] }> }).payload?.[0]?.payload
+                              let countStr = ''
+                              let dotColor = '#6b7280'
+                              if (name.includes('亲喂')) { dotColor = '#ec4899'; if (d) countStr = `（${d.亲喂次数}次）` }
+                              else if (name.includes('瓶喂')) { dotColor = '#a855f7'; if (d) countStr = `（${d.瓶喂次数}次）` }
+                              else if (name.includes('奶粉')) { dotColor = palette.blue; if (d) countStr = `（${d.奶粉次数}次）` }
+                              return (
+                                <p key={name} className="mt-0.5 text-gray-600">
+                                  <span style={{ color: dotColor }}>●</span> {name}：{name.includes('分钟') ? `${value}分钟` : `${value}ml`}{countStr}
+                                </p>
+                              )
+                            })}
                           </>
                         ))} />
                         <Legend wrapperStyle={{ fontSize: 12 }} />
@@ -926,40 +939,11 @@ export default function StatsComponent({
                         <Bar dataKey="母乳瓶喂量" fill="#a855f7" name="瓶喂量(ml)" radius={[2, 2, 0, 0]}>
                           <LabelList dataKey="母乳瓶喂量" position="top" fill="#a855f7" fontSize={10} fontWeight={600} />
                         </Bar>
+                        <Bar dataKey="奶粉量" fill={palette.blue} name="奶粉量(ml)" radius={[2, 2, 0, 0]}>
+                          <LabelList dataKey="奶粉量" position="top" fill={palette.blue} fontSize={10} fontWeight={600} />
+                        </Bar>
                       </BarChart>
                     </StableResponsiveChart>
-                  </div>
-
-                  <div className="min-w-0 rounded-2xl border border-blue-100 bg-blue-50/40 p-3">
-                    <div className="mb-3 flex items-center justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900">奶粉趋势</p>
-                        <p className="mt-1 text-xs text-blue-700">查看每日奶粉摄入量</p>
-                      </div>
-                    </div>
-                    {chartData.every(day => day.奶粉量 === 0) ? (
-                      <StatsEmptyState
-                        icon={Milk}
-                        title="当前周期暂无奶粉记录"
-                        description="添加奶粉喂养后，这里会展示每日摄入量趋势"
-                        className="py-10 text-center text-gray-400"
-                      />
-                    ) : (
-                      <StableResponsiveChart className="min-w-0 h-56 sm:h-72 -ml-2">
-                        <BarChart data={chartData} margin={{ top: 25, right: 5, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#dbeafe" />
-                          <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#475569' }} axisLine={{ stroke: '#bfdbfe' }} tickLine={{ stroke: '#bfdbfe' }} />
-                          <YAxis tick={{ fontSize: 11, fill: '#475569' }} axisLine={{ stroke: '#bfdbfe' }} tickLine={{ stroke: '#bfdbfe' }} />
-                          <Tooltip content={(props) => renderTooltipWithAge(props as unknown as Parameters<typeof renderTooltipWithAge>[0], (items) => (
-                            <p className="mt-0.5 text-gray-600">奶粉量：{items[0]?.value}ml</p>
-                          ))} />
-                          <Legend wrapperStyle={{ fontSize: 12 }} />
-                          <Bar dataKey="奶粉量" fill={palette.blue} name="奶粉量(ml)" radius={[2, 2, 0, 0]} barSize={18}>
-                            <LabelList dataKey="奶粉量" position="top" fill={palette.blue} fontSize={10} fontWeight={600} />
-                          </Bar>
-                        </BarChart>
-                      </StableResponsiveChart>
-                    )}
                   </div>
 
                   {/* Feeding heatmap */}
@@ -1097,6 +1081,72 @@ export default function StatsComponent({
                         </div>
                       )
                     })()}
+                  </div>
+
+                  {/* Sleep duration trend - side by side with heatmap on PC */}
+                  <div className="min-w-0 rounded-2xl border border-indigo-100 bg-indigo-50/30 p-3">
+                    <div className="mb-3 flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">每日睡眠趋势</p>
+                        <p className="mt-1 text-xs text-indigo-700">按自然日统计睡眠时长与次数</p>
+                      </div>
+                    </div>
+                    {hasSleepData ? (
+                      <>
+                        {/* Summary row */}
+                        <div className="mb-2 flex items-stretch gap-1.5">
+                          <div className="flex flex-1 items-center gap-1.5 rounded-lg bg-indigo-100/60 px-2 py-1.5">
+                            <p className="shrink-0 text-[10px] text-indigo-500">日均</p>
+                            <p className="text-xs font-bold text-indigo-800 tabular-nums">
+                              {avgSleepHours > 0 ? `${avgSleepHours}h` : ''}{avgSleepMins > 0 ? `${avgSleepMins}m` : ''}{avgSleepMinutes === 0 ? '—' : ''}
+                            </p>
+                          </div>
+                          <div className="flex flex-1 items-center gap-1.5 rounded-lg bg-indigo-100/60 px-2 py-1.5">
+                            <p className="shrink-0 text-[10px] text-indigo-500">最长</p>
+                            <p className="text-xs font-bold text-indigo-800 tabular-nums">
+                              {peakSleepDay && peakSleepDay.totalMinutes > 0
+                                ? `${Math.floor(peakSleepDay.totalMinutes / 60)}h${peakSleepDay.totalMinutes % 60 > 0 ? `${peakSleepDay.totalMinutes % 60}m` : ''}`
+                                : '—'}
+                            </p>
+                          </div>
+                          <div className="flex flex-1 items-center gap-1.5 rounded-lg bg-indigo-100/60 px-2 py-1.5">
+                            <p className="shrink-0 text-[10px] text-indigo-500">天数</p>
+                            <p className="text-xs font-bold text-indigo-800 tabular-nums">{sleepActiveDays}天</p>
+                          </div>
+                        </div>
+                        <StableResponsiveChart className="min-w-0 h-56 sm:h-64 -ml-2">
+                          <BarChart data={sleepChartData} margin={{ top: 22, right: 5, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
+                            <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#475569' }} axisLine={{ stroke: '#a5b4fc' }} tickLine={{ stroke: '#a5b4fc' }} />
+                            <YAxis tick={{ fontSize: 11, fill: '#475569' }} tickFormatter={(v) => `${v}h`} axisLine={{ stroke: '#a5b4fc' }} tickLine={{ stroke: '#a5b4fc' }} domain={[0, (dataMax: number) => Math.ceil(dataMax) + 1]} />
+                            <Tooltip content={({ active, payload, label }) => {
+                              if (!active || !payload?.length) return null
+                              const d = payload[0].payload as typeof sleepChartData[number]
+                              const durationStr = d.hours > 0
+                                ? (d.minutes > 0 ? `${d.hours}h ${d.minutes}m` : `${d.hours}h`)
+                                : (d.minutes > 0 ? `${d.minutes}m` : '无记录')
+                              const ageStr = d.rawDate ? formatBabyAge(d.rawDate) : null
+                              return (
+                                <div className="rounded-lg border border-indigo-100 bg-white px-3 py-2 text-xs shadow-md">
+                                  <p className="font-semibold text-gray-900">{label}{ageStr ? <span className="ml-1.5 font-normal text-gray-400">({ageStr})</span> : null}</p>
+                                  <p className="mt-1 text-indigo-600">时长：{durationStr}</p>
+                                  <p className="text-purple-600">次数：{d.睡眠次数}次</p>
+                                </div>
+                              )
+                            }} />
+                            <Bar dataKey="睡眠时长" fill="#818cf8" name="睡眠时长(小时)" radius={[3, 3, 0, 0]} barSize={18}>
+                              <LabelList dataKey="sleepLabel" position="top" fill="#4f46e5" fontSize={10} fontWeight={600} />
+                            </Bar>
+                          </BarChart>
+                        </StableResponsiveChart>
+                      </>
+                    ) : (
+                      <StatsEmptyState
+                        icon={Moon}
+                        title="暂无睡眠记录"
+                        description="添加睡眠记录后，这里会展示每日睡眠趋势"
+                      />
+                    )}
                   </div>
 
                   <div className="min-w-0 rounded-2xl border border-teal-100 bg-teal-50/40 p-3">
@@ -1294,72 +1344,6 @@ export default function StatsComponent({
                   </div>
 
                 </div>
-              </StatsPanel>
-
-              {/* Sleep duration trend */}
-              <StatsPanel className="p-3">
-                <div className="mb-3 flex items-center justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">每日睡眠趋势</p>
-                    <p className="mt-1 text-xs text-indigo-700">按自然日统计睡眠时长与次数</p>
-                  </div>
-                </div>
-                {hasSleepData ? (
-                  <>
-                    {/* Summary row */}
-                    <div className="mb-2 flex items-stretch gap-1.5">
-                      <div className="flex flex-1 items-center gap-1.5 rounded-lg bg-indigo-100/60 px-2 py-1.5">
-                        <p className="shrink-0 text-[10px] text-indigo-500">日均</p>
-                        <p className="text-xs font-bold text-indigo-800 tabular-nums">
-                          {avgSleepHours > 0 ? `${avgSleepHours}h` : ''}{avgSleepMins > 0 ? `${avgSleepMins}m` : ''}{avgSleepMinutes === 0 ? '—' : ''}
-                        </p>
-                      </div>
-                      <div className="flex flex-1 items-center gap-1.5 rounded-lg bg-indigo-100/60 px-2 py-1.5">
-                        <p className="shrink-0 text-[10px] text-indigo-500">最长</p>
-                        <p className="text-xs font-bold text-indigo-800 tabular-nums">
-                          {peakSleepDay && peakSleepDay.totalMinutes > 0
-                            ? `${Math.floor(peakSleepDay.totalMinutes / 60)}h${peakSleepDay.totalMinutes % 60 > 0 ? `${peakSleepDay.totalMinutes % 60}m` : ''}`
-                            : '—'}
-                        </p>
-                      </div>
-                      <div className="flex flex-1 items-center gap-1.5 rounded-lg bg-indigo-100/60 px-2 py-1.5">
-                        <p className="shrink-0 text-[10px] text-indigo-500">天数</p>
-                        <p className="text-xs font-bold text-indigo-800 tabular-nums">{sleepActiveDays}天</p>
-                      </div>
-                    </div>
-                    <StableResponsiveChart className="min-w-0 h-56 sm:h-64 -ml-2">
-                      <BarChart data={sleepChartData} margin={{ top: 22, right: 5, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
-                        <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#475569' }} axisLine={{ stroke: '#a5b4fc' }} tickLine={{ stroke: '#a5b4fc' }} />
-                        <YAxis tick={{ fontSize: 11, fill: '#475569' }} tickFormatter={(v) => `${v}h`} axisLine={{ stroke: '#a5b4fc' }} tickLine={{ stroke: '#a5b4fc' }} domain={[0, (dataMax: number) => Math.ceil(dataMax) + 1]} />
-                        <Tooltip content={({ active, payload, label }) => {
-                          if (!active || !payload?.length) return null
-                          const d = payload[0].payload as typeof sleepChartData[number]
-                          const durationStr = d.hours > 0
-                            ? (d.minutes > 0 ? `${d.hours}h ${d.minutes}m` : `${d.hours}h`)
-                            : (d.minutes > 0 ? `${d.minutes}m` : '无记录')
-                          const ageStr = d.rawDate ? formatBabyAge(d.rawDate) : null
-                          return (
-                            <div className="rounded-lg border border-indigo-100 bg-white px-3 py-2 text-xs shadow-md">
-                              <p className="font-semibold text-gray-900">{label}{ageStr ? <span className="ml-1.5 font-normal text-gray-400">({ageStr})</span> : null}</p>
-                              <p className="mt-1 text-indigo-600">时长：{durationStr}</p>
-                              <p className="text-purple-600">次数：{d.睡眠次数}次</p>
-                            </div>
-                          )
-                        }} />
-                        <Bar dataKey="睡眠时长" fill="#818cf8" name="睡眠时长(小时)" radius={[3, 3, 0, 0]} barSize={18}>
-                          <LabelList dataKey="sleepLabel" position="top" fill="#4f46e5" fontSize={10} fontWeight={600} />
-                        </Bar>
-                      </BarChart>
-                    </StableResponsiveChart>
-                  </>
-                ) : (
-                  <StatsEmptyState
-                    icon={Moon}
-                    title="暂无睡眠记录"
-                    description="添加睡眠记录后，这里会展示每日睡眠趋势"
-                  />
-                )}
               </StatsPanel>
 
               <StatsPanel className="p-3">
