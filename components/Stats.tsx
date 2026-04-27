@@ -1726,7 +1726,7 @@ export default function StatsComponent({
                   </div>
                   {hasFeedingStructureData ? (
                     <StableResponsiveChart className="min-w-0 h-56 sm:h-72 -ml-2">
-                      <BarChart data={feedingStructureData} margin={{ top: 25, right: 5, left: -10, bottom: 0 }} barCategoryGap="25%" style={{ outline: 'none' }}>
+                      <BarChart data={feedingStructureData} margin={{ top: 20, right: 5, left: -10, bottom: 0 }} barCategoryGap="25%" style={{ outline: 'none' }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f3e8ff" />
                         <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#475569' }} axisLine={{ stroke: '#d8b4fe' }} tickLine={{ stroke: '#d8b4fe' }} />
                         <YAxis tick={{ fontSize: 11, fill: '#475569' }} axisLine={{ stroke: '#d8b4fe' }} tickLine={{ stroke: '#d8b4fe' }} />
@@ -1739,13 +1739,22 @@ export default function StatsComponent({
                         ))} />
                         <Legend wrapperStyle={{ fontSize: 12 }} />
                         <Bar dataKey="亲喂" fill="#f472b6" name="亲喂" radius={[2, 2, 0, 0]} stackId="feed" maxBarSize={32}>
-                          <LabelList dataKey="亲喂" position="inside" fill="#fff" fontSize={10} fontWeight={600} />
+                          <LabelList dataKey="亲喂" content={({ x, y, width, height, value }) => {
+                            if (!value || Number(value) === 0 || !height || Number(height) < 16 || !width || Number(width) < 14) return null
+                            return <text x={Number(x) + Number(width) / 2} y={Number(y) + Number(height) / 2} textAnchor="middle" dominantBaseline="central" fill="#fff" fontSize={9} fontWeight={600}>{value}</text>
+                          }} />
                         </Bar>
                         <Bar dataKey="瓶喂" fill="#a78bfa" name="瓶喂" radius={[2, 2, 0, 0]} stackId="feed" maxBarSize={32}>
-                          <LabelList dataKey="瓶喂" position="inside" fill="#fff" fontSize={10} fontWeight={600} />
+                          <LabelList dataKey="瓶喂" content={({ x, y, width, height, value }) => {
+                            if (!value || Number(value) === 0 || !height || Number(height) < 16 || !width || Number(width) < 14) return null
+                            return <text x={Number(x) + Number(width) / 2} y={Number(y) + Number(height) / 2} textAnchor="middle" dominantBaseline="central" fill="#fff" fontSize={9} fontWeight={600}>{value}</text>
+                          }} />
                         </Bar>
                         <Bar dataKey="奶粉" fill="#60a5fa" name="奶粉" radius={[2, 2, 0, 0]} stackId="feed" maxBarSize={32}>
-                          <LabelList dataKey="奶粉" position="top" fill="#60a5fa" fontSize={10} fontWeight={600} />
+                          <LabelList dataKey="奶粉" content={({ x, y, width, value }) => {
+                            if (!value || Number(value) === 0 || !width || Number(width) < 14) return null
+                            return <text x={Number(x) + Number(width) / 2} y={Number(y) - 5} textAnchor="middle" fill="#60a5fa" fontSize={9} fontWeight={600}>{value}</text>
+                          }} />
                         </Bar>
                       </BarChart>
                     </StableResponsiveChart>
