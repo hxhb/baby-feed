@@ -662,6 +662,10 @@ export default function TimelineComponent({
     let sleepTotalMinutes = 0
     let sleepCount = 0
 
+    // Current day boundaries in Beijing time (for clamping cross-midnight sleep)
+    const dayStartMs = new Date(`${currentDateStr}T00:00:00+08:00`).getTime()
+    const dayEndMs = new Date(`${currentDateStr}T23:59:59.999+08:00`).getTime()
+
     records.forEach((record) => {
       if (record.type === 'BREAST_MILK') {
         breastFeedingCount += 1
@@ -701,7 +705,13 @@ export default function TimelineComponent({
           const start = new Date(hr.sleepStartTime).getTime()
           const end = new Date(hr.sleepEndTime).getTime()
           if (end > start) {
-            sleepTotalMinutes += Math.round((end - start) / 60000)
+            // Clamp to current day boundaries (Beijing time) so cross-midnight
+            // sleep is split by natural day rather than counted in full
+            const clampedStart = Math.max(start, dayStartMs)
+            const clampedEnd = Math.min(end, dayEndMs)
+            if (clampedEnd > clampedStart) {
+              sleepTotalMinutes += Math.round((clampedEnd - clampedStart) / 60000)
+            }
           }
         }
       }
@@ -718,7 +728,7 @@ export default function TimelineComponent({
       sleepTotalMinutes,
       sleepCount,
     }
-  }, [records])
+  }, [records, currentDateStr])
 
   if (loading) {
     return (

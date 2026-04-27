@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { getPreloadedBabies } from '@/lib/server-babies'
 import { getServerSession } from '@/lib/server-auth'
-import { getBeijingDateStr, getBeijingDayRange, getBeijingTodayStr, getBeijingDaysAgoStr } from '@/lib/api-helpers'
+import { getBeijingDateStr, getBeijingDayRange, getBeijingTodayStr, getBeijingDaysAgoStr, splitDurationByBeijingDay } from '@/lib/api-helpers'
 
 export interface PreloadedStatsBaby {
   id: string
@@ -298,30 +298,19 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
 
     // SLEEP: split duration across natural day boundaries (Beijing time)
     if (record.type === 'SLEEP' && record.sleepStartTime && record.sleepEndTime) {
-      const startMs = new Date(record.sleepStartTime).getTime()
-      const endMs = new Date(record.sleepEndTime).getTime()
-      if (endMs > startMs) {
-        let cursor = startMs
-        while (cursor < endMs) {
-          const dayStr = getBeijingDateStr(new Date(cursor))
-          const { end: dayEnd } = getBeijingDayRange(dayStr)
-          const segmentEnd = Math.min(endMs, dayEnd.getTime() + 1) // +1 to include 23:59:59.999
-          const segmentMin = Math.round((segmentEnd - cursor) / (60 * 1000))
-          if (segmentMin > 0) {
-            const targetStats = statsMap.get(dayStr)
-            if (targetStats) {
-              targetStats.sleepDurationMinutes += segmentMin
-              // Count the sleep session only on the day it started
-              if (cursor === startMs) {
-                targetStats.sleepCount += 1
-              }
+      splitDurationByBeijingDay(
+        new Date(record.sleepStartTime).getTime(),
+        new Date(record.sleepEndTime).getTime(),
+        (dayStr, minutes, isStartDay) => {
+          const targetStats = statsMap.get(dayStr)
+          if (targetStats) {
+            targetStats.sleepDurationMinutes += minutes
+            if (isStartDay) {
+              targetStats.sleepCount += 1
             }
           }
-          // Advance to the start of the next Beijing day
-          const { end: thisDayEnd } = getBeijingDayRange(dayStr)
-          cursor = thisDayEnd.getTime() + 1
-        }
-      }
+        },
+      )
     }
   })
 
