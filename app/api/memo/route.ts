@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { validateMemoInput, validateId, validateDateOnlyString, validateInt, safeParseBody, validateSameOrigin } from '@/lib/validation'
+import { validateMemoInput, validateId, validateInt, safeParseBody, validateSameOrigin } from '@/lib/validation'
 import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
 import { noStoreHeaders } from '@/lib/api-helpers'
 
@@ -41,15 +41,29 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    if (completed !== null && completed !== 'true' && completed !== 'false') {
+      return NextResponse.json({ error: 'completed 参数值无效，应为 true 或 false' }, { status: 400, headers: noStoreHeaders })
+    }
+
     if (date) {
-      const dateCheck = validateDateOnlyString(date, '日期')
-      if (!dateCheck.valid) {
-        return NextResponse.json({ error: dateCheck.error }, { status: 400, headers: noStoreHeaders })
+      // Only validate format (YYYY-MM-DD), allow future dates for memo range queries
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return NextResponse.json({ error: '日期格式无效，应为 YYYY-MM-DD' }, { status: 400, headers: noStoreHeaders })
+      }
+      const parsed = new Date(`${date}T12:00:00+08:00`)
+      if (isNaN(parsed.getTime())) {
+        return NextResponse.json({ error: '日期不是有效的日期' }, { status: 400, headers: noStoreHeaders })
       }
     }
 
     if (rangeDays) {
+      if (!date) {
+        return NextResponse.json({ error: 'rangeDays 需要配合 date 参数使用' }, { status: 400, headers: noStoreHeaders })
+      }
       const parsedDays = Number(rangeDays)
+      if (isNaN(parsedDays)) {
+        return NextResponse.json({ error: '天数范围必须是数字' }, { status: 400, headers: noStoreHeaders })
+      }
       const daysCheck = validateInt(parsedDays, '天数范围', 1, 365)
       if (!daysCheck.valid) {
         return NextResponse.json({ error: daysCheck.error }, { status: 400, headers: noStoreHeaders })

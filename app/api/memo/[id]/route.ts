@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { validateMemoInput, validateId, safeParseBody, validateSameOrigin } from '@/lib/validation'
+import { validateId, safeParseBody, validateSameOrigin } from '@/lib/validation'
 import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
 import { noStoreHeaders } from '@/lib/api-helpers'
 
@@ -58,17 +58,55 @@ export async function PUT(
       return NextResponse.json({ error: '备忘不存在' }, { status: 404, headers: noStoreHeaders })
     }
 
-    // Build the merged body for validation (use existing values for unspecified fields)
-    const mergedBody = {
-      title: body.title !== undefined ? body.title : existingMemo.title,
-      content: body.content !== undefined ? body.content : existingMemo.content,
-      scheduledAt: body.scheduledAt !== undefined ? body.scheduledAt : existingMemo.scheduledAt.toISOString(),
-      completed: body.completed !== undefined ? body.completed : existingMemo.completed,
+    // Check if there's anything to update
+    const hasUpdate = body.title !== undefined || body.content !== undefined || body.scheduledAt !== undefined || body.completed !== undefined
+    if (!hasUpdate) {
+      return NextResponse.json({ error: '没有需要更新的字段' }, { status: 400, headers: noStoreHeaders })
     }
 
-    const validation = validateMemoInput(mergedBody)
-    if (!validation.valid) {
-      return NextResponse.json({ error: validation.error }, { status: 400, headers: noStoreHeaders })
+    // Validate individual fields before building merged body
+    if (body.title !== undefined) {
+      if (typeof body.title !== 'string') {
+        return NextResponse.json({ error: '备忘标题必须是字符串' }, { status: 400, headers: noStoreHeaders })
+      }
+      if (!body.title.trim()) {
+        return NextResponse.json({ error: '备忘标题不能为空' }, { status: 400, headers: noStoreHeaders })
+      }
+      if (body.title.length > 100) {
+        return NextResponse.json({ error: '备忘标题超出最大长度 (100)' }, { status: 400, headers: noStoreHeaders })
+      }
+    }
+
+    if (body.content !== undefined && body.content !== null) {
+      if (typeof body.content !== 'string') {
+        return NextResponse.json({ error: '备忘内容必须是字符串' }, { status: 400, headers: noStoreHeaders })
+      }
+      if (body.content.length > 500) {
+        return NextResponse.json({ error: '备忘内容超出最大长度 (500)' }, { status: 400, headers: noStoreHeaders })
+      }
+    }
+
+    if (body.scheduledAt !== undefined) {
+      if (typeof body.scheduledAt !== 'string') {
+        return NextResponse.json({ error: '备忘时间必须是字符串' }, { status: 400, headers: noStoreHeaders })
+      }
+      const scheduledDate = new Date(body.scheduledAt)
+      if (isNaN(scheduledDate.getTime())) {
+        return NextResponse.json({ error: '备忘时间不是有效的日期格式' }, { status: 400, headers: noStoreHeaders })
+      }
+      // Allow past dates (user may set a past reminder), only reject unreasonable ones (>100 years ago or >5 years in future)
+      const fiveYearsMs = 5 * 365 * 24 * 60 * 60 * 1000
+      const hundredYearsMs = 100 * 365 * 24 * 60 * 60 * 1000
+      const now = Date.now()
+      if (scheduledDate.getTime() > now + fiveYearsMs || scheduledDate.getTime() < now - hundredYearsMs) {
+        return NextResponse.json({ error: '备忘时间超出合理范围' }, { status: 400, headers: noStoreHeaders })
+      }
+    }
+
+    if (body.completed !== undefined) {
+      if (typeof body.completed !== 'boolean') {
+        return NextResponse.json({ error: '是否已完成必须是布尔值' }, { status: 400, headers: noStoreHeaders })
+      }
     }
 
     // Build update data
