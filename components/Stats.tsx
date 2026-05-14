@@ -16,7 +16,7 @@ import {
   LabelList,
 } from 'recharts'
 import type { Props as LabelProps } from 'recharts/types/component/Label'
-import { Baby as BabyIcon, ChartColumn, Clock, Droplets, Milk, Moon, Pill, Ruler, Scale, Syringe, Thermometer, TrendingUp } from 'lucide-react'
+import { Baby as BabyIcon, ChartColumn, ChevronDown, ChevronUp, Clock, Droplets, Milk, Moon, Pill, Ruler, Scale, Syringe, Thermometer, TrendingUp } from 'lucide-react'
 import { dedupeRequest, invalidateRequestCache } from '@/lib/client-request-cache'
 import type { PreloadedStatsData } from '@/lib/server-stats'
 import { StatsEmptyState, StatsPanel, StatsSegmentedTabs } from '@/components/StatsUi'
@@ -284,6 +284,7 @@ export default function StatsComponent({
   const [days, setDays] = useState(7)
   const [activeSubpage, setActiveSubpage] = useState<'dashboard' | 'insights'>('dashboard')
   const [freshFetch, setFreshFetch] = useState(false)
+  const [showCompletedVaccines, setShowCompletedVaccines] = useState(false)
   const hasInitialStats = !freshFetch && !!initialStats && selectedBabyId === initialStats.baby.id && days === 7
 
   // If a record was just saved, bypass SSR initial data and force a fresh fetch
@@ -1363,56 +1364,128 @@ export default function StatsComponent({
                   )}
                 </div>
                 {stats.vaccineRecords.length > 0 ? (
-                  <div className="mt-2.5 grid gap-2 sm:grid-cols-2">
-                    {vaccineProgressSummary.map(item => (
-                      <div key={item.vaccineName} className={`rounded-xl border p-3 ${item.isCompleted ? 'border-emerald-100 bg-emerald-50/30' : 'border-amber-100 bg-amber-50/20'}`}>
-                        {/* Header row: name + status + progress bar */}
-                        <div className="flex items-center gap-2">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5">
-                              <p className="text-sm font-bold text-gray-900 truncate">{item.vaccineName}</p>
-                              <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${item.isCompleted ? 'bg-emerald-200 text-emerald-800' : 'bg-amber-200 text-amber-800'}`}>
-                                {item.isCompleted ? '已完成' : `差${item.remainingDoses}针`}
-                              </span>
+                  <div className="mt-2.5">
+                    {/* Pending vaccines - always visible */}
+                    {pendingVaccines.length > 0 && (
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {vaccineProgressSummary.filter(v => !v.isCompleted).map(item => (
+                          <div key={item.vaccineName} className="rounded-xl border p-3 border-amber-100 bg-amber-50/20">
+                            {/* Header row: name + status + progress bar */}
+                            <div className="flex items-center gap-2">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5">
+                                  <p className="text-sm font-bold text-gray-900 truncate">{item.vaccineName}</p>
+                                  <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold bg-amber-200 text-amber-800">
+                                    差{item.remainingDoses}针
+                                  </span>
+                                </div>
+                                <div className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-500">
+                                  <span className="font-medium text-teal-600">{formatVaccineProgress(item.latestDoseNumber, item.totalDoses) || '未标注'}</span>
+                                  <span>·</span>
+                                  <span>{item.latestDate}</span>
+                                </div>
+                              </div>
+                              {/* Mini progress indicator */}
+                              {item.latestDoseNumber && item.totalDoses && (
+                                <div className="shrink-0 w-12">
+                                  <div className="flex h-2 overflow-hidden rounded-full bg-gray-100">
+                                    <div className="rounded-full transition-all bg-teal-500" style={{ width: `${Math.round((item.latestDoseNumber / item.totalDoses) * 100)}%` }} />
+                                  </div>
+                                  <p className="mt-0.5 text-center text-[10px] text-slate-400">{item.latestDoseNumber}/{item.totalDoses}</p>
+                                </div>
+                              )}
                             </div>
-                            <div className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-500">
-                              <span className="font-medium text-teal-600">{formatVaccineProgress(item.latestDoseNumber, item.totalDoses) || '未标注'}</span>
-                              <span>·</span>
-                              <span>{item.latestDate}</span>
+                            {/* Dose entries - compact inline */}
+                            <div className="mt-2 rounded-lg bg-white/70 px-2.5 py-2">
+                              <div className="space-y-1 text-xs leading-4 text-slate-600">
+                                {item.doseEntries.map(doseEntry => (
+                                  <div key={doseEntry.id} className="flex items-start gap-1">
+                                    <span className="shrink-0 text-slate-300 leading-4">•</span>
+                                    <p className="min-w-0 break-words">
+                                      <span className="font-semibold text-slate-700">
+                                        {formatVaccineProgress(doseEntry.doseNumber, doseEntry.totalDoses) || '未标注'}
+                                      </span>
+                                      {' · '}
+                                      <span className="text-slate-400">{formatRecordedSummaryTime(doseEntry.recordedAt)}</span>
+                                      {doseEntry.note ? (
+                                        <span className="text-slate-500">：{doseEntry.note}</span>
+                                      ) : null}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           </div>
-                          {/* Mini progress indicator */}
-                          {item.latestDoseNumber && item.totalDoses && (
-                            <div className="shrink-0 w-12">
-                              <div className="flex h-2 overflow-hidden rounded-full bg-gray-100">
-                                <div className={`rounded-full transition-all ${item.isCompleted ? 'bg-emerald-500' : 'bg-teal-500'}`} style={{ width: `${Math.round((item.latestDoseNumber / item.totalDoses) * 100)}%` }} />
-                              </div>
-                              <p className="mt-0.5 text-center text-[10px] text-slate-400">{item.latestDoseNumber}/{item.totalDoses}</p>
-                            </div>
-                          )}
-                        </div>
-                        {/* Dose entries - compact inline */}
-                        <div className="mt-2 rounded-lg bg-white/70 px-2.5 py-2">
-                          <div className="space-y-1 text-xs leading-4 text-slate-600">
-                            {item.doseEntries.map(doseEntry => (
-                              <div key={doseEntry.id} className="flex items-start gap-1">
-                                <span className="shrink-0 text-slate-300 leading-4">•</span>
-                                <p className="min-w-0 break-words">
-                                  <span className="font-semibold text-slate-700">
-                                    {formatVaccineProgress(doseEntry.doseNumber, doseEntry.totalDoses) || '未标注'}
-                                  </span>
-                                  {' · '}
-                                  <span className="text-slate-400">{formatRecordedSummaryTime(doseEntry.recordedAt)}</span>
-                                  {doseEntry.note ? (
-                                    <span className="text-slate-500">：{doseEntry.note}</span>
-                                  ) : null}
-                                </p>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Completed vaccines - collapsible */}
+                    {completedVaccineTypes > 0 && (
+                      <div className={pendingVaccines.length > 0 ? 'mt-2' : ''}>
+                        <button
+                          type="button"
+                          onClick={() => setShowCompletedVaccines(!showCompletedVaccines)}
+                          className="flex w-full items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-medium text-gray-400 transition hover:bg-gray-50 hover:text-gray-600"
+                        >
+                          {showCompletedVaccines ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                          已完成 ({completedVaccineTypes})
+                        </button>
+                        {showCompletedVaccines && (
+                          <div className="mt-1 grid gap-2 sm:grid-cols-2">
+                            {vaccineProgressSummary.filter(v => v.isCompleted).map(item => (
+                              <div key={item.vaccineName} className="rounded-xl border p-3 border-emerald-100 bg-emerald-50/30">
+                                {/* Header row: name + status + progress bar */}
+                                <div className="flex items-center gap-2">
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-1.5">
+                                      <p className="text-sm font-bold text-gray-900 truncate">{item.vaccineName}</p>
+                                      <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold bg-emerald-200 text-emerald-800">
+                                        已完成
+                                      </span>
+                                    </div>
+                                    <div className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-500">
+                                      <span className="font-medium text-teal-600">{formatVaccineProgress(item.latestDoseNumber, item.totalDoses) || '未标注'}</span>
+                                      <span>·</span>
+                                      <span>{item.latestDate}</span>
+                                    </div>
+                                  </div>
+                                  {/* Mini progress indicator */}
+                                  {item.latestDoseNumber && item.totalDoses && (
+                                    <div className="shrink-0 w-12">
+                                      <div className="flex h-2 overflow-hidden rounded-full bg-gray-100">
+                                        <div className="rounded-full transition-all bg-emerald-500" style={{ width: `${Math.round((item.latestDoseNumber / item.totalDoses) * 100)}%` }} />
+                                      </div>
+                                      <p className="mt-0.5 text-center text-[10px] text-slate-400">{item.latestDoseNumber}/{item.totalDoses}</p>
+                                    </div>
+                                  )}
+                                </div>
+                                {/* Dose entries - compact inline */}
+                                <div className="mt-2 rounded-lg bg-white/70 px-2.5 py-2">
+                                  <div className="space-y-1 text-xs leading-4 text-slate-600">
+                                    {item.doseEntries.map(doseEntry => (
+                                      <div key={doseEntry.id} className="flex items-start gap-1">
+                                        <span className="shrink-0 text-slate-300 leading-4">•</span>
+                                        <p className="min-w-0 break-words">
+                                          <span className="font-semibold text-slate-700">
+                                            {formatVaccineProgress(doseEntry.doseNumber, doseEntry.totalDoses) || '未标注'}
+                                          </span>
+                                          {' · '}
+                                          <span className="text-slate-400">{formatRecordedSummaryTime(doseEntry.recordedAt)}</span>
+                                          {doseEntry.note ? (
+                                            <span className="text-slate-500">：{doseEntry.note}</span>
+                                          ) : null}
+                                        </p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
                               </div>
                             ))}
                           </div>
-                        </div>
+                        )}
                       </div>
-                    ))}
+                    )}
                   </div>
                 ) : (
                   <StatsEmptyState
