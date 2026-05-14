@@ -422,6 +422,42 @@ export async function safeParseBody(request: Request, maxSize: number = 10 * 102
   }
 }
 
+// 验证备忘录输入
+export function validateMemoInput(body: Record<string, unknown>): ValidationResult {
+  const titleCheck = validateString(body.title, '备忘标题', 100)
+  if (!titleCheck.valid) return titleCheck
+
+  if (!body.title || (typeof body.title === 'string' && !body.title.trim())) {
+    return { valid: false, error: '备忘标题不能为空' }
+  }
+
+  const contentCheck = validateString(body.content, '备忘内容', 500)
+  if (!contentCheck.valid) return contentCheck
+
+  // scheduledAt: must be a valid date string, allow future dates (up to 5 years)
+  if (body.scheduledAt === undefined || body.scheduledAt === null) {
+    return { valid: false, error: '备忘时间不能为空' }
+  }
+  if (typeof body.scheduledAt !== 'string') {
+    return { valid: false, error: '备忘时间必须是字符串' }
+  }
+  const scheduledDate = new Date(body.scheduledAt as string)
+  if (isNaN(scheduledDate.getTime())) {
+    return { valid: false, error: '备忘时间不是有效的日期格式' }
+  }
+  const fiveYearsMs = 5 * 365 * 24 * 60 * 60 * 1000
+  const hundredYearsMs = 100 * 365 * 24 * 60 * 60 * 1000
+  const now = Date.now()
+  if (scheduledDate.getTime() > now + fiveYearsMs || scheduledDate.getTime() < now - hundredYearsMs) {
+    return { valid: false, error: '备忘时间超出合理范围' }
+  }
+
+  const completedCheck = validateBoolean(body.completed, '是否已完成')
+  if (!completedCheck.valid) return completedCheck
+
+  return { valid: true }
+}
+
 function isApiKeyRequest(request: Request): boolean {
   const authHeader = request.headers.get('authorization')
   return !!authHeader && /^Bearer\s+bfk_[a-f0-9]{64}$/i.test(authHeader)

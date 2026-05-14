@@ -67,6 +67,14 @@ export interface PreloadedStatsData {
     recordedAt: string
     notes: string | null
   }[]
+  memoRecords: {
+    id: string
+    title: string
+    content: string | null
+    scheduledAt: string
+    completed: boolean
+    completedAt: string | null
+  }[]
   feedingIntervals: number[]
   feedingHeatmap: { date: string; hour: number; count: number }[]
   babyBirthDate: string | null
@@ -126,7 +134,7 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
   const { start: rangeStart } = getBeijingDayRange(startDateStr)
   const { end: rangeEnd } = getBeijingDayRange(todayStr)
 
-  const [feedingRecords, healthRecords, allWeightRecords, allHeightRecords, vaccineRecords, medicationRecords] = await Promise.all([
+  const [feedingRecords, healthRecords, allWeightRecords, allHeightRecords, vaccineRecords, medicationRecords, memoRecords] = await Promise.all([
     prisma.feedingRecord.findMany({
       where: {
         babyId,
@@ -203,6 +211,21 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
         medicationDose: true,
         recordedAt: true,
         notes: true,
+      },
+    }),
+    prisma.memo.findMany({
+      where: {
+        babyId,
+        createdBy: userId,
+      },
+      orderBy: { scheduledAt: 'asc' },
+      select: {
+        id: true,
+        title: true,
+        content: true,
+        scheduledAt: true,
+        completed: true,
+        completedAt: true,
       },
     }),
   ])
@@ -372,6 +395,14 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
         notes: record.notes,
       }
     }),
+    memoRecords: memoRecords.map((record) => ({
+      id: record.id,
+      title: record.title,
+      content: record.content,
+      scheduledAt: record.scheduledAt.toISOString(),
+      completed: record.completed,
+      completedAt: record.completedAt ? record.completedAt.toISOString() : null,
+    })),
     feedingIntervals,
     feedingHeatmap: (() => {
       const heatmap = new Map<string, number>()

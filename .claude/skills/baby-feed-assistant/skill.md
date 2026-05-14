@@ -1,7 +1,7 @@
 ---
 name: baby-feed-assistant
-version: 1.3.0
-description: "Query and manage baby feeding/health data via the Baby Feed HTTP API. Use this skill whenever the user asks about their baby's feeding situation, daily summary, health stats, sleep, diapers, weight trends, or wants to record a new feeding/health event. Trigger on any mention of: feeding, nursing, formula, breast milk, diaper, sleep, weight, temperature, baby stats, today's summary, how much the baby ate, when was the last feed, record a feed, log a diaper change, etc. Even casual questions like '宝宝今天吃了多少' or '记录一下刚才喂奶' should trigger this skill."
+version: 1.4.0
+description: "Query and manage baby feeding/health data via the Baby Feed HTTP API. Use this skill whenever the user asks about their baby's feeding situation, daily summary, health stats, sleep, diapers, weight trends, memos, reminders, or wants to record a new feeding/health/memo event. Trigger on any mention of: feeding, nursing, formula, breast milk, diaper, sleep, weight, temperature, baby stats, today's summary, how much the baby ate, when was the last feed, record a feed, log a diaper change, memo, reminder, 备忘, 待办, vaccine schedule, upcoming checkup, etc. Even casual questions like '宝宝今天吃了多少' or '记录一下刚才喂奶' or '有什么备忘' or '下次疫苗什么时候' should trigger this skill."
 ---
 
 # Baby Feed Assistant
@@ -67,6 +67,11 @@ The user's question falls into one of these categories:
 | Record a new feeding | `POST /api/feeding` |
 | Record a health event | `POST /api/health` |
 | Update/delete a record | `PUT/DELETE /api/feeding/:id` or `/api/health/:id` |
+| List memos (all or filtered) | `GET /api/memo?babyId=ID` |
+| List pending memos near a date | `GET /api/memo?babyId=ID&completed=false&date=YYYY-MM-DD&rangeDays=N` |
+| Create a memo | `POST /api/memo` |
+| Update / complete a memo | `PUT /api/memo/:id` |
+| Delete a memo | `DELETE /api/memo/:id` |
 
 ### Step 3: Call the appropriate API(s)
 
@@ -121,12 +126,36 @@ When the user wants to log something, extract the information from their message
 - `recordedAt`: ISO 8601 (if not specified, use current Beijing time)
 - Type-specific fields (weight in kg, height in cm, temperature in C, diaperType: PEE/POOP/BOTH, etc.)
 
+### Memo fields:
+- `babyId`: (use cached baby ID)
+- `title`: string, 1-100 chars (e.g., "接种第二针乙肝疫苗")
+- `content`: optional string, max 500 chars (e.g., "社区卫生服务中心，带接种本")
+- `scheduledAt`: ISO 8601 (the date/time when this should be done)
+
+### Memo query parameters:
+- `babyId`: filter by baby
+- `completed`: `true` or `false` to filter by completion status
+- `date`: center date (YYYY-MM-DD, Beijing time) for range filter
+- `rangeDays`: number of days before and after `date` (default 7, max 365)
+
+### Memo update fields (PUT /api/memo/:id):
+- `title`: new title (optional)
+- `content`: new content, or null to clear (optional)
+- `scheduledAt`: new time (optional)
+- `completed`: set to `true` to mark done (auto-sets `completedAt`), `false` to reopen (clears `completedAt`)
+
 ### Recording flow:
 1. Parse the user's message to extract event details
 2. If critical info is missing (e.g., type of feeding, amount), ask
 3. If info is sufficient, show what you'll record and ask for confirmation
 4. On confirmation, POST to the API
 5. Report success or failure
+
+### Memo management flow:
+1. **Querying memos:** When user asks about upcoming tasks/reminders, fetch with `completed=false`. Use `date` and `rangeDays` to scope to a relevant time window.
+2. **Creating memos:** Extract title and scheduled time from the user's message. If time is vague (e.g., "下周"), calculate the approximate date. Content is optional.
+3. **Completing memos:** When the user says something is done, PUT with `completed: true`. The API auto-sets `completedAt`.
+4. **Presenting memos:** Group by overdue vs upcoming. Highlight overdue items. Show title, time, and content (if any).
 
 ## Time Handling
 
@@ -157,3 +186,7 @@ All dates use Beijing time (UTC+8). When the user says "今天" or "today", calc
 | "宝宝多大了" / "宝宝出生日期" | babies/ID (get birthDate, compute age) |
 | "哪些天有记录" / "最早的记录" | timeline-dates |
 | "上个月X号的情况" | timeline-dates (confirm date exists) + stats/day |
+| "有什么备忘" / "待办事项" | memo (babyId, completed=false) |
+| "最近要打什么疫苗" / "接下来有什么安排" | memo (babyId, completed=false, date=today, rangeDays=30) |
+| "记录一下下周要打疫苗" | POST /api/memo (title, scheduledAt) |
+| "备忘已经完成了" / "疫苗打完了" | PUT /api/memo/:id (completed=true) |

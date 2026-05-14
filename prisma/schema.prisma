@@ -19,6 +19,7 @@ model User {
   feedingRecords FeedingRecord[]
   healthRecords HealthRecord[]
   apiKeys   ApiKey[]
+  memos     Memo[]
 }
 
 model SiteSettings {
@@ -52,6 +53,7 @@ model Baby {
   user      User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
   feedingRecords FeedingRecord[]
   healthRecords HealthRecord[]
+  memos          Memo[]
 
   @@index([createdBy])
 }
@@ -109,4 +111,22 @@ model HealthRecord {
 
   @@index([createdBy, babyId, recordedAt])
   @@index([babyId, type, recordedAt])
+}
+
+model Memo {
+  id          String    @id @default(cuid())
+  babyId      String
+  title       String                          // 备忘标题
+  content     String?                         // 备忘详细内容（可选）
+  scheduledAt DateTime                        // 备忘时间（什么时候该做这件事）
+  completed   Boolean   @default(false)       // 是否已处理
+  completedAt DateTime?                       // 标记完成的时间
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdBy   String
+  baby        Baby      @relation(fields: [babyId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@index([createdBy, babyId, scheduledAt])
+  @@index([babyId, completed, scheduledAt])
 }

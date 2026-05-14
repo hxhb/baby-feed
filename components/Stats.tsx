@@ -20,6 +20,7 @@ import { Baby as BabyIcon, ChartColumn, Clock, Droplets, Milk, Moon, Pill, Ruler
 import { dedupeRequest, invalidateRequestCache } from '@/lib/client-request-cache'
 import type { PreloadedStatsData } from '@/lib/server-stats'
 import { StatsEmptyState, StatsPanel, StatsSegmentedTabs } from '@/components/StatsUi'
+import MemoSection from '@/components/MemoSection'
 import { generateWHOCurve } from '@/lib/who-growth-standards'
 
 interface Baby {
@@ -1421,6 +1422,13 @@ export default function StatsComponent({
                   />
                 )}
               </StatsPanel>
+
+              {selectedBabyId && (
+                <MemoSection
+                  memoRecords={stats.memoRecords}
+                  babyId={selectedBabyId}
+                />
+              )}
             </>
           )}
 
