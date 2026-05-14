@@ -1,0 +1,3 @@
+# Copy this file to config.local and fill in your actual values
+BABY_FEED_BASE_URL=https://your-baby-feed-instance.example.com
+BABY_FEED_API_KEY=bfk_your_api_key_here

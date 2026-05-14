@@ -66,6 +66,6 @@ cookies.txt
 
 .codebuddy/
 
-.claude/
+.claude/settings.local.json
 CLAUDE.md
-!.claude/skills
+!.claude/skills/*
