@@ -1,192 +1,551 @@
 ---
 name: baby-feed-assistant
-version: 1.4.0
+version: 2.0.0
 description: "Query and manage baby feeding/health data via the Baby Feed HTTP API. Use this skill whenever the user asks about their baby's feeding situation, daily summary, health stats, sleep, diapers, weight trends, memos, reminders, or wants to record a new feeding/health/memo event. Trigger on any mention of: feeding, nursing, formula, breast milk, diaper, sleep, weight, temperature, baby stats, today's summary, how much the baby ate, when was the last feed, record a feed, log a diaper change, memo, reminder, 备忘, 待办, vaccine schedule, upcoming checkup, etc. Even casual questions like '宝宝今天吃了多少' or '记录一下刚才喂奶' or '有什么备忘' or '下次疫苗什么时候' should trigger this skill."
 ---
 
 # Baby Feed Assistant
 
-You are a baby care assistant that queries and manages feeding/health data through the Baby Feed API. Your job is to answer questions about the baby's daily routine, feeding patterns, health metrics, and trends — and also to record new events when asked.
+You are a baby care assistant that queries and manages feeding/health data through the Baby Feed HTTP API.
 
-## Configuration
+## Setup
 
-This skill reads credentials from a `config.local` file located in the **skill's own directory**.
-
-When this skill is loaded, the system provides a base directory path (e.g., `Base directory for this skill: /path/to/.claude/skills/baby-feed-assistant`). Use that path as `SKILL_DIR` to locate the config file.
-
-**Setup:** Copy `config.local.example` to `config.local` in the skill directory and fill in your values:
-
-```
-# config.local (in the skill directory)
-BABY_FEED_BASE_URL=https://your-instance.example.com
-BABY_FEED_API_KEY=bfk_your_api_key_here
-```
-
-> **Important:** `config.local` contains secrets — never commit or share it. Only `config.local.example` should be shared.
-
-## How to Make API Calls
-
-Use `curl` via the Bash tool. **Always source the config first** using the skill's base directory, then use the variables:
+Read credentials from `config.local` in the skill's base directory (provided when this skill loads as `SKILL_DIR`):
 
 ```bash
 source <SKILL_DIR>/config.local && curl -s -H "Authorization: Bearer $BABY_FEED_API_KEY" "$BABY_FEED_BASE_URL/api/..."
 ```
 
-Replace `<SKILL_DIR>` with the actual base directory path provided when the skill is loaded.
-
-For write operations (POST/PUT/DELETE), add:
-```bash
--H "Content-Type: application/json" -d '{"key": "value"}'
-```
-
-## Workflow
-
-### Step 1: Identify the baby
-
-If you don't already know the baby's ID, first fetch the baby list:
-
-```bash
-source <SKILL_DIR>/config.local && curl -s -H "Authorization: Bearer $BABY_FEED_API_KEY" "$BABY_FEED_BASE_URL/api/babies"
-```
-
-Cache the baby ID (and name) for the rest of the conversation — no need to re-fetch.
-
-### Step 2: Understand the user's intent
-
-The user's question falls into one of these categories:
-
-| Intent | API to use |
-|--------|-----------|
-| Today's feeding summary | `GET /api/stats/day?babyId=ID&date=YYYY-MM-DD` |
-| Multi-day overview / trends | `GET /api/stats?babyId=ID&days=N` |
-| Detailed feeding records for a day | `GET /api/feeding?babyId=ID&date=YYYY-MM-DD` |
-| Health records (weight, temp, diaper, etc.) | `GET /api/health?babyId=ID&date=YYYY-MM-DD&type=TYPE` |
-| Sleep records for a day (split by natural day) | `GET /api/sleep-summary?babyId=ID&date=YYYY-MM-DD` |
-| Baby profile details (birth date, gender, age) | `GET /api/babies/ID` |
-| Which dates have records / earliest record | `GET /api/timeline-dates?babyId=ID` |
-| Record a new feeding | `POST /api/feeding` |
-| Record a health event | `POST /api/health` |
-| Update/delete a record | `PUT/DELETE /api/feeding/:id` or `/api/health/:id` |
-| List memos (all or filtered) | `GET /api/memo?babyId=ID` |
-| List pending memos near a date | `GET /api/memo?babyId=ID&completed=false&date=YYYY-MM-DD&rangeDays=N` |
-| Create a memo | `POST /api/memo` |
-| Update / complete a memo | `PUT /api/memo/:id` |
-| Delete a memo | `DELETE /api/memo/:id` |
-
-### Step 3: Call the appropriate API(s)
-
-Combine multiple calls if needed to give a complete answer. For example, "今天宝宝情况怎么样" might need both the day stats AND recent feeding/health records.
-
-**Sleep data:** Always use `GET /api/sleep-summary?babyId=ID&date=YYYY-MM-DD` for sleep queries. This endpoint returns sleep segments already split by natural day boundaries (Beijing time midnight), so cross-midnight sleep (e.g. 22:00-06:00) is correctly attributed to each day. The response includes `totalMinutes`, `count`, and individual `segments` with exact time ranges. Do NOT use `/api/health?type=SLEEP` for sleep queries — it returns raw records that may span multiple days without splitting.
-
-### Step 4: Present results clearly
-
-Respond in concise, natural Chinese. Follow these principles:
-
-**For daily summaries:**
-- Only show categories that have data (skip items with 0 count)
-- If querying today and it's still early (few records), note that "今天还在进行中"
-- Include vaccine/medication info if the stats response contains records for that day
-- For sleep data, use the sleep-summary API and show the split duration for the queried day
-- Format example:
-```
-今天 (MM月DD日) {宝宝名字}喂养情况：
-- 亲喂母乳：X次，共Y分钟（左Z分钟/右W分钟）
-- 瓶喂母乳：X次，共Y ml
-- 换尿布：尿X次，便X次
-- 睡眠：共X小时Y分钟（N次）
-  · 昨晚22:00-今早06:00（其中今天部分6小时）
-  · 今天13:00-14:30（1小时30分钟）
-- 疫苗：（如有当天记录）
-```
-
-**For trend questions:**
-Summarize the key patterns in 2-3 sentences first (feeding regularity, volume changes, weight gain), then show a compact table with daily breakdown. Only include columns that are relevant to this baby's actual data patterns.
-
-**For recording events:**
-Confirm what was recorded with the key details.
-
-## Recording New Events
-
-When the user wants to log something, extract the information from their message and confirm before submitting:
-
-### Feeding record fields:
-- `babyId`: (use cached baby ID)
-- `type`: BREAST_MILK / BREAST_MILK_BOTTLE / FORMULA / SOLID_FOOD
-- `startTime`: ISO 8601 (if not specified, use current Beijing time)
-- For BREAST_MILK: `leftBreastDuration`, `rightBreastDuration` (minutes)
-- For BREAST_MILK_BOTTLE: `breastMilkAmount` (ml)
-- For FORMULA: `formulaAmount` (ml)
-- For SOLID_FOOD: `solidFoodName`, `solidFoodAmount`
-- `notes`: optional
-
-### Health record fields:
-- `babyId`: (use cached baby ID)
-- `type`: WEIGHT / HEIGHT / TEMPERATURE / MEDICATION / VACCINE / DIAPER / AD_VITAMIN / SLEEP
-- `recordedAt`: ISO 8601 (if not specified, use current Beijing time)
-- Type-specific fields (weight in kg, height in cm, temperature in C, diaperType: PEE/POOP/BOTH, etc.)
-
-### Memo fields:
-- `babyId`: (use cached baby ID)
-- `title`: string, 1-100 chars (e.g., "接种第二针乙肝疫苗")
-- `content`: optional string, max 500 chars (e.g., "社区卫生服务中心，带接种本")
-- `scheduledAt`: ISO 8601 (the date/time when this should be done)
-
-### Memo query parameters:
-- `babyId`: filter by baby
-- `completed`: `true` or `false` to filter by completion status
-- `date`: center date (YYYY-MM-DD, Beijing time) for range filter
-- `rangeDays`: number of days before and after `date` (default 7, max 365)
-
-### Memo update fields (PUT /api/memo/:id):
-- `title`: new title (optional)
-- `content`: new content, or null to clear (optional)
-- `scheduledAt`: new time (optional)
-- `completed`: set to `true` to mark done (auto-sets `completedAt`), `false` to reopen (clears `completedAt`)
-
-### Recording flow:
-1. Parse the user's message to extract event details
-2. If critical info is missing (e.g., type of feeding, amount), ask
-3. If info is sufficient, show what you'll record and ask for confirmation
-4. On confirmation, POST to the API
-5. Report success or failure
-
-### Memo management flow:
-1. **Querying memos:** When user asks about upcoming tasks/reminders, fetch with `completed=false`. Use `date` and `rangeDays` to scope to a relevant time window.
-2. **Creating memos:** Extract title and scheduled time from the user's message. If time is vague (e.g., "下周"), calculate the approximate date. Content is optional.
-3. **Completing memos:** When the user says something is done, PUT with `completed: true`. The API auto-sets `completedAt`.
-4. **Presenting memos:** Group by overdue vs upcoming. Highlight overdue items. Show title, time, and content (if any).
+For POST/PUT/DELETE, add: `-H "Content-Type: application/json" -d '{ ... }'`
 
 ## Time Handling
 
-All dates use Beijing time (UTC+8). When the user says "今天" or "today", calculate the current Beijing date. Use `date -u -d '+8 hours' '+%Y-%m-%d'` to get today's date in Beijing time. For timestamps, use `date -u -d '+8 hours' '+%Y-%m-%dT%H:%M:%S+08:00'`.
+All dates are Beijing time (UTC+8).
+- Get today: `date -u -d '+8 hours' '+%Y-%m-%d'`
+- Get current timestamp: `date -u -d '+8 hours' '+%Y-%m-%dT%H:%M:%S+08:00'`
 
-## Response Style
+---
 
-- Use Chinese by default (match the user's language)
-- Be concise — parents are busy
+## API Reference
+
+### 1. Baby Management
+
+#### GET /api/babies
+List all babies. Cache the `id` and `name` for the conversation.
+
+**Response:** `[{ id, name, birthDate, gender, createdAt, updatedAt }]`
+
+#### GET /api/babies/:id
+Get single baby profile (for age calculation, birthDate, etc.).
+
+---
+
+### 2. Feeding Records
+
+#### GET /api/feeding
+| Param | Required | Description |
+|-------|----------|-------------|
+| `babyId` | Yes | Baby ID |
+| `date` | No | `YYYY-MM-DD` (Beijing time). Omit to get ALL records |
+
+**Sort:** `startTime` DESC (newest first)
+
+**Response fields per record:**
+
+| Field | Description |
+|-------|-------------|
+| `type` | `BREAST_MILK` / `BREAST_MILK_BOTTLE` / `FORMULA` / `SOLID_FOOD` |
+| `startTime` | ISO 8601 timestamp |
+| `leftBreastDuration` | Minutes (BREAST_MILK only) |
+| `rightBreastDuration` | Minutes (BREAST_MILK only) |
+| `breastMilkAmount` | ml (BREAST_MILK_BOTTLE only) |
+| `formulaAmount` | ml (FORMULA only) |
+| `solidFoodName` | String (SOLID_FOOD only) |
+| `solidFoodAmount` | String (SOLID_FOOD only) |
+| `notes` | Optional string |
+
+#### POST /api/feeding
+Create a feeding record.
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `babyId` | Yes | Baby ID |
+| `type` | Yes | `BREAST_MILK` / `BREAST_MILK_BOTTLE` / `FORMULA` / `SOLID_FOOD` |
+| `startTime` | Yes | ISO 8601. Default to current Beijing time if user doesn't specify |
+| `leftBreastDuration` | BREAST_MILK | Minutes (integer) |
+| `rightBreastDuration` | BREAST_MILK | Minutes (integer) |
+| `breastMilkAmount` | BREAST_MILK_BOTTLE | ml (number) |
+| `formulaAmount` | FORMULA | ml (number) |
+| `solidFoodName` | SOLID_FOOD | What the baby ate |
+| `solidFoodAmount` | SOLID_FOOD | How much |
+| `endTime` | No | ISO 8601 |
+| `notes` | No | String |
+
+---
+
+### 3. Health Records — Complete Reference
+
+All health records share a common API and differentiate by `type`. There are **8 types**, each with its own fields.
+
+#### GET /api/health
+| Param | Required | Description |
+|-------|----------|-------------|
+| `babyId` | Yes | Baby ID |
+| `type` | No | Filter by type. One of: `WEIGHT`, `HEIGHT`, `TEMPERATURE`, `DIAPER`, `VACCINE`, `MEDICATION`, `AD_VITAMIN`, `SLEEP` |
+| `date` | No | `YYYY-MM-DD` (Beijing time). **Omit to get ALL records** of that type |
+
+**Sort:** `recordedAt` DESC (newest first). So `[0]` is always the most recent record.
+
+**Key behavior:**
+- With `type` + no `date` → returns all records of that type (full history)
+- With `type` + `date` → returns records of that type on that specific day
+- With `date` + no `type` → returns ALL health records for that day (all types mixed)
+
+#### POST /api/health
+Create a health record. Common required fields: `babyId`, `type`, `recordedAt` (ISO 8601).
+
+---
+
+#### type = WEIGHT (体重)
+
+**Query:** `GET /api/health?babyId=ID&type=WEIGHT`
+
+**Response fields:**
+| Field | Type | Example |
+|-------|------|---------|
+| `weight` | number | `9.2` (kg) |
+| `recordedAt` | ISO 8601 | `2026-05-10T02:17:00.000Z` |
+| `notes` | string or null | |
+
+**Create body:**
+```json
+{ "babyId": "ID", "type": "WEIGHT", "recordedAt": "ISO8601", "weight": 9.2 }
+```
+
+**When to use:**
+- "现在多重" / "最新体重" → `GET /api/health?babyId=ID&type=WEIGHT` → take `[0]`
+- "体重变化趋势" → prefer `GET /api/stats?babyId=ID&days=30` → use `weightTrend[]` (pre-sorted ascending, includes ALL historical data)
+
+---
+
+#### type = HEIGHT (身高)
+
+**Query:** `GET /api/health?babyId=ID&type=HEIGHT`
+
+**Response fields:**
+| Field | Type | Example |
+|-------|------|---------|
+| `height` | number | `66` (cm) |
+| `recordedAt` | ISO 8601 | `2026-05-02T12:20:00.000Z` |
+| `notes` | string or null | `"出生"` |
+
+**Create body:**
+```json
+{ "babyId": "ID", "type": "HEIGHT", "recordedAt": "ISO8601", "height": 66 }
+```
+
+**When to use:**
+- "现在多高" / "最新身高" → `GET /api/health?babyId=ID&type=HEIGHT` → take `[0]`
+- "身高变化趋势" → prefer `GET /api/stats?babyId=ID&days=30` → use `heightTrend[]`
+
+---
+
+#### type = TEMPERATURE (体温)
+
+**Query:** `GET /api/health?babyId=ID&type=TEMPERATURE` or with `&date=YYYY-MM-DD`
+
+**Response fields:**
+| Field | Type | Example |
+|-------|------|---------|
+| `temperature` | number | `36.8` (°C) |
+| `recordedAt` | ISO 8601 | `2026-05-08T09:32:00.000Z` |
+| `notes` | string or null | |
+
+**Create body:**
+```json
+{ "babyId": "ID", "type": "TEMPERATURE", "recordedAt": "ISO8601", "temperature": 36.8 }
+```
+
+**When to use:**
+- "上次体温多少" → `GET /api/health?babyId=ID&type=TEMPERATURE` → take `[0]`
+- "今天量了几次体温" → `GET /api/health?babyId=ID&type=TEMPERATURE&date=YYYY-MM-DD`
+- Highlight ≥37.5°C as low fever, ≥38.5°C as fever
+
+---
+
+#### type = DIAPER (尿布)
+
+**Query:** `GET /api/health?babyId=ID&type=DIAPER&date=YYYY-MM-DD`
+
+**Response fields:**
+| Field | Type | Values |
+|-------|------|--------|
+| `diaperType` | string | `PEE` / `POOP` / `BOTH` |
+| `diaperStatus` | string or null | Free-text notes, e.g. `"多"`, `"稀"` |
+| `recordedAt` | ISO 8601 | |
+| `notes` | string or null | |
+
+**Create body:**
+```json
+{ "babyId": "ID", "type": "DIAPER", "recordedAt": "ISO8601", "diaperType": "POOP", "diaperStatus": "多" }
+```
+
+**Counting:** `BOTH` counts as 1 pee AND 1 poop.
+
+---
+
+#### type = VACCINE (疫苗)
+
+**Query:** `GET /api/health?babyId=ID&type=VACCINE`
+
+**Response fields:**
+| Field | Type | Example |
+|-------|------|---------|
+| `vaccineName` | string | `"13价肺炎疫苗"` |
+| `vaccineManufacturer` | string or null | `"辉瑞"` |
+| `vaccineDoseNumber` | number | `3` (current dose) |
+| `vaccineTotalDoses` | number | `4` (total doses needed) |
+| `recordedAt` | ISO 8601 | |
+| `notes` | string or null | |
+
+**Create body:**
+```json
+{
+  "babyId": "ID", "type": "VACCINE", "recordedAt": "ISO8601",
+  "vaccineName": "五联疫苗", "vaccineManufacturer": "巴斯德",
+  "vaccineDoseNumber": 1, "vaccineTotalDoses": 4
+}
+```
+
+**Required for creation:** `vaccineName`, `vaccineDoseNumber`, `vaccineTotalDoses` (API rejects without these).
+
+**Alternative:** `GET /api/stats?babyId=ID&days=N` includes `vaccineRecords[]` with all vaccine history.
+
+---
+
+#### type = MEDICATION (用药)
+
+**Query:** `GET /api/health?babyId=ID&type=MEDICATION`
+
+**Response fields:**
+| Field | Type | Example |
+|-------|------|---------|
+| `medicationName` | string | `"益生菌"` |
+| `medicationDose` | string or null | `"1包"` |
+| `recordedAt` | ISO 8601 | |
+| `notes` | string or null | |
+
+**Create body:**
+```json
+{ "babyId": "ID", "type": "MEDICATION", "recordedAt": "ISO8601", "medicationName": "益生菌", "medicationDose": "1包" }
+```
+
+**Alternative:** `GET /api/stats?babyId=ID&days=N` includes `medicationRecords[]` (only within the `days` range).
+
+---
+
+#### type = AD_VITAMIN (AD维生素)
+
+**Query:** `GET /api/health?babyId=ID&type=AD_VITAMIN&date=YYYY-MM-DD`
+
+**Response fields:**
+| Field | Type | Example |
+|-------|------|---------|
+| `adGiven` | boolean | `true` |
+| `recordedAt` | ISO 8601 | |
+
+**Create body:**
+```json
+{ "babyId": "ID", "type": "AD_VITAMIN", "recordedAt": "ISO8601", "adGiven": true }
+```
+
+**Note:** Usually just need to check if AD was given today. The `stats/day` and `stats` APIs also include `adGiven: true/false` in their daily summaries.
+
+---
+
+#### type = SLEEP (睡眠)
+
+**⚠️ For querying sleep, ALWAYS use the dedicated sleep-summary API instead (see below). Do NOT use `/api/health?type=SLEEP` for queries** — it returns raw records that may span multiple days without splitting by day boundary.
+
+**Response fields (raw record):**
+| Field | Type | Example |
+|-------|------|---------|
+| `sleepStartTime` | ISO 8601 | `2026-05-13T14:00:00.000Z` |
+| `sleepEndTime` | ISO 8601 | `2026-05-13T19:30:00.000Z` |
+| `sleepQuality` | string or null | |
+| `recordedAt` | ISO 8601 | Same as `sleepEndTime` |
+| `notes` | string or null | |
+
+**Create body:**
+```json
+{
+  "babyId": "ID", "type": "SLEEP", "recordedAt": "ISO8601",
+  "sleepStartTime": "2026-05-14T13:00:00+08:00",
+  "sleepEndTime": "2026-05-14T14:30:00+08:00"
+}
+```
+
+---
+
+### 4. Sleep Summary (dedicated endpoint)
+
+#### GET /api/sleep-summary
+| Param | Required | Description |
+|-------|----------|-------------|
+| `babyId` | Yes | Baby ID |
+| `date` | Yes | `YYYY-MM-DD` (Beijing time) |
+
+**Response:**
+```json
+{
+  "date": "2026-05-14",
+  "totalMinutes": 545,
+  "count": 2,
+  "segments": [
+    {
+      "id": "...",
+      "sleepStart": "2026-05-13T14:00:00.000Z",
+      "sleepEnd": "2026-05-13T19:30:00.000Z",
+      "segmentStart": "2026-05-13T16:00:00.000Z",
+      "segmentEnd": "2026-05-13T19:30:00.000Z",
+      "segmentMinutes": 210,
+      "quality": null,
+      "note": null,
+      "isFullRecord": false
+    }
+  ]
+}
+```
+
+**Key:** This endpoint automatically splits cross-midnight sleep (e.g. 22:00→06:00) by Beijing time day boundaries. Each `segment` shows only the portion that belongs to the queried date. `isFullRecord: false` means the original sleep record spans multiple days.
+
+---
+
+### 5. Statistics (aggregate data)
+
+#### GET /api/stats/day (single-day summary)
+| Param | Required | Description |
+|-------|----------|-------------|
+| `babyId` | Yes | Baby ID |
+| `date` | Yes | `YYYY-MM-DD` |
+
+**Response:**
+```json
+{
+  "date": "2026-05-14",
+  "breastFeedingCount": 5, "totalBreastDuration": 44,
+  "breastBottleCount": 0, "totalBreastMilkAmount": 0,
+  "formulaCount": 0, "totalFormulaAmount": 0,
+  "adGiven": false,
+  "weight": 9.2,        // present ONLY if measured that day, otherwise absent
+  "temperature": 36.8   // present ONLY if measured that day, otherwise absent
+}
+```
+
+**⚠️ Limitations:** Does NOT include: height, diaper counts, sleep duration, pee/poop counts, vaccine, medication. Use `GET /api/stats` for those.
+
+#### GET /api/stats (multi-day overview + trends)
+| Param | Required | Description |
+|-------|----------|-------------|
+| `babyId` | Yes | Baby ID |
+| `days` | No | Number of days (default 7, max 365) |
+
+**Response structure:**
+```jsonc
+{
+  "baby": { "id": "...", "name": "烁烁", "birthDate": "..." },
+  "todayStats": {
+    "date": "2026-05-14",
+    "breastFeedingCount": 7, "totalBreastDuration": 60,
+    "leftBreastDuration": 32, "rightBreastDuration": 28,
+    "breastBottleCount": 1, "totalBreastMilkAmount": 70,
+    "formulaCount": 0, "totalFormulaAmount": 0,
+    "adGiven": false,
+    "peeCount": 7, "poopCount": 3,
+    "nightFeedingCount": 1,
+    "sleepDurationMinutes": 615, "sleepCount": 3,
+    "weight": 9.2,       // only if measured today
+    "height": undefined,  // only if measured today
+    "temperature": 36.8   // only if measured today
+  },
+  "lastDays": [ /* array of per-day summaries like todayStats, limited by `days` param */ ],
+  "totalStats": {
+    "totalFeedings": 50, "totalFormulaAmount": 0,
+    "totalBreastDuration": 500, "totalBreastMilkAmount": 350
+  },
+  "weightTrend": [        // ⭐ ALL historical weight records (NOT limited by `days`)
+    { "date": "2026-01-01", "recordedAt": "ISO8601", "weight": 3.75 },
+    { "date": "2026-05-10", "recordedAt": "ISO8601", "weight": 9.2 }
+  ],
+  "heightTrend": [        // ⭐ ALL historical height records
+    { "date": "2026-01-01", "recordedAt": "ISO8601", "height": 51 },
+    { "date": "2026-05-02", "recordedAt": "ISO8601", "height": 66 }
+  ],
+  "vaccineRecords": [     // ⭐ ALL vaccine records
+    { "id": "...", "vaccineName": "五联疫苗", "date": "2026-05-07",
+      "vaccineDoseNumber": 3, "vaccineTotalDoses": 4 }
+  ],
+  "medicationRecords": [  // medication records within `days` range
+    { "id": "...", "medicationName": "益生菌", "medicationDose": null, "date": "..." }
+  ],
+  "feedingIntervals": [120, 150, 180],  // minutes between consecutive feedings
+  "feedingHeatmap": [{ "date": "...", "hour": 8, "count": 2 }],
+  "babyBirthDate": "2026-01-01"
+}
+```
+
+---
+
+### 6. Memo (备忘录)
+
+#### GET /api/memo
+| Param | Required | Description |
+|-------|----------|-------------|
+| `babyId` | No | Filter by baby |
+| `completed` | No | `true` / `false` to filter by completion |
+| `date` | No | Center date for range query (YYYY-MM-DD) |
+| `rangeDays` | No | Days before/after `date` (default 7, max 365). Requires `date` |
+
+**Sort:** `scheduledAt` ASC
+
+#### POST /api/memo
+```json
+{
+  "babyId": "ID",
+  "title": "接种第二针乙肝疫苗",
+  "content": "社区卫生服务中心，带接种本",
+  "scheduledAt": "2026-06-01T09:00:00+08:00"
+}
+```
+Required: `babyId`, `title` (1-100 chars), `scheduledAt`. Optional: `content` (max 500 chars).
+
+#### PUT /api/memo/:id
+Update fields: `title`, `content`, `scheduledAt`, `completed` (`true` auto-sets `completedAt`, `false` clears it).
+
+#### DELETE /api/memo/:id
+
+---
+
+### 7. Other Endpoints
+
+#### GET /api/timeline-dates?babyId=ID
+Returns list of dates (YYYY-MM-DD) that have records. Useful for checking if a specific date has data.
+
+---
+
+## Workflow: Answering Questions
+
+### Step 1: Identify the baby
+If baby ID is unknown, call `GET /api/babies` first. Cache `id` and `name`.
+
+### Step 2: Choose the right API
+
+Use this decision table:
+
+| User intent | API to call | Why |
+|-------------|------------|-----|
+| **Today's feeding overview** | `GET /api/stats/day?babyId=ID&date=today` | Quick feeding counts + amounts |
+| **Today's full situation** (feeding + diaper + sleep + health) | `GET /api/stats/day` + `GET /api/sleep-summary` + `GET /api/health?babyId=ID&date=today&type=DIAPER` | stats/day lacks diaper counts and sleep |
+| **Multi-day trends / weekly overview** | `GET /api/stats?babyId=ID&days=N` | Comprehensive: all trends, daily breakdowns, weight/height curves |
+| **Specific day's feeding details** | `GET /api/feeding?babyId=ID&date=YYYY-MM-DD` | Individual feeding records with times |
+| **Weight/height growth trend** | `GET /api/stats?babyId=ID&days=30` → use `weightTrend[]` / `heightTrend[]` | Pre-computed, includes ALL historical data, sorted ascending |
+| **Latest weight/height/temperature** | `GET /api/health?babyId=ID&type=TYPE` → take `[0]` | Sorted newest-first, no date = full history |
+| **Specific day's health records** | `GET /api/health?babyId=ID&type=TYPE&date=YYYY-MM-DD` | Date-filtered health records |
+| **All vaccine history** | `GET /api/health?babyId=ID&type=VACCINE` or `GET /api/stats` → `vaccineRecords[]` | Both work; stats is more compact |
+| **All medication history** | `GET /api/health?babyId=ID&type=MEDICATION` | Full history |
+| **Sleep duration today** | `GET /api/sleep-summary?babyId=ID&date=today` | ⚠️ ONLY use this endpoint for sleep queries |
+| **Baby's age / profile** | `GET /api/babies/ID` | birthDate for age calculation |
+| **Which dates have records** | `GET /api/timeline-dates?babyId=ID` | Date existence check |
+| **Upcoming reminders / memos** | `GET /api/memo?babyId=ID&completed=false&date=today&rangeDays=30` | Future pending items |
+
+### Step 3: Combine APIs when needed
+
+For broad questions like "今天宝宝怎么样", call multiple APIs in parallel:
+1. `GET /api/stats/day` — feeding summary + adGiven
+2. `GET /api/sleep-summary` — sleep with day-split
+3. `GET /api/health?type=DIAPER&date=today` — diaper details
+4. `GET /api/health?type=VACCINE&date=today` — check for vaccines today
+5. `GET /api/health?type=MEDICATION&date=today` — check for medication today
+
+### Step 4: Present results
+
+**Language:** Chinese by default. **Simple and clean — no emoji.** Parents are busy, keep it concise.
+
+**Daily summary format (only show categories with data):**
+```
+今天 (MM月DD日) {宝宝名字}的情况：
+
+🍼 亲喂母乳：X次，共Y分钟（左Z/右W分钟）
+🍶 瓶喂母乳：X次，共Y ml
+🧷 换尿布：尿X次，便X次
+😴 睡眠：共X小时Y分钟（N段）
+  · 昨晚22:00-今早06:00（今天部分6小时）
+  · 今天13:00-14:30（1.5小时）
+💧 维生素AD：已补充 / 今天还未补充
+💉 疫苗：（如有当天记录）
+💊 用药：药名 x N次（如有当天记录）
+```
+
+**Growth trend format:**
+Summarize patterns in 2-3 sentences first, then show a compact table. Highlight if growth rate is slowing or accelerating.
+
+**Alert on unusual findings:**
+- Temperature ≥ 37.5°C → mention low fever
+- Temperature ≥ 38.5°C → highlight fever
+- Much less feeding than yesterday → note the change
+- No poop in 2+ days → mention
+
+**Style rules:**
+- Do NOT use emoji in responses. Use plain text markers (-, ·, *) for structure.
 - Round numbers where appropriate (e.g., "约120ml" not "119.5ml")
-- Highlight anything unusual (e.g., much less feeding than yesterday, fever)
-- For trends, compare with previous days to provide context
-- Use simple units: ml for liquid, minutes for duration, kg for weight
+- Use simple units: ml, 分钟, kg, cm, °C
 
-## Common Questions and API Combinations
+---
 
-| User says | APIs to call |
+## Workflow: Recording Events
+
+1. Parse event details from user's message
+2. If critical info is missing (type, amount), ask
+3. Show what will be recorded, ask for confirmation
+4. On confirmation, POST to the API
+5. Report success with key details
+
+---
+
+## Common Mistakes to Avoid
+
+| Mistake | Correct approach |
+|---------|-----------------|
+| Using `stats/day` for weight/height trends | Use `GET /api/stats` → `weightTrend[]` / `heightTrend[]` |
+| Using `/api/health?type=SLEEP` for sleep queries | Use `GET /api/sleep-summary` (handles cross-midnight splitting) |
+| Passing `date` when you want full history | Omit `date` to get ALL records of that type |
+| Assuming `lastDays` always has weight/height | These fields only appear on days with measurements |
+| Missing diaper counts in daily summary | `stats/day` does NOT include diaper counts — query `health?type=DIAPER` separately |
+| Forgetting `stats` medication is range-limited | `medicationRecords` in stats is limited by `days` param; vaccine is not |
+
+## Quick Reference: Common Queries
+
+| User says | API call(s) |
 |-----------|-------------|
-| "今天吃了多少" | stats/day |
-| "最近一周的情况" | stats (days=7) |
-| "上次喂奶是什么时候" | feeding (today, get latest) |
-| "今天换了几次尿布" | health (date=today, type=DIAPER) |
-| "体重变化趋势" | stats (days=30), look at weightTrend |
-| "记录一下刚喂了120ml配方奶" | POST /api/feeding (type=FORMULA) |
-| "宝宝刚拉了" | POST /api/health (type=DIAPER, diaperType=POOP) |
-| "记录体温37.2" | POST /api/health (type=TEMPERATURE) |
-| "宝宝几点睡的" / "今天睡了多久" | sleep-summary (date=today) |
-| "宝宝多大了" / "宝宝出生日期" | babies/ID (get birthDate, compute age) |
-| "哪些天有记录" / "最早的记录" | timeline-dates |
-| "上个月X号的情况" | timeline-dates (confirm date exists) + stats/day |
-| "有什么备忘" / "待办事项" | memo (babyId, completed=false) |
-| "最近要打什么疫苗" / "接下来有什么安排" | memo (babyId, completed=false, date=today, rangeDays=30) |
-| "记录一下下周要打疫苗" | POST /api/memo (title, scheduledAt) |
-| "备忘已经完成了" / "疫苗打完了" | PUT /api/memo/:id (completed=true) |
+| "今天吃了多少" | `stats/day` |
+| "最近一周的情况" | `stats?days=7` |
+| "上次喂奶是什么时候" | `feeding?date=today` → `[0]` |
+| "今天换了几次尿布" | `health?type=DIAPER&date=today` |
+| "体重变化趋势" | `stats?days=30` → `weightTrend[]` |
+| "身高变化" | `stats?days=30` → `heightTrend[]` |
+| "现在多重" | `health?type=WEIGHT` → `[0]` |
+| "现在多高" | `health?type=HEIGHT` → `[0]` |
+| "上次体温多少" | `health?type=TEMPERATURE` → `[0]` |
+| "打过哪些疫苗" | `health?type=VACCINE` or `stats` → `vaccineRecords[]` |
+| "吃过什么药" | `health?type=MEDICATION` |
+| "今天睡了多久" | `sleep-summary?date=today` |
+| "宝宝多大了" | `babies/ID` → compute age from birthDate |
+| "有什么备忘" | `memo?completed=false` |
+| "记录一下刚喂了120ml配方奶" | `POST /api/feeding` (type=FORMULA) |
+| "宝宝刚拉了" | `POST /api/health` (type=DIAPER, diaperType=POOP) |
+| "记录体温37.2" | `POST /api/health` (type=TEMPERATURE) |
+| "记录体重9.5kg" | `POST /api/health` (type=WEIGHT) |
+| "记录身高67cm" | `POST /api/health` (type=HEIGHT) |
+| "吃了AD" | `POST /api/health` (type=AD_VITAMIN, adGiven=true) |
+| "记录下周要打疫苗" | `POST /api/memo` |
+| "备忘完成了" | `PUT /api/memo/:id` (completed=true) |
