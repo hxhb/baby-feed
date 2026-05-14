@@ -767,7 +767,7 @@ export default function StatsComponent({
   ).map(item => ({
     ...item,
     doseEntries: [...item.doseEntries].sort((a, b) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime()),
-  }))
+  })).sort((a, b) => Number(a.isCompleted) - Number(b.isCompleted))
   const pendingVaccines = vaccineProgressSummary.filter(item => item.remainingDoses && item.remainingDoses > 0)
   const totalVaccineTypes = vaccineProgressSummary.length
   const completedVaccineTypes = vaccineProgressSummary.filter(v => v.isCompleted).length
