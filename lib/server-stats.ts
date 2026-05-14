@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { getPreloadedBabies } from '@/lib/server-babies'
 import { getServerSession } from '@/lib/server-auth'
-import { getBeijingDateStr, getBeijingDayRange, getBeijingTodayStr, getBeijingDaysAgoStr, splitDurationByBeijingDay } from '@/lib/api-helpers'
+import { getBeijingDateStr, getBeijingDayRange, getBeijingTodayStr, getBeijingDaysAgoStr, splitDurationByBeijingDay, buildSleepAwareOrClause } from '@/lib/api-helpers'
 
 export interface PreloadedStatsBaby {
   id: string
@@ -144,21 +144,7 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
         createdBy: userId,
         // Include records where recordedAt is in range
         // OR sleep records whose sleepStartTime is in range (cross-midnight sleep)
-        OR: [
-          {
-            recordedAt: {
-              gte: rangeStart,
-              lte: rangeEnd,
-            },
-          },
-          {
-            type: 'SLEEP',
-            sleepStartTime: {
-              gte: rangeStart,
-              lte: rangeEnd,
-            },
-          },
-        ],
+        OR: buildSleepAwareOrClause(rangeStart, rangeEnd),
       },
       orderBy: { recordedAt: 'asc' },
     }),

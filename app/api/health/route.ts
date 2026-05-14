@@ -4,7 +4,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { validateHealthInput, validateId, HEALTH_TYPES, safeParseBody, validateDateOnlyString, validateEnum, validateSameOrigin } from '@/lib/validation'
 import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
-import { noStoreHeaders, getBeijingDayRange } from '@/lib/api-helpers'
+import { noStoreHeaders, getBeijingDayRange, buildSleepAwareOrClause } from '@/lib/api-helpers'
 
 export async function GET(request: NextRequest) {
   try {
@@ -71,13 +71,7 @@ export async function GET(request: NextRequest) {
       // For sleep records that cross midnight (e.g. 23:00 -> 06:00 next day),
       // recordedAt = sleepEndTime (next day), so they won't appear on the start day.
       // Use OR to also include records whose sleepStartTime falls within this day.
-      whereClause.OR = [
-        { recordedAt: { gte: start, lte: end } },
-        {
-          type: 'SLEEP',
-          sleepStartTime: { gte: start, lte: end },
-        },
-      ]
+      whereClause.OR = buildSleepAwareOrClause(start, end)
     }
 
     const records = await prisma.healthRecord.findMany({

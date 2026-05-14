@@ -38,6 +38,7 @@
 - [7. 统计数据](#7-统计数据)
   - [7.1 获取多日统计数据](#71-获取多日统计数据)
   - [7.2 获取单日统计数据](#72-获取单日统计数据)
+  - [7.3 获取单日睡眠摘要](#73-获取单日睡眠摘要)
 - [8. 时间轴](#8-时间轴)
   - [8.1 获取时间轴有效日期](#81-获取时间轴有效日期)
 - [9. 站点设置（公开）](#9-站点设置公开)
@@ -946,6 +947,73 @@
   "temperature": 36.5
 }
 ```
+
+---
+
+### 7.3 获取单日睡眠摘要
+
+获取指定婴儿某一天的睡眠摘要。跨天的睡眠记录会按北京时间自然日边界（00:00）拆分，只返回属于该天的片段及聚合时长。
+
+- **URL**: `GET /api/sleep-summary`
+- **认证**: 需要
+- **限流**: 120 次/60秒
+
+**查询参数**:
+
+| 参数 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `babyId` | string | 是 | 婴儿 ID（CUID 格式） |
+| `date` | string | 是 | 日期，格式 `YYYY-MM-DD`（北京时间） |
+
+**成功响应** (`200`):
+
+```json
+{
+  "date": "2024-01-12",
+  "totalMinutes": 510,
+  "count": 2,
+  "segments": [
+    {
+      "id": "cxxxxxxxxxxxxxxxxxxxxxxxx",
+      "sleepStart": "2024-01-11T14:00:00.000Z",
+      "sleepEnd": "2024-01-11T22:00:00.000Z",
+      "segmentStart": "2024-01-11T16:00:00.000Z",
+      "segmentEnd": "2024-01-11T22:00:00.000Z",
+      "segmentMinutes": 360,
+      "quality": "GOOD",
+      "note": "睡得很好",
+      "isFullRecord": false
+    },
+    {
+      "id": "cyyyyyyyyyyyyyyyyyyyyyyyy",
+      "sleepStart": "2024-01-12T12:00:00.000Z",
+      "sleepEnd": "2024-01-12T14:00:00.000Z",
+      "segmentStart": "2024-01-12T12:00:00.000Z",
+      "segmentEnd": "2024-01-12T14:00:00.000Z",
+      "segmentMinutes": 120,
+      "quality": null,
+      "note": null,
+      "isFullRecord": true
+    }
+  ]
+}
+```
+
+**字段说明**:
+
+| 字段 | 说明 |
+|---|---|
+| `date` | 查询的日期 |
+| `totalMinutes` | 当天所有睡眠片段的总时长（分钟） |
+| `count` | 在当天**入睡**的次数（跨天记录只在入睡那天计数，与统计页逻辑一致） |
+| `segments[].sleepStart` | 原始记录的完整入睡时间（UTC） |
+| `segments[].sleepEnd` | 原始记录的完整醒来时间（UTC） |
+| `segments[].segmentStart` | 属于当天的片段起始时间（UTC） |
+| `segments[].segmentEnd` | 属于当天的片段结束时间（UTC） |
+| `segments[].segmentMinutes` | 片段时长（分钟） |
+| `segments[].quality` | 睡眠质量（原始记录值） |
+| `segments[].note` | 备注（原始记录值） |
+| `segments[].isFullRecord` | `true` 表示整段睡眠完全在当天内（非跨天），`false` 表示跨天已裁剪 |
 
 ---
 

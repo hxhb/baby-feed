@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { getPreloadedBabies } from '@/lib/server-babies'
 import { getServerSession } from '@/lib/server-auth'
 import { getBeijingToday } from '@/lib/time'
-import { getBeijingDateStr, getBeijingDayRange } from '@/lib/api-helpers'
+import { getBeijingDateStr, getBeijingDayRange, buildSleepAwareOrClause } from '@/lib/api-helpers'
 
 export interface PreloadedTimelineBaby {
   id: string
@@ -134,13 +134,7 @@ async function getPreloadedTimelineRecords(userId: string, babyId: string, dateS
       where: {
         babyId,
         createdBy: userId,
-        OR: [
-          { recordedAt: { gte: start, lte: end } },
-          {
-            type: 'SLEEP',
-            sleepStartTime: { gte: start, lte: end },
-          },
-        ],
+        OR: buildSleepAwareOrClause(start, end),
       },
       orderBy: { recordedAt: 'desc' },
       select: {

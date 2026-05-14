@@ -1,6 +1,6 @@
 ---
 name: baby-feed-assistant
-version: 1.2.1
+version: 1.3.0
 description: "Query and manage baby feeding/health data via the Baby Feed HTTP API. Use this skill whenever the user asks about their baby's feeding situation, daily summary, health stats, sleep, diapers, weight trends, or wants to record a new feeding/health event. Trigger on any mention of: feeding, nursing, formula, breast milk, diaper, sleep, weight, temperature, baby stats, today's summary, how much the baby ate, when was the last feed, record a feed, log a diaper change, etc. Even casual questions like '宝宝今天吃了多少' or '记录一下刚才喂奶' should trigger this skill."
 ---
 
@@ -60,7 +60,8 @@ The user's question falls into one of these categories:
 | Today's feeding summary | `GET /api/stats/day?babyId=ID&date=YYYY-MM-DD` |
 | Multi-day overview / trends | `GET /api/stats?babyId=ID&days=N` |
 | Detailed feeding records for a day | `GET /api/feeding?babyId=ID&date=YYYY-MM-DD` |
-| Health records (weight, temp, sleep, diaper) | `GET /api/health?babyId=ID&date=YYYY-MM-DD&type=TYPE` |
+| Health records (weight, temp, diaper, etc.) | `GET /api/health?babyId=ID&date=YYYY-MM-DD&type=TYPE` |
+| Sleep records for a day (split by natural day) | `GET /api/sleep-summary?babyId=ID&date=YYYY-MM-DD` |
 | Baby profile details (birth date, gender, age) | `GET /api/babies/ID` |
 | Which dates have records / earliest record | `GET /api/timeline-dates?babyId=ID` |
 | Record a new feeding | `POST /api/feeding` |
@@ -71,6 +72,8 @@ The user's question falls into one of these categories:
 
 Combine multiple calls if needed to give a complete answer. For example, "今天宝宝情况怎么样" might need both the day stats AND recent feeding/health records.
 
+**Sleep data:** Always use `GET /api/sleep-summary?babyId=ID&date=YYYY-MM-DD` for sleep queries. This endpoint returns sleep segments already split by natural day boundaries (Beijing time midnight), so cross-midnight sleep (e.g. 22:00-06:00) is correctly attributed to each day. The response includes `totalMinutes`, `count`, and individual `segments` with exact time ranges. Do NOT use `/api/health?type=SLEEP` for sleep queries — it returns raw records that may span multiple days without splitting.
+
 ### Step 4: Present results clearly
 
 Respond in concise, natural Chinese. Follow these principles:
@@ -79,13 +82,16 @@ Respond in concise, natural Chinese. Follow these principles:
 - Only show categories that have data (skip items with 0 count)
 - If querying today and it's still early (few records), note that "今天还在进行中"
 - Include vaccine/medication info if the stats response contains records for that day
+- For sleep data, use the sleep-summary API and show the split duration for the queried day
 - Format example:
 ```
 今天 (MM月DD日) {宝宝名字}喂养情况：
 - 亲喂母乳：X次，共Y分钟（左Z分钟/右W分钟）
 - 瓶喂母乳：X次，共Y ml
 - 换尿布：尿X次，便X次
-- 睡眠：共X小时Y分钟
+- 睡眠：共X小时Y分钟（N次）
+  · 昨晚22:00-今早06:00（其中今天部分6小时）
+  · 今天13:00-14:30（1小时30分钟）
 - 疫苗：（如有当天记录）
 ```
 
@@ -147,7 +153,7 @@ All dates use Beijing time (UTC+8). When the user says "今天" or "today", calc
 | "记录一下刚喂了120ml配方奶" | POST /api/feeding (type=FORMULA) |
 | "宝宝刚拉了" | POST /api/health (type=DIAPER, diaperType=POOP) |
 | "记录体温37.2" | POST /api/health (type=TEMPERATURE) |
-| "宝宝几点睡的" | health (date=today, type=SLEEP) |
+| "宝宝几点睡的" / "今天睡了多久" | sleep-summary (date=today) |
 | "宝宝多大了" / "宝宝出生日期" | babies/ID (get birthDate, compute age) |
 | "哪些天有记录" / "最早的记录" | timeline-dates |
 | "上个月X号的情况" | timeline-dates (confirm date exists) + stats/day |

@@ -47,6 +47,19 @@ export function getBeijingDaysAgoStr(daysAgo: number): string {
 }
 
 /**
+ * Build a Prisma OR clause that captures health records for a date range,
+ * including SLEEP records whose sleepStartTime falls in range (cross-midnight).
+ *
+ * Use inside a `where` block: `OR: buildSleepAwareOrClause(start, end)`
+ */
+export function buildSleepAwareOrClause(start: Date, end: Date) {
+  return [
+    { recordedAt: { gte: start, lte: end } },
+    { type: 'SLEEP', sleepStartTime: { gte: start, lte: end } },
+  ]
+}
+
+/**
  * Split a time span across natural Beijing-day boundaries.
  *
  * Walks day-by-day from `startMs` to `endMs` and invokes `callback` for each

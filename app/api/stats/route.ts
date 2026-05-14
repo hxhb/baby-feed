@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { validateId } from '@/lib/validation'
 import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
-import { noStoreHeaders, getBeijingDateStr, getBeijingDayRange, getBeijingTodayStr, getBeijingDaysAgoStr, splitDurationByBeijingDay } from '@/lib/api-helpers'
+import { noStoreHeaders, getBeijingDateStr, getBeijingDayRange, getBeijingTodayStr, getBeijingDaysAgoStr, splitDurationByBeijingDay, buildSleepAwareOrClause } from '@/lib/api-helpers'
 
 export async function GET(request: NextRequest) {
   try {
@@ -94,10 +94,7 @@ export async function GET(request: NextRequest) {
         where: {
           babyId,
           createdBy: session.user.id,
-          OR: [
-            { recordedAt: { gte: rangeStart, lte: rangeEnd } },
-            { type: 'SLEEP', sleepStartTime: { gte: rangeStart, lte: rangeEnd } },
-          ],
+          OR: buildSleepAwareOrClause(rangeStart, rangeEnd),
         },
         orderBy: { recordedAt: 'asc' }
       })

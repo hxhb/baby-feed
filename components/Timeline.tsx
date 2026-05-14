@@ -5,6 +5,7 @@ import TimelineEditRecordModal from '@/components/TimelineEditRecordModal'
 import { format, isToday, isYesterday } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
 import { formatBeijingTime, getBeijingHour } from '@/lib/time'
+import { splitDurationByBeijingDay } from '@/lib/api-helpers'
 import { dedupeRequest, invalidateRequestCache } from '@/lib/client-request-cache'
 import type { PreloadedTimelineRecord } from '@/lib/server-timeline'
 import Link from 'next/link'
@@ -662,10 +663,6 @@ export default function TimelineComponent({
     let sleepTotalMinutes = 0
     let sleepCount = 0
 
-    // Current day boundaries in Beijing time (for clamping cross-midnight sleep)
-    const dayStartMs = new Date(`${currentDateStr}T00:00:00+08:00`).getTime()
-    const dayEndMs = new Date(`${currentDateStr}T23:59:59.999+08:00`).getTime()
-
     records.forEach((record) => {
       if (record.type === 'BREAST_MILK') {
         breastFeedingCount += 1
@@ -700,18 +697,17 @@ export default function TimelineComponent({
 
       if (record.type === 'SLEEP') {
         const hr = record as HealthRecord
-        sleepCount += 1
         if (hr.sleepStartTime && hr.sleepEndTime) {
-          const start = new Date(hr.sleepStartTime).getTime()
-          const end = new Date(hr.sleepEndTime).getTime()
-          if (end > start) {
-            // Clamp to current day boundaries (Beijing time) so cross-midnight
-            // sleep is split by natural day rather than counted in full
-            const clampedStart = Math.max(start, dayStartMs)
-            const clampedEnd = Math.min(end, dayEndMs)
-            if (clampedEnd > clampedStart) {
-              sleepTotalMinutes += Math.round((clampedEnd - clampedStart) / 60000)
-            }
+          const startMs = new Date(hr.sleepStartTime).getTime()
+          const endMs = new Date(hr.sleepEndTime).getTime()
+          if (endMs > startMs) {
+            splitDurationByBeijingDay(startMs, endMs, (dayStr, minutes, isStartDay) => {
+              if (dayStr !== currentDateStr) return
+              sleepTotalMinutes += minutes
+              if (isStartDay) {
+                sleepCount += 1
+              }
+            })
           }
         }
       }
