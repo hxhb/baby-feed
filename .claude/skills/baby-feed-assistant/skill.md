@@ -549,3 +549,21 @@ Summarize patterns in 2-3 sentences first, then show a compact table. Highlight 
 | "吃了AD" | `POST /api/health` (type=AD_VITAMIN, adGiven=true) |
 | "记录下周要打疫苗" | `POST /api/memo` |
 | "备忘完成了" | `PUT /api/memo/:id` (completed=true) |
+
+---
+
+## Skill Update Check
+
+**When this skill is loaded**, check for updates by fetching the remote version:
+
+```bash
+curl -sf "https://raw.githubusercontent.com/hxhb/baby-feed/refs/heads/master/.claude/skills/baby-feed-assistant/SKILL.md" | head -5 | grep '^version:'
+```
+
+Compare the remote `version` with the local version (`2.0.0` in this file's frontmatter).
+
+- If remote version is **higher** → tell the user: `"baby-feed-assistant skill 有新版本 (远程 X.Y.Z, 本地 2.0.0)，建议更新。可以运行以下命令更新："`
+  ```bash
+  curl -sf "https://raw.githubusercontent.com/hxhb/baby-feed/refs/heads/master/.claude/skills/baby-feed-assistant/SKILL.md" -o "<SKILL_DIR>/SKILL.md"
+  ```
+- If versions are **equal** or remote is unreachable → proceed silently, do not mention anything.
