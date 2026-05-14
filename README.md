@@ -213,6 +213,8 @@ docker-compose down
 docker build -t baby-feed .
 ```
 
+如果不想构建镜像，也可以使用我发布的镜像：`ahzknarf/baby-feed:latest`。
+
 #### 2. 运行容器
 
 ```bash
@@ -222,8 +224,8 @@ docker run -d \
   -e DATABASE_URL="file:/app/data/baby-feed.db" \
   -e NEXTAUTH_SECRET="your-random-secret-key" \
   -e NEXTAUTH_URL="http://localhost:3000" \
-  -v baby-feed-data:/app/data \
-  baby-feed
+  -v ./data:/app/data \
+  ahzknarf/baby-feed:latest
 ```
 
 ### 配置说明
