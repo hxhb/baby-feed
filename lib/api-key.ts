@@ -14,6 +14,8 @@ import { createHash, randomBytes } from 'crypto'
 import { prisma } from './prisma'
 import { Session } from 'next-auth'
 import { NextRequest } from 'next/server'
+import { getClientIp as getClientIpFromRequest } from './rate-limit'
+import { logError } from '@/lib/logger'
 
 const API_KEY_PREFIX = 'bfk_'
 
@@ -95,10 +97,8 @@ export async function authByApiKey(request: NextRequest): Promise<Session | null
 
   const plainKey = match[1]
 
-  // 速率限制检查
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-    || request.headers.get('x-real-ip')
-    || 'unknown'
+  // 速率限制检查（使用统一的 IP 获取逻辑）
+  const ip = getClientIpFromRequest(request)
 
   if (isRateLimited(ip)) {
     return null // 返回 null，由调用方返回 401，不暴露限流信息
@@ -144,7 +144,7 @@ export async function authByApiKey(request: NextRequest): Promise<Session | null
         : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
     }
   } catch (error) {
-    console.error('API Key 验证失败:', error)
+    logError('API Key 验证失败', error)
     return null
   }
 }

@@ -103,6 +103,26 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
     }
   }, [activeModal])
 
+  // 清除 Service Worker 缓存（登出时调用，防止敏感数据残留）
+  const clearServiceWorkerCache = async () => {
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      const mc = new MessageChannel()
+      navigator.serviceWorker.controller.postMessage(
+        { type: 'CLEAR_CACHE' },
+        [mc.port2]
+      )
+      await new Promise<void>((resolve) => {
+        mc.port1.onmessage = () => resolve()
+        setTimeout(resolve, 1000)
+      })
+    }
+  }
+
+  const handleLogout = async () => {
+    await clearServiceWorkerCache()
+    await signOut({ callbackUrl: '/login' })
+  }
+
   const fetchBabies = async () => {
     try {
       const response = await fetch('/api/babies')
@@ -314,7 +334,8 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
       })
 
       if (response.ok) {
-        // 注销成功，退出登录
+        // 注销成功，清除缓存后退出登录
+        await clearServiceWorkerCache()
         await signOut({ callbackUrl: '/login' })
       } else {
         const data = await response.json()
@@ -415,7 +436,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
           </button>
 
           <button
-            onClick={() => signOut({ callbackUrl: '/login' })}
+            onClick={handleLogout}
             className="mobile-touch-target w-full flex items-center justify-between rounded-xl px-2 py-3 text-left transition group hover:bg-gray-50"
           >
             <div className="flex items-center space-x-3">

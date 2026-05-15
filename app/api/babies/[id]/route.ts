@@ -3,7 +3,9 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { validateBabyInput, validateId, safeParseBody, GENDERS, validateSameOrigin } from '@/lib/validation'
 import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
+import { getRateLimit } from '@/lib/rate-limit-config'
 import { noStoreHeaders } from '@/lib/api-helpers'
+import { logError } from '@/lib/logger'
 
 export async function GET(
   request: NextRequest,
@@ -18,8 +20,7 @@ export async function GET(
 
     const readRateLimit = enforceRateLimit({
       key: buildUserActionKey('baby-detail-read', session.user.id, request),
-      limit: 120,
-      windowMs: 60 * 1000,
+      ...getRateLimit('baby-detail-read'),
     })
     if (!readRateLimit.allowed) {
       return NextResponse.json({ error: '请求过于频繁，请稍后再试' }, {
@@ -49,7 +50,7 @@ export async function GET(
 
     return NextResponse.json(baby, { headers: noStoreHeaders })
   } catch (error) {
-    console.error('获取婴儿信息失败:', error)
+    logError('获取婴儿信息失败', error)
     return NextResponse.json({ error: '获取失败' }, { status: 500, headers: noStoreHeaders })
   }
 }
@@ -67,8 +68,7 @@ export async function PUT(
 
     const updateRateLimit = enforceRateLimit({
       key: buildUserActionKey('baby-update', session.user.id, request),
-      limit: 20,
-      windowMs: 10 * 60 * 1000,
+      ...getRateLimit('baby-update'),
     })
     if (!updateRateLimit.allowed) {
       return NextResponse.json({ error: '操作过于频繁，请稍后再试' }, {
@@ -151,7 +151,7 @@ export async function PUT(
 
     return NextResponse.json(baby, { headers: noStoreHeaders })
   } catch (error) {
-    console.error('更新婴儿信息失败:', error)
+    logError('更新婴儿信息失败', error)
     return NextResponse.json({ error: '更新失败' }, { status: 500, headers: noStoreHeaders })
   }
 }
@@ -169,8 +169,7 @@ export async function DELETE(
 
     const deleteRateLimit = enforceRateLimit({
       key: buildUserActionKey('baby-delete', session.user.id, request),
-      limit: 10,
-      windowMs: 15 * 60 * 1000,
+      ...getRateLimit('baby-delete'),
     })
     if (!deleteRateLimit.allowed) {
       return NextResponse.json({ error: '操作过于频繁，请稍后再试' }, {
@@ -209,7 +208,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true }, { headers: noStoreHeaders })
   } catch (error) {
-    console.error('删除婴儿信息失败:', error)
+    logError('删除婴儿信息失败', error)
     return NextResponse.json({ error: '删除失败' }, { status: 500, headers: noStoreHeaders })
   }
 }

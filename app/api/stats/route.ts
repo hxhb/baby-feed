@@ -3,7 +3,9 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { validateId } from '@/lib/validation'
 import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
+import { getRateLimit } from '@/lib/rate-limit-config'
 import { noStoreHeaders, getBeijingDateStr, getBeijingDayRange, getBeijingTodayStr, getBeijingDaysAgoStr, splitDurationByBeijingDay, buildSleepAwareOrClause } from '@/lib/api-helpers'
+import { logError } from '@/lib/logger'
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,8 +16,7 @@ export async function GET(request: NextRequest) {
 
     const statsRateLimit = enforceRateLimit({
       key: buildUserActionKey('stats-query', session.user.id, request),
-      limit: 120,
-      windowMs: 60 * 1000,
+      ...getRateLimit('stats-query'),
     })
     if (!statsRateLimit.allowed) {
       return NextResponse.json({ error: '请求过于频繁，请稍后再试' }, {
@@ -361,7 +362,7 @@ export async function GET(request: NextRequest) {
       babyBirthDate: baby.birthDate ? getBeijingDateStr(new Date(baby.birthDate)) : null,
     }, { headers: noStoreHeaders })
   } catch (error) {
-    console.error('获取统计数据失败:', error)
+    logError('获取统计数据失败', error)
     return NextResponse.json({ error: '获取失败' }, { status: 500, headers: noStoreHeaders })
   }
 }

@@ -3,7 +3,9 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { validateHealthInput, validateId, safeParseBody, validateSameOrigin } from '@/lib/validation'
 import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
+import { getRateLimit } from '@/lib/rate-limit-config'
 import { noStoreHeaders } from '@/lib/api-helpers'
+import { logError } from '@/lib/logger'
 
 export async function PUT(
   request: NextRequest,
@@ -18,8 +20,7 @@ export async function PUT(
 
     const updateRateLimit = enforceRateLimit({
       key: buildUserActionKey('health-update', session.user.id, request),
-      limit: 30,
-      windowMs: 10 * 60 * 1000,
+      ...getRateLimit('health-update'),
     })
     if (!updateRateLimit.allowed) {
       return NextResponse.json({ error: '操作过于频繁，请稍后再试' }, {
@@ -169,7 +170,7 @@ export async function PUT(
 
     return NextResponse.json(record, { headers: noStoreHeaders })
   } catch (error) {
-    console.error('更新健康记录失败:', error)
+    logError('更新健康记录失败', error)
     return NextResponse.json({ error: '更新失败' }, { status: 500, headers: noStoreHeaders })
   }
 }
@@ -187,8 +188,7 @@ export async function DELETE(
 
     const deleteRateLimit = enforceRateLimit({
       key: buildUserActionKey('health-delete', session.user.id, request),
-      limit: 20,
-      windowMs: 15 * 60 * 1000,
+      ...getRateLimit('health-delete'),
     })
     if (!deleteRateLimit.allowed) {
       return NextResponse.json({ error: '操作过于频繁，请稍后再试' }, {
@@ -227,7 +227,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true }, { headers: noStoreHeaders })
   } catch (error) {
-    console.error('删除健康记录失败:', error)
+    logError('删除健康记录失败', error)
     return NextResponse.json({ error: '删除失败' }, { status: 500, headers: noStoreHeaders })
   }
 }

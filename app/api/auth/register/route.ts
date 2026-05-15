@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
+import { logError } from '@/lib/logger'
 import { enforceRateLimit, buildIpActionKey } from '@/lib/rate-limit'
+import { getRateLimit } from '@/lib/rate-limit-config'
 import { safeParseBody, validatePassword } from '@/lib/validation'
 import { getAllowRegistration } from '@/lib/site-settings'
 
@@ -16,8 +18,7 @@ export async function POST(request: NextRequest) {
 
     const registerRateLimit = enforceRateLimit({
       key: buildIpActionKey('auth-register', request),
-      limit: 5,
-      windowMs: 60 * 1000,
+      ...getRateLimit('auth-register'),
     })
     if (!registerRateLimit.allowed) {
       return NextResponse.json(
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '注册失败，请检查输入信息' }, { status: 400 })
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10)
+    const hashedPassword = await bcrypt.hash(password, 12)
 
     const user = await prisma.user.create({
       data: {
@@ -82,7 +83,7 @@ export async function POST(request: NextRequest) {
       name: user.name
     }, { status: 201 })
   } catch (error) {
-    console.error('注册失败:', error)
+    logError('注册失败', error)
     return NextResponse.json({ error: '注册失败' }, { status: 500 })
   }
 }

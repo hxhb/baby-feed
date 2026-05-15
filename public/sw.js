@@ -144,3 +144,20 @@ self.addEventListener('fetch', (event) => {
       })
   )
 })
+
+// 接收前端消息：登出时清除所有缓存，防止敏感数据残留
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'CLEAR_CACHE') {
+    event.waitUntil(
+      caches.keys().then((cacheNames) => {
+        return Promise.all(
+          cacheNames.map((name) => caches.delete(name))
+        )
+      }).then(() => {
+        if (event.ports && event.ports[0]) {
+          event.ports[0].postMessage({ cleared: true })
+        }
+      })
+    )
+  }
+})

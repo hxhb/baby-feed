@@ -3,8 +3,10 @@ import bcrypt from 'bcryptjs'
 import { auth, invalidateUserCache } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
+import { getRateLimit } from '@/lib/rate-limit-config'
 import { safeParseBody, validateSameOrigin } from '@/lib/validation'
 import { noStoreHeaders } from '@/lib/api-helpers'
+import { logError } from '@/lib/logger'
 
 // DELETE /api/user/delete - 注销账户（删除用户及所有关联数据）
 export async function DELETE(request: NextRequest) {
@@ -21,8 +23,7 @@ export async function DELETE(request: NextRequest) {
 
     const deleteAccountRateLimit = enforceRateLimit({
       key: buildUserActionKey('user-delete-account', session.user.id, request),
-      limit: 3,
-      windowMs: 15 * 60 * 1000,
+      ...getRateLimit('user-delete-account'),
     })
     if (!deleteAccountRateLimit.allowed) {
       return NextResponse.json(
@@ -82,7 +83,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ message: '账户已注销' }, { headers: noStoreHeaders })
   } catch (error) {
-    console.error('注销账户失败:', error)
+    logError('注销账户失败', error)
     return NextResponse.json({ error: '注销账户失败' }, { status: 500, headers: noStoreHeaders })
   }
 }

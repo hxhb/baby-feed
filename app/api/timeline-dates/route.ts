@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { validateId } from '@/lib/validation'
 import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
+import { getRateLimit } from '@/lib/rate-limit-config'
 import { getTimelineValidDates } from '@/lib/server-timeline'
 import { noStoreHeaders } from '@/lib/api-helpers'
+import { logError } from '@/lib/logger'
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,8 +16,7 @@ export async function GET(request: NextRequest) {
 
     const listRateLimit = enforceRateLimit({
       key: buildUserActionKey('timeline-valid-dates', session.user.id, request),
-      limit: 180,
-      windowMs: 60 * 1000,
+      ...getRateLimit('timeline-valid-dates'),
     })
     if (!listRateLimit.allowed) {
       return NextResponse.json({ error: '请求过于频繁，请稍后再试' }, {
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest) {
     const validDates = await getTimelineValidDates(session.user.id, babyId)
     return NextResponse.json(validDates, { headers: noStoreHeaders })
   } catch (error) {
-    console.error('获取时间轴有效日期失败:', error)
+    logError('获取时间轴有效日期失败', error)
     return NextResponse.json({ error: '获取失败' }, { status: 500, headers: noStoreHeaders })
   }
 }

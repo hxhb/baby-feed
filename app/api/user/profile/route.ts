@@ -3,7 +3,9 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { safeParseBody, validateSameOrigin } from '@/lib/validation'
 import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
+import { getRateLimit } from '@/lib/rate-limit-config'
 import { noStoreHeaders } from '@/lib/api-helpers'
+import { logError } from '@/lib/logger'
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,8 +16,7 @@ export async function GET(request: NextRequest) {
 
     const profileReadRateLimit = enforceRateLimit({
       key: buildUserActionKey('user-profile-read', session.user.id, request),
-      limit: 60,
-      windowMs: 60 * 1000,
+      ...getRateLimit('user-profile-read'),
     })
     if (!profileReadRateLimit.allowed) {
       return NextResponse.json({ error: '请求过于频繁，请稍后再试' }, {
@@ -43,7 +44,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(user, { headers: noStoreHeaders })
   } catch (error) {
-    console.error('获取用户信息失败:', error)
+    logError('获取用户信息失败', error)
     return NextResponse.json({ error: '获取用户信息失败' }, { status: 500, headers: noStoreHeaders })
   }
 }
@@ -57,8 +58,7 @@ export async function PUT(request: NextRequest) {
 
     const profileUpdateRateLimit = enforceRateLimit({
       key: buildUserActionKey('user-profile-update', session.user.id, request),
-      limit: 10,
-      windowMs: 10 * 60 * 1000,
+      ...getRateLimit('user-profile-update'),
     })
     if (!profileUpdateRateLimit.allowed) {
       return NextResponse.json({ error: '操作过于频繁，请稍后再试' }, {
@@ -103,7 +103,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json(updatedUser, { headers: noStoreHeaders })
   } catch (error) {
-    console.error('修改用户名失败:', error)
+    logError('修改用户名失败', error)
     return NextResponse.json({ error: '修改用户名失败' }, { status: 500, headers: noStoreHeaders })
   }
 }

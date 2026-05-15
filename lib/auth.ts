@@ -5,6 +5,9 @@ import bcrypt from 'bcryptjs'
 import { prisma } from './prisma'
 import { NextRequest } from 'next/server'
 import { authByApiKey } from './api-key'
+import { logError } from '@/lib/logger'
+import { enforceRateLimit } from './rate-limit'
+import { getRateLimit } from './rate-limit-config'
 
 interface SessionUser {
   id: string
@@ -23,6 +26,7 @@ declare module 'next-auth/jwt' {
   interface JWT {
     id: string
     role: string
+    passwordVersion: number
   }
 }
 
@@ -41,8 +45,23 @@ export const authOptions: AuthOptions = {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' }
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) {
+          return null
+        }
+
+        // Fix 1: 登录接口速率限制 — 防止暴力破解密码
+        const ip = (req?.headers && typeof req.headers === 'object')
+          ? (req.headers as Record<string, string>)['x-forwarded-for']?.split(',')[0]?.trim()
+            || (req.headers as Record<string, string>)['x-real-ip']
+            || 'unknown'
+          : 'unknown'
+
+        const loginRateLimit = enforceRateLimit({
+          key: `auth-login:${ip}`,
+          ...getRateLimit('auth-login'),
+        })
+        if (!loginRateLimit.allowed) {
           return null
         }
 
@@ -67,14 +86,16 @@ export const authOptions: AuthOptions = {
           id: user.id,
           email: user.email,
           name: user.name,
-          role: user.role
+          role: user.role,
+          passwordVersion: user.passwordVersion,
         }
       }
     })
   ],
   session: {
     strategy: 'jwt',
-    maxAge: 30 * 24 * 60 * 60,
+    // Fix 3: 缩短 JWT 有效期从 30 天到 7 天，降低 token 被盗后的攻击窗口
+    maxAge: 7 * 24 * 60 * 60,
   },
   pages: {
     signIn: '/login'
@@ -115,7 +136,9 @@ export const authOptions: AuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id
-        token.role = (user as SessionUser).role
+        token.role = (user as SessionUser & { passwordVersion?: number }).role
+        // Fix 3: 将 passwordVersion 存入 JWT，用于检测密码是否已更改
+        token.passwordVersion = (user as SessionUser & { passwordVersion?: number }).passwordVersion ?? 0
       }
       return token
     },
@@ -131,46 +154,56 @@ export const authOptions: AuthOptions = {
   debug: process.env.NODE_ENV !== 'production' && process.env.NEXTAUTH_DEBUG === 'true',
 }
 
-// 用户存在性缓存（5分钟TTL），避免每次请求都查询数据库
-// 用于检测已被管理员删除但JWT尚未过期的用户
-const userExistsCache = new Map<string, { exists: boolean; expiry: number }>()
+// 用户验证缓存（5分钟TTL），避免每次请求都查询数据库
+// 用于检测已被管理员删除但JWT尚未过期的用户，以及密码版本变更
+interface UserCacheEntry {
+  exists: boolean
+  passwordVersion: number
+  expiry: number
+}
+
+const userValidationCache = new Map<string, UserCacheEntry>()
 const USER_CACHE_TTL = 5 * 60 * 1000 // 5分钟
 const USER_CACHE_MAX_SIZE = 100
 
-async function checkUserExists(userId: string): Promise<boolean> {
+async function validateUser(userId: string): Promise<UserCacheEntry | null> {
   const now = Date.now()
-  const cached = userExistsCache.get(userId)
-  
+  const cached = userValidationCache.get(userId)
+
   if (cached && now < cached.expiry) {
-    return cached.exists
+    return cached
   }
 
   // 清理过期缓存
-  if (userExistsCache.size > USER_CACHE_MAX_SIZE) {
-    for (const [key, val] of userExistsCache) {
-      if (now > val.expiry) userExistsCache.delete(key)
+  if (userValidationCache.size > USER_CACHE_MAX_SIZE) {
+    for (const [key, val] of userValidationCache) {
+      if (now > val.expiry) userValidationCache.delete(key)
     }
   }
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true }
+    select: { id: true, passwordVersion: true }
   })
-  
-  const exists = !!user
-  userExistsCache.set(userId, { exists, expiry: now + USER_CACHE_TTL })
-  return exists
+
+  const entry: UserCacheEntry = {
+    exists: !!user,
+    passwordVersion: user?.passwordVersion ?? 0,
+    expiry: now + USER_CACHE_TTL,
+  }
+  userValidationCache.set(userId, entry)
+  return entry
 }
 
-// 当用户被删除时，清除缓存（供 admin API 调用）
+// 当用户被删除或密码变更时，清除缓存（供 admin API 和密码变更 API 调用）
 export function invalidateUserCache(userId: string) {
-  userExistsCache.delete(userId)
+  userValidationCache.delete(userId)
 }
 
 export async function auth(request: NextRequest): Promise<Session | null> {
   try {
     // 1. 优先尝试 Cookie/Session 认证
-    const token = await getToken({ 
+    const token = await getToken({
       req: request,
       secret: process.env.NEXTAUTH_SECRET,
       // 显式指定 cookie 名，与 authOptions.cookies.sessionToken.name 保持一致
@@ -178,14 +211,25 @@ export async function auth(request: NextRequest): Promise<Session | null> {
       // 在反向代理场景下 secureCookie 必须与 useSecureCookies 一致
       secureCookie: useSecureCookies,
     })
-    
+
     if (token) {
-      // 检查用户是否仍然存在（防止被管理员删除后 JWT 仍有效）
       const userId = token.id as string
-      if (!userId || !(await checkUserExists(userId))) {
+      if (!userId) {
         return null
       }
-      
+
+      // Fix 3: 验证用户存在性 + 密码版本（防止被删除或密码变更后 JWT 仍有效）
+      const userEntry = await validateUser(userId)
+      if (!userEntry || !userEntry.exists) {
+        return null
+      }
+
+      // 如果 JWT 中的 passwordVersion 与数据库不一致，说明密码已更改，强制重新登录
+      const tokenPasswordVersion = (token.passwordVersion as number) ?? 0
+      if (tokenPasswordVersion < userEntry.passwordVersion) {
+        return null
+      }
+
       return {
         user: {
           id: token.id as string,
@@ -193,14 +237,14 @@ export async function auth(request: NextRequest): Promise<Session | null> {
           name: token.name as string,
           role: (token.role as string) || 'USER'
         },
-        expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+        expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
       }
     }
 
     // 2. Cookie 无效时，尝试 API Key 认证（从 Authorization: Bearer bfk_xxx 头）
     return await authByApiKey(request)
   } catch (error) {
-    console.error('Auth error:', error)
+    logError('Auth error', error)
     return null
   }
 }

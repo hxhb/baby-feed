@@ -4,11 +4,22 @@ import { requireAdmin } from '@/lib/admin'
 import { prisma } from '@/lib/prisma'
 import { validateId, safeParseBody, validateSameOrigin } from '@/lib/validation'
 import { noStoreHeaders } from '@/lib/api-helpers'
+import { logError } from '@/lib/logger'
+import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
+import { getRateLimit } from '@/lib/rate-limit-config'
 
 export async function GET(request: NextRequest) {
   const check = await requireAdmin(request)
   if ('error' in check) {
     return NextResponse.json({ error: check.error }, { status: check.status })
+  }
+
+  const rateLimit = enforceRateLimit({
+    key: buildUserActionKey('admin-users-list', check.session.user.id, request),
+    ...getRateLimit('admin-users-list'),
+  })
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: '请求过于频繁' }, { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } })
   }
 
   try {
@@ -34,7 +45,7 @@ export async function GET(request: NextRequest) {
       headers: noStoreHeaders,
     })
   } catch (error) {
-    console.error('获取用户列表失败:', error)
+    logError('获取用户列表失败', error)
     return NextResponse.json({ error: '获取用户列表失败' }, { status: 500 })
   }
 }
@@ -43,6 +54,14 @@ export async function DELETE(request: NextRequest) {
   const check = await requireAdmin(request)
   if ('error' in check) {
     return NextResponse.json({ error: check.error }, { status: check.status })
+  }
+
+  const rateLimit = enforceRateLimit({
+    key: buildUserActionKey('admin-users-delete', check.session.user.id, request),
+    ...getRateLimit('admin-users-delete'),
+  })
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: '操作过于频繁' }, { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } })
   }
 
   try {
@@ -92,7 +111,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('删除用户失败:', error)
+    logError('删除用户失败', error)
     return NextResponse.json({ error: '删除用户失败' }, { status: 500 })
   }
 }
@@ -101,6 +120,14 @@ export async function PUT(request: NextRequest) {
   const check = await requireAdmin(request)
   if ('error' in check) {
     return NextResponse.json({ error: check.error }, { status: check.status })
+  }
+
+  const rateLimit = enforceRateLimit({
+    key: buildUserActionKey('admin-users-role', check.session.user.id, request),
+    ...getRateLimit('admin-users-role'),
+  })
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: '操作过于频繁' }, { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } })
   }
 
   try {
@@ -141,7 +168,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json(user)
   } catch (error) {
-    console.error('修改用户角色失败:', error)
+    logError('修改用户角色失败', error)
     return NextResponse.json({ error: '修改用户角色失败' }, { status: 500 })
   }
 }

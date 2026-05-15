@@ -16,6 +16,8 @@ services:
       # 如果通过域名访问：https://yourdomain.com
       # 如果仅本机访问：http://localhost:3000
       - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
+      # 如果使用反向代理（nginx/traefik），设为 true 以信任 X-Forwarded-For 头
+      - TRUST_PROXY=${TRUST_PROXY:-true}
     volumes:
       - ${DATA_PATH:-./data}:/app/data
     healthcheck:

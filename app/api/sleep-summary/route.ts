@@ -3,7 +3,9 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { validateId, validateDateOnlyString } from '@/lib/validation'
 import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
+import { getRateLimit } from '@/lib/rate-limit-config'
 import { noStoreHeaders, getBeijingDayRange, getBeijingDateStr, splitDurationByBeijingDay } from '@/lib/api-helpers'
+import { logError } from '@/lib/logger'
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,8 +16,7 @@ export async function GET(request: NextRequest) {
 
     const rateLimit = enforceRateLimit({
       key: buildUserActionKey('sleep-summary', session.user.id, request),
-      limit: 120,
-      windowMs: 60 * 1000,
+      ...getRateLimit('sleep-summary'),
     })
     if (!rateLimit.allowed) {
       return NextResponse.json({ error: '请求过于频繁，请稍后再试' }, {
@@ -143,7 +144,7 @@ export async function GET(request: NextRequest) {
       segments,
     }, { headers: noStoreHeaders })
   } catch (error) {
-    console.error('获取睡眠摘要失败:', error)
+    logError('获取睡眠摘要失败', error)
     return NextResponse.json({ error: '获取失败' }, { status: 500, headers: noStoreHeaders })
   }
 }

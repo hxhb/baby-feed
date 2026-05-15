@@ -3,8 +3,10 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { generateApiKey } from '@/lib/api-key'
 import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
+import { getRateLimit } from '@/lib/rate-limit-config'
 import { validateString, validateId, safeParseBody, validateSameOrigin } from '@/lib/validation'
 import { noStoreHeaders } from '@/lib/api-helpers'
+import { logError } from '@/lib/logger'
 
 // 每个用户最多拥有的 API Key 数量
 const MAX_KEYS_PER_USER = 10
@@ -22,8 +24,7 @@ export async function GET(request: NextRequest) {
 
     const listRateLimit = enforceRateLimit({
       key: buildUserActionKey('user-api-key-list', session.user.id, request),
-      limit: 60,
-      windowMs: 60 * 1000,
+      ...getRateLimit('user-api-key-list'),
     })
     if (!listRateLimit.allowed) {
       return NextResponse.json(
@@ -54,7 +55,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(keys, { headers: noStoreHeaders })
   } catch (error) {
-    console.error('获取 API Key 列表失败:', error)
+    logError('获取 API Key 列表失败', error)
     return NextResponse.json({ error: '获取失败' }, { status: 500, headers: noStoreHeaders })
   }
 }
@@ -85,8 +86,7 @@ export async function POST(request: NextRequest) {
 
     const createApiKeyRateLimit = enforceRateLimit({
       key: buildUserActionKey('user-api-key-create', session.user.id, request),
-      limit: 5,
-      windowMs: 10 * 60 * 1000,
+      ...getRateLimit('user-api-key-create'),
     })
     if (!createApiKeyRateLimit.allowed) {
       return NextResponse.json(
@@ -176,7 +176,7 @@ export async function POST(request: NextRequest) {
       message: '请立即保存此 API Key，之后将无法再次查看完整 Key。'
     }, { status: 201, headers: noStoreHeaders })
   } catch (error) {
-    console.error('创建 API Key 失败:', error)
+    logError('创建 API Key 失败', error)
     return NextResponse.json({ error: '创建失败' }, { status: 500, headers: noStoreHeaders })
   }
 }
@@ -202,8 +202,7 @@ export async function DELETE(request: NextRequest) {
 
     const deleteApiKeyRateLimit = enforceRateLimit({
       key: buildUserActionKey('user-api-key-delete', session.user.id, request),
-      limit: 10,
-      windowMs: 10 * 60 * 1000,
+      ...getRateLimit('user-api-key-delete'),
     })
     if (!deleteApiKeyRateLimit.allowed) {
       return NextResponse.json(
@@ -252,7 +251,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ message: 'API Key 已删除' }, { headers: noStoreHeaders })
   } catch (error) {
-    console.error('删除 API Key 失败:', error)
+    logError('删除 API Key 失败', error)
     return NextResponse.json({ error: '删除失败' }, { status: 500, headers: noStoreHeaders })
   }
 }

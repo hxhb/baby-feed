@@ -8,18 +8,19 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String
-  password  String
-  role      String   @default("USER")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  babies    Baby[]
-  feedingRecords FeedingRecord[]
-  healthRecords HealthRecord[]
-  apiKeys   ApiKey[]
-  memos     Memo[]
+  id              String   @id @default(cuid())
+  email           String   @unique
+  name            String
+  password        String
+  role            String   @default("USER")
+  passwordVersion Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  babies          Baby[]
+  feedingRecords  FeedingRecord[]
+  healthRecords   HealthRecord[]
+  apiKeys         ApiKey[]
+  memos           Memo[]
 }
 
 model SiteSettings {

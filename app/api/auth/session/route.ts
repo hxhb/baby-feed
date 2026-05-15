@@ -1,6 +1,7 @@
 import { auth } from '@/lib/auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { noStoreHeaders } from '@/lib/api-helpers'
+import { logError } from '@/lib/logger'
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,7 +13,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ user: session.user }, { headers: noStoreHeaders })
   } catch (error) {
-    console.error('获取会话失败:', error)
+    logError('获取会话失败', error)
     return NextResponse.json({ user: null }, { headers: noStoreHeaders })
   }
 }

@@ -71,9 +71,16 @@ export function enforceRateLimit(options: RateLimitOptions): RateLimitResult {
 }
 
 export function getClientIp(request: NextRequest): string {
-  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-    || request.headers.get('x-real-ip')
-    || 'unknown'
+  // 仅在明确信任反向代理时才读取 x-forwarded-for / x-real-ip
+  // 否则攻击者可伪造这些头来绕过速率限制
+  if (process.env.TRUST_PROXY === 'true') {
+    return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+      || request.headers.get('x-real-ip')
+      || 'unknown'
+  }
+  // 非信任代理模式：使用 x-real-ip（通常由 Next.js 运行时设置，无法被外部伪造）
+  // 如果都不可用则回退到固定值（单实例场景下所有用户共享限流池）
+  return request.headers.get('x-real-ip') || 'unknown'
 }
 
 export function buildUserActionKey(action: string, userId: string, request: NextRequest): string {

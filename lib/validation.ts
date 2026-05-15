@@ -463,21 +463,32 @@ function isApiKeyRequest(request: Request): boolean {
   return !!authHeader && /^Bearer\s+bfk_[a-f0-9]{64}$/i.test(authHeader)
 }
 
+// 从环境变量构建可信来源集合（启动时确定，不依赖请求头）
+// 这避免了攻击者伪造 x-forwarded-proto / x-forwarded-host 绕过 CSRF 检查
+const trustedOrigins: Set<string> = (() => {
+  const origins = new Set<string>()
+  const nextAuthUrl = process.env.NEXTAUTH_URL
+  if (nextAuthUrl) {
+    try { origins.add(new URL(nextAuthUrl).origin) } catch { /* 忽略无效 URL */ }
+  }
+  const corsOrigin = process.env.CORS_ALLOWED_ORIGIN
+  if (corsOrigin) {
+    try { origins.add(new URL(corsOrigin).origin) } catch { /* 忽略无效 URL */ }
+  }
+  if (origins.size === 0) {
+    origins.add('http://localhost:3000')
+  }
+  return origins
+})()
+
 export function validateSameOrigin(request: Request): ValidationResult {
   if (isApiKeyRequest(request)) {
     return { valid: true }
   }
 
-  const requestUrl = new URL(request.url)
-  const forwardedProto = request.headers.get('x-forwarded-proto')
-  const forwardedHost = request.headers.get('x-forwarded-host')
-  const host = forwardedHost || request.headers.get('host') || requestUrl.host
-  const protocol = forwardedProto || requestUrl.protocol.replace(':', '')
-  const expectedOrigin = `${protocol}://${host}`
-
   const origin = request.headers.get('origin')
   if (origin) {
-    return origin === expectedOrigin
+    return trustedOrigins.has(origin)
       ? { valid: true }
       : { valid: false, error: '非法请求来源' }
   }
@@ -486,7 +497,7 @@ export function validateSameOrigin(request: Request): ValidationResult {
   if (referer) {
     try {
       const refererUrl = new URL(referer)
-      return refererUrl.origin === expectedOrigin
+      return trustedOrigins.has(refererUrl.origin)
         ? { valid: true }
         : { valid: false, error: '非法请求来源' }
     } catch {

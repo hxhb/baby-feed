@@ -4,7 +4,9 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { validateFeedingInput, validateId, FEEDING_TYPES, safeParseBody, validateDateOnlyString, validateSameOrigin } from '@/lib/validation'
 import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
+import { getRateLimit } from '@/lib/rate-limit-config'
 import { noStoreHeaders, getBeijingDayRange } from '@/lib/api-helpers'
+import { logError } from '@/lib/logger'
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,8 +17,7 @@ export async function GET(request: NextRequest) {
 
     const listRateLimit = enforceRateLimit({
       key: buildUserActionKey('feeding-list', session.user.id, request),
-      limit: 180,
-      windowMs: 60 * 1000,
+      ...getRateLimit('feeding-list'),
     })
     if (!listRateLimit.allowed) {
       return NextResponse.json({ error: '请求过于频繁，请稍后再试' }, {
@@ -70,7 +71,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(records, { headers: noStoreHeaders })
   } catch (error) {
-    console.error('获取喂养记录失败:', error)
+    logError('获取喂养记录失败', error)
     return NextResponse.json({ error: '获取失败' }, { status: 500, headers: noStoreHeaders })
   }
 }
@@ -84,8 +85,7 @@ export async function POST(request: NextRequest) {
 
     const createRateLimit = enforceRateLimit({
       key: buildUserActionKey('feeding-create', session.user.id, request),
-      limit: 60,
-      windowMs: 10 * 60 * 1000,
+      ...getRateLimit('feeding-create'),
     })
     if (!createRateLimit.allowed) {
       return NextResponse.json({ error: '操作过于频繁，请稍后再试' }, {
@@ -188,7 +188,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(record, { status: 201, headers: noStoreHeaders })
   } catch (error) {
-    console.error('创建喂养记录失败:', error)
+    logError('创建喂养记录失败', error)
     return NextResponse.json({ error: '创建失败' }, { status: 500, headers: noStoreHeaders })
   }
 }

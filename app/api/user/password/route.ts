@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
-import { auth } from '@/lib/auth'
+import { auth, invalidateUserCache } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
+import { getRateLimit } from '@/lib/rate-limit-config'
 import { safeParseBody, validateSameOrigin, validatePassword } from '@/lib/validation'
 import { noStoreHeaders } from '@/lib/api-helpers'
+import { logError } from '@/lib/logger'
 
 // PUT /api/user/password - 修改密码
 export async function PUT(request: NextRequest) {
@@ -21,8 +23,7 @@ export async function PUT(request: NextRequest) {
 
     const passwordRateLimit = enforceRateLimit({
       key: buildUserActionKey('user-password-update', session.user.id, request),
-      limit: 5,
-      windowMs: 10 * 60 * 1000,
+      ...getRateLimit('user-password-update'),
     })
     if (!passwordRateLimit.allowed) {
       return NextResponse.json(
@@ -79,16 +80,26 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: '当前密码不正确' }, { status: 400, headers: noStoreHeaders })
     }
 
-    // 哈希新密码并更新
-    const hashedPassword = await bcrypt.hash(newPassword, 10)
-    await prisma.user.update({
-      where: { id: session.user.id },
-      data: { password: hashedPassword }
+    // 哈希新密码并更新，同时递增 passwordVersion 使所有现有 JWT 失效
+    const hashedPassword = await bcrypt.hash(newPassword, 12)
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: session.user.id },
+        data: {
+          password: hashedPassword,
+          passwordVersion: { increment: 1 },
+        }
+      })
+      // 吊销所有 API Key（密码泄露场景下，API Key 也应失效）
+      await tx.apiKey.deleteMany({ where: { userId: session.user.id } })
     })
 
-    return NextResponse.json({ message: '密码修改成功' }, { headers: noStoreHeaders })
+    // 清除用户验证缓存，使 passwordVersion 检查立即生效
+    invalidateUserCache(session.user.id)
+
+    return NextResponse.json({ message: '密码修改成功，请重新登录' }, { headers: noStoreHeaders })
   } catch (error) {
-    console.error('修改密码失败:', error)
+    logError('修改密码失败', error)
     return NextResponse.json({ error: '修改密码失败' }, { status: 500, headers: noStoreHeaders })
   }
 }

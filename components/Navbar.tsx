@@ -66,6 +66,18 @@ export default function Navbar() {
   const handleSignOut = async () => {
     try {
       setIsSigningOut(true)
+      // 登出时清除 Service Worker 缓存，防止敏感数据残留在共享设备上
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        const mc = new MessageChannel()
+        navigator.serviceWorker.controller.postMessage(
+          { type: 'CLEAR_CACHE' },
+          [mc.port2]
+        )
+        await new Promise<void>((resolve) => {
+          mc.port1.onmessage = () => resolve()
+          setTimeout(resolve, 1000) // 超时 1 秒后继续登出
+        })
+      }
       await signOut({ callbackUrl: '/login' })
     } catch (error) {
       console.error('Sign out failed:', error)

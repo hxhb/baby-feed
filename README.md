@@ -51,6 +51,7 @@ docker run -d \
   -e NEXTAUTH_SECRET="$(openssl rand -base64 32)" \
   -e NEXTAUTH_URL="http://localhost:3000" \
   -e DATABASE_URL="file:/app/data/baby-feed.db" \
+  -e TRUST_PROXY="true" \
   -v ./data:/app/data \
   --restart unless-stopped \
   ahzknarf/baby-feed:latest
@@ -75,6 +76,7 @@ services:
       - DATABASE_URL=file:/app/data/baby-feed.db
       - NEXTAUTH_SECRET=your-random-secret-at-least-32-chars  # 必须修改！
       - NEXTAUTH_URL=http://localhost:3000                     # 修改为实际访问地址
+      - TRUST_PROXY=true                                       # 信任代理头，用于正确识别客户端 IP
     volumes:
       - ./data:/app/data
     healthcheck:
@@ -99,6 +101,7 @@ docker-compose up -d
 | `NEXTAUTH_SECRET` | 是 | JWT 加密密钥，至少 32 位随机字符串，用 `openssl rand -base64 32` 生成 |
 | `NEXTAUTH_URL` | 是 | 应用访问地址，如 `http://localhost:3000` 或 `https://baby.yourdomain.com` |
 | `CORS_ALLOWED_ORIGIN` | 否 | 自定义 CORS 来源，默认使用 `NEXTAUTH_URL` |
+| `TRUST_PROXY` | 否 | 设为 `true` 时信任反向代理传递的 `X-Forwarded-For` 头（用于正确识别客户端 IP 以实施速率限制）。使用 Nginx/Traefik 等反向代理时**必须设为 `true`**，默认 `true` |
 
 > **注意**：如果使用 HTTPS 反向代理，`NEXTAUTH_URL` 必须以 `https://` 开头。
 

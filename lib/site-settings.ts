@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { logError } from '@/lib/logger'
 
 export interface SiteSettings {
   allowRegistration: boolean
@@ -20,7 +21,7 @@ export async function getSiteSettings(): Promise<SiteSettings> {
       allowRegistration: settingsMap.get('allowRegistration') !== 'false',
     }
   } catch (error) {
-    console.error('查询站点设置失败:', error)
+    logError('查询站点设置失败', error)
     return {
       allowRegistration: true,
     }

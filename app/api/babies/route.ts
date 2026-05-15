@@ -3,7 +3,9 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { validateBabyInput, GENDERS, safeParseBody, validateSameOrigin } from '@/lib/validation'
 import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
+import { getRateLimit } from '@/lib/rate-limit-config'
 import { noStoreHeaders } from '@/lib/api-helpers'
+import { logError } from '@/lib/logger'
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,8 +16,7 @@ export async function GET(request: NextRequest) {
 
     const listRateLimit = enforceRateLimit({
       key: buildUserActionKey('babies-list', session.user.id, request),
-      limit: 120,
-      windowMs: 60 * 1000,
+      ...getRateLimit('babies-list'),
     })
     if (!listRateLimit.allowed) {
       return NextResponse.json({ error: '请求过于频繁，请稍后再试' }, {
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(babies, { headers: noStoreHeaders })
   } catch (error) {
-    console.error('获取婴儿列表失败:', error)
+    logError('获取婴儿列表失败', error)
     return NextResponse.json({ error: '获取失败' }, { status: 500, headers: noStoreHeaders })
   }
 }
@@ -48,8 +49,7 @@ export async function POST(request: NextRequest) {
 
     const createRateLimit = enforceRateLimit({
       key: buildUserActionKey('babies-create', session.user.id, request),
-      limit: 20,
-      windowMs: 10 * 60 * 1000,
+      ...getRateLimit('babies-create'),
     })
     if (!createRateLimit.allowed) {
       return NextResponse.json({ error: '操作过于频繁，请稍后再试' }, {
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(baby, { status: 201, headers: noStoreHeaders })
   } catch (error) {
-    console.error('创建婴儿失败:', error)
+    logError('创建婴儿失败', error)
     return NextResponse.json({ error: '创建失败' }, { status: 500, headers: noStoreHeaders })
   }
 }

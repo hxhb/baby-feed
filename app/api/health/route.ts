@@ -4,7 +4,9 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { validateHealthInput, validateId, HEALTH_TYPES, safeParseBody, validateDateOnlyString, validateEnum, validateSameOrigin } from '@/lib/validation'
 import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
+import { getRateLimit } from '@/lib/rate-limit-config'
 import { noStoreHeaders, getBeijingDayRange, buildSleepAwareOrClause } from '@/lib/api-helpers'
+import { logError } from '@/lib/logger'
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,8 +17,7 @@ export async function GET(request: NextRequest) {
 
     const listRateLimit = enforceRateLimit({
       key: buildUserActionKey('health-list', session.user.id, request),
-      limit: 180,
-      windowMs: 60 * 1000,
+      ...getRateLimit('health-list'),
     })
     if (!listRateLimit.allowed) {
       return NextResponse.json({ error: '请求过于频繁，请稍后再试' }, {
@@ -82,7 +83,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(records, { headers: noStoreHeaders })
   } catch (error) {
-    console.error('获取健康记录失败:', error)
+    logError('获取健康记录失败', error)
     return NextResponse.json({ error: '获取失败' }, { status: 500, headers: noStoreHeaders })
   }
 }
@@ -96,8 +97,7 @@ export async function POST(request: NextRequest) {
 
     const createRateLimit = enforceRateLimit({
       key: buildUserActionKey('health-create', session.user.id, request),
-      limit: 60,
-      windowMs: 10 * 60 * 1000,
+      ...getRateLimit('health-create'),
     })
     if (!createRateLimit.allowed) {
       return NextResponse.json({ error: '操作过于频繁，请稍后再试' }, {
@@ -232,7 +232,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(record, { status: 201, headers: noStoreHeaders })
   } catch (error) {
-    console.error('创建健康记录失败:', error)
+    logError('创建健康记录失败', error)
     return NextResponse.json({ error: '创建失败' }, { status: 500, headers: noStoreHeaders })
   }
 }

@@ -3,7 +3,9 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { validateId, validateDateOnlyString } from '@/lib/validation'
 import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
+import { getRateLimit } from '@/lib/rate-limit-config'
 import { noStoreHeaders, getBeijingDayRange } from '@/lib/api-helpers'
+import { logError } from '@/lib/logger'
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,8 +16,7 @@ export async function GET(request: NextRequest) {
 
     const dayStatsRateLimit = enforceRateLimit({
       key: buildUserActionKey('stats-day-query', session.user.id, request),
-      limit: 120,
-      windowMs: 60 * 1000,
+      ...getRateLimit('stats-day-query'),
     })
     if (!dayStatsRateLimit.allowed) {
       return NextResponse.json({ error: '请求过于频繁，请稍后再试' }, {
@@ -108,7 +109,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(dayStats, { headers: noStoreHeaders })
   } catch (error) {
-    console.error('获取单日统计失败:', error)
+    logError('获取单日统计失败', error)
     return NextResponse.json({ error: '获取失败' }, { status: 500, headers: noStoreHeaders })
   }
 }
