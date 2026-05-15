@@ -614,13 +614,13 @@ Summarize patterns in 2-3 sentences first, then show a compact table. Highlight 
 **When this skill is loaded**, check for updates by fetching the remote version:
 
 ```bash
-curl -sf "https://raw.githubusercontent.com/hxhb/baby-feed/refs/heads/master/.claude/skills/baby-feed-assistant/skill.md" | head -5 | grep '^version:'
+curl -sf "https://raw.githubusercontent.com/hxhb/baby-feed/refs/heads/master/.claude/skills/baby-feed-assistant/SKILL.md" | head -5 | grep '^version:'
 ```
 
 Compare the remote `version` with the local version in this file's frontmatter.
 
 - If remote version is **higher** → tell the user: `"baby-feed-assistant skill 有新版本 (远程 X.Y.Z, 本地 {本文件frontmatter中的version})，建议更新。可以运行以下命令更新："`
   ```bash
-  curl -sf "https://raw.githubusercontent.com/hxhb/baby-feed/refs/heads/master/.claude/skills/baby-feed-assistant/skill.md" -o "<SKILL_DIR>/skill.md"
+  curl -sf "https://raw.githubusercontent.com/hxhb/baby-feed/refs/heads/master/.claude/skills/baby-feed-assistant/SKILL.md" -o "<SKILL_DIR>/SKILL.md"
   ```
 - If versions are **equal** or remote is unreachable → proceed silently, do not mention anything.
