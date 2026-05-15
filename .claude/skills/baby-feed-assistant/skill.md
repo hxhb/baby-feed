@@ -1,6 +1,6 @@
 ---
 name: baby-feed-assistant
-version: 2.0.1
+version: 2.1.0
 description: "Query and manage baby feeding/health data via the Baby Feed HTTP API. Use this skill whenever the user asks about their baby's feeding situation, daily summary, health stats, sleep, diapers, weight trends, memos, reminders, or wants to record a new feeding/health/memo event. Trigger on any mention of: feeding, nursing, formula, breast milk, diaper, sleep, weight, temperature, baby stats, today's summary, how much the baby ate, when was the last feed, record a feed, log a diaper change, memo, reminder, 备忘, 待办, vaccine schedule, upcoming checkup, etc. Even casual questions like '宝宝今天吃了多少' or '记录一下刚才喂奶' or '有什么备忘' or '下次疫苗什么时候' should trigger this skill."
 ---
 
@@ -18,11 +18,65 @@ source <SKILL_DIR>/config.local && curl -s -H "Authorization: Bearer $BABY_FEED_
 
 For POST/PUT/DELETE, add: `-H "Content-Type: application/json" -d '{ ... }'`
 
-## Time Handling
+## Time Handling — CRITICAL
 
-All dates are Beijing time (UTC+8).
-- Get today: `date -u -d '+8 hours' '+%Y-%m-%d'`
-- Get current timestamp: `date -u -d '+8 hours' '+%Y-%m-%dT%H:%M:%S+08:00'`
+This system uses **Beijing time (UTC+8)** throughout. Getting timestamps wrong is the #1 source of bugs.
+
+### The Golden Rule
+
+**All timestamps sent to POST/PUT APIs MUST include the `+08:00` offset suffix.**
+
+The API stores times via `new Date(value)` in JavaScript. If you omit the timezone offset:
+- `"2026-05-15T15:00:00"` (no offset) → JS interprets as **UTC 15:00** → stored as UTC 15:00 → displays as Beijing 23:00. **8 hours off!**
+- `"2026-05-15T15:00:00Z"` (Z = UTC) → stored as UTC 15:00 → same problem.
+- `"2026-05-15T15:00:00+08:00"` → JS correctly converts to **UTC 07:00** → stored as UTC 07:00 → displays as Beijing 15:00. **Correct!**
+
+### Generating Timestamps
+
+**Get today's date (Beijing):**
+```bash
+date -u -d '+8 hours' '+%Y-%m-%d'
+```
+
+**Get current time as Beijing ISO 8601 (for POST body):**
+```bash
+date -u -d '+8 hours' '+%Y-%m-%dT%H:%M:%S+08:00'
+```
+
+**Convert user-specified Beijing time to API format:**
+User says "下午3点" (today) → `"2026-05-15T15:00:00+08:00"` (MUST have `+08:00`)
+
+### Reading Timestamps from API Responses
+
+API responses return UTC timestamps with `Z` suffix (e.g. `"2026-05-15T07:00:00.000Z"`).
+To display to user: convert UTC to Beijing by adding 8 hours.
+- `"2026-05-15T07:00:00.000Z"` → Beijing 15:00 (2026-05-15)
+- `"2026-05-14T23:30:00.000Z"` → Beijing 07:30 (2026-05-15, note the date change!)
+
+### Query Parameters
+
+The `date` query parameter (used in GET requests) takes a **Beijing date** string `YYYY-MM-DD`. The server converts this to the correct UTC range internally. No timezone math needed for GET queries.
+
+### Summary Table
+
+| Scenario | Format | Example |
+|----------|--------|---------|
+| POST/PUT `startTime` | Beijing with `+08:00` | `"2026-05-15T15:00:00+08:00"` |
+| POST/PUT `recordedAt` | Beijing with `+08:00` | `"2026-05-15T15:00:00+08:00"` |
+| POST/PUT `sleepStartTime` | Beijing with `+08:00` | `"2026-05-15T22:00:00+08:00"` |
+| POST/PUT `sleepEndTime` | Beijing with `+08:00` | `"2026-05-16T06:30:00+08:00"` |
+| POST/PUT `scheduledAt` (memo) | Beijing with `+08:00` | `"2026-06-01T09:00:00+08:00"` |
+| GET `date` param | Beijing date only | `2026-05-15` |
+| Response timestamps | UTC with `Z` | `"2026-05-15T07:00:00.000Z"` |
+
+### Common Timestamp Mistakes
+
+| Mistake | Result | Fix |
+|---------|--------|-----|
+| `"2026-05-15T15:00:00"` (no offset) | Stored as UTC 15:00, shown as Beijing 23:00 | Add `+08:00` |
+| `"2026-05-15T15:00:00Z"` (Z suffix) | Stored as UTC 15:00, shown as Beijing 23:00 | Replace `Z` with `+08:00` |
+| Using `date '+%Y-%m-%dT%H:%M:%S'` without UTC+8 | System timezone may not be Beijing | Use `date -u -d '+8 hours' ...` |
+| Treating response `Z` time as Beijing | All display times off by 8 hours | Add 8 hours when displaying |
 
 ---
 
@@ -71,14 +125,14 @@ Create a feeding record.
 |-------|----------|-------------|
 | `babyId` | Yes | Baby ID |
 | `type` | Yes | `BREAST_MILK` / `BREAST_MILK_BOTTLE` / `FORMULA` / `SOLID_FOOD` |
-| `startTime` | Yes | ISO 8601. Default to current Beijing time if user doesn't specify |
+| `startTime` | Yes | ISO 8601 **with `+08:00` offset**. Default to current Beijing time if user doesn't specify |
 | `leftBreastDuration` | BREAST_MILK | Minutes (integer) |
 | `rightBreastDuration` | BREAST_MILK | Minutes (integer) |
 | `breastMilkAmount` | BREAST_MILK_BOTTLE | ml (number) |
 | `formulaAmount` | FORMULA | ml (number) |
 | `solidFoodName` | SOLID_FOOD | What the baby ate |
 | `solidFoodAmount` | SOLID_FOOD | How much |
-| `endTime` | No | ISO 8601 |
+| `endTime` | No | ISO 8601 **with `+08:00` offset** |
 | `notes` | No | String |
 
 ---
@@ -102,7 +156,7 @@ All health records share a common API and differentiate by `type`. There are **8
 - With `date` + no `type` → returns ALL health records for that day (all types mixed)
 
 #### POST /api/health
-Create a health record. Common required fields: `babyId`, `type`, `recordedAt` (ISO 8601).
+Create a health record. Common required fields: `babyId`, `type`, `recordedAt` (ISO 8601 **with `+08:00` offset**).
 
 ---
 
@@ -119,7 +173,7 @@ Create a health record. Common required fields: `babyId`, `type`, `recordedAt` (
 
 **Create body:**
 ```json
-{ "babyId": "ID", "type": "WEIGHT", "recordedAt": "ISO8601", "weight": 9.2 }
+{ "babyId": "ID", "type": "WEIGHT", "recordedAt": "2026-05-15T10:00:00+08:00", "weight": 9.2 }
 ```
 
 **When to use:**
@@ -141,7 +195,7 @@ Create a health record. Common required fields: `babyId`, `type`, `recordedAt` (
 
 **Create body:**
 ```json
-{ "babyId": "ID", "type": "HEIGHT", "recordedAt": "ISO8601", "height": 66 }
+{ "babyId": "ID", "type": "HEIGHT", "recordedAt": "2026-05-15T10:00:00+08:00", "height": 66 }
 ```
 
 **When to use:**
@@ -163,7 +217,7 @@ Create a health record. Common required fields: `babyId`, `type`, `recordedAt` (
 
 **Create body:**
 ```json
-{ "babyId": "ID", "type": "TEMPERATURE", "recordedAt": "ISO8601", "temperature": 36.8 }
+{ "babyId": "ID", "type": "TEMPERATURE", "recordedAt": "2026-05-15T10:00:00+08:00", "temperature": 36.8 }
 ```
 
 **When to use:**
@@ -187,7 +241,7 @@ Create a health record. Common required fields: `babyId`, `type`, `recordedAt` (
 
 **Create body:**
 ```json
-{ "babyId": "ID", "type": "DIAPER", "recordedAt": "ISO8601", "diaperType": "POOP", "diaperStatus": "多" }
+{ "babyId": "ID", "type": "DIAPER", "recordedAt": "2026-05-15T10:00:00+08:00", "diaperType": "POOP", "diaperStatus": "多" }
 ```
 
 **Counting:** `BOTH` counts as 1 pee AND 1 poop.
@@ -211,7 +265,7 @@ Create a health record. Common required fields: `babyId`, `type`, `recordedAt` (
 **Create body:**
 ```json
 {
-  "babyId": "ID", "type": "VACCINE", "recordedAt": "ISO8601",
+  "babyId": "ID", "type": "VACCINE", "recordedAt": "2026-05-15T09:30:00+08:00",
   "vaccineName": "五联疫苗", "vaccineManufacturer": "巴斯德",
   "vaccineDoseNumber": 1, "vaccineTotalDoses": 4
 }
@@ -237,7 +291,7 @@ Create a health record. Common required fields: `babyId`, `type`, `recordedAt` (
 
 **Create body:**
 ```json
-{ "babyId": "ID", "type": "MEDICATION", "recordedAt": "ISO8601", "medicationName": "益生菌", "medicationDose": "1包" }
+{ "babyId": "ID", "type": "MEDICATION", "recordedAt": "2026-05-15T08:00:00+08:00", "medicationName": "益生菌", "medicationDose": "1包" }
 ```
 
 **Alternative:** `GET /api/stats?babyId=ID&days=N` includes `medicationRecords[]` (only within the `days` range).
@@ -256,7 +310,7 @@ Create a health record. Common required fields: `babyId`, `type`, `recordedAt` (
 
 **Create body:**
 ```json
-{ "babyId": "ID", "type": "AD_VITAMIN", "recordedAt": "ISO8601", "adGiven": true }
+{ "babyId": "ID", "type": "AD_VITAMIN", "recordedAt": "2026-05-15T08:00:00+08:00", "adGiven": true }
 ```
 
 **Note:** Usually just need to check if AD was given today. The `stats/day` and `stats` APIs also include `adGiven: true/false` in their daily summaries.
@@ -279,7 +333,7 @@ Create a health record. Common required fields: `babyId`, `type`, `recordedAt` (
 **Create body:**
 ```json
 {
-  "babyId": "ID", "type": "SLEEP", "recordedAt": "ISO8601",
+  "babyId": "ID", "type": "SLEEP", "recordedAt": "2026-05-14T14:30:00+08:00",
   "sleepStartTime": "2026-05-14T13:00:00+08:00",
   "sleepEndTime": "2026-05-14T14:30:00+08:00"
 }
@@ -516,6 +570,9 @@ Summarize patterns in 2-3 sentences first, then show a compact table. Highlight 
 
 | Mistake | Correct approach |
 |---------|-----------------|
+| **Sending timestamps without `+08:00` offset** | All POST/PUT time fields MUST end with `+08:00`. Without it, times are off by 8 hours |
+| **Sending timestamps with `Z` (UTC) suffix** | Replace `Z` with `+08:00` and use Beijing local time values |
+| **Displaying response UTC times as-is** | Response times end in `Z` (UTC) — add 8 hours to convert to Beijing for display |
 | Using `stats/day` for weight/height trends | Use `GET /api/stats` → `weightTrend[]` / `heightTrend[]` |
 | Using `/api/health?type=SLEEP` for sleep queries | Use `GET /api/sleep-summary` (handles cross-midnight splitting) |
 | Passing `date` when you want full history | Omit `date` to get ALL records of that type |
