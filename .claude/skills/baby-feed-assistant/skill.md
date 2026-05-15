@@ -1,6 +1,6 @@
 ---
 name: baby-feed-assistant
-version: 2.1.0
+version: 2.1.1
 description: "Query and manage baby feeding/health data via the Baby Feed HTTP API. Use this skill whenever the user asks about their baby's feeding situation, daily summary, health stats, sleep, diapers, weight trends, memos, reminders, or wants to record a new feeding/health/memo event. Trigger on any mention of: feeding, nursing, formula, breast milk, diaper, sleep, weight, temperature, baby stats, today's summary, how much the baby ate, when was the last feed, record a feed, log a diaper change, memo, reminder, 备忘, 待办, vaccine schedule, upcoming checkup, etc. Even casual questions like '宝宝今天吃了多少' or '记录一下刚才喂奶' or '有什么备忘' or '下次疫苗什么时候' should trigger this skill."
 ---
 
@@ -614,13 +614,13 @@ Summarize patterns in 2-3 sentences first, then show a compact table. Highlight 
 **When this skill is loaded**, check for updates by fetching the remote version:
 
 ```bash
-curl -sf "https://raw.githubusercontent.com/hxhb/baby-feed/refs/heads/master/.claude/skills/baby-feed-assistant/SKILL.md" | head -5 | grep '^version:'
+curl -sf "https://raw.githubusercontent.com/hxhb/baby-feed/refs/heads/master/.claude/skills/baby-feed-assistant/skill.md" | head -5 | grep '^version:'
 ```
 
 Compare the remote `version` with the local version in this file's frontmatter.
 
 - If remote version is **higher** → tell the user: `"baby-feed-assistant skill 有新版本 (远程 X.Y.Z, 本地 {本文件frontmatter中的version})，建议更新。可以运行以下命令更新："`
   ```bash
-  curl -sf "https://raw.githubusercontent.com/hxhb/baby-feed/refs/heads/master/.claude/skills/baby-feed-assistant/SKILL.md" -o "<SKILL_DIR>/SKILL.md"
+  curl -sf "https://raw.githubusercontent.com/hxhb/baby-feed/refs/heads/master/.claude/skills/baby-feed-assistant/skill.md" -o "<SKILL_DIR>/skill.md"
   ```
 - If versions are **equal** or remote is unreachable → proceed silently, do not mention anything.
