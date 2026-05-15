@@ -30,9 +30,11 @@
 ### 其他特性
 - 多用户账号系统
 - 支持多宝宝管理
+- **备忘录**：创建定时备忘（如疫苗接种提醒、体检日期），支持完成标记和日期范围查询
 - 移动端响应式设计
 - **PWA 支持**：可安装到手机桌面，支持离线访问
 - **API Key 外部集成**：支持通过 HTTP API 对接外部程序（iOS 快捷指令、自动化脚本等）
+- **AI Agent 集成**：内置 Agent Skill，可接入 Claude Code 等 AI 平台，用自然语言查询和记录喂养数据
 - **管理员面板**：管理用户、控制注册开放
 - Docker 一键部署
 - 数据本地持久化（SQLite）
@@ -216,6 +218,9 @@ npm run dev
 | `/api/feeding/[id]` | PUT/DELETE | 修改 / 删除喂养记录 |
 | `/api/health` | GET/POST | 健康记录列表 / 添加记录 |
 | `/api/health/[id]` | PUT/DELETE | 修改 / 删除健康记录 |
+| `/api/memo` | GET/POST | 备忘录列表 / 创建备忘 |
+| `/api/memo/[id]` | PUT/DELETE | 更新（含标记完成） / 删除备忘 |
+| `/api/sleep-summary` | GET | 按日汇总的睡眠数据 |
 | `/api/stats` | GET | 多日统计数据 |
 | `/api/stats/day` | GET | 单日统计数据 |
 | `/api/timeline-dates` | GET | 时间轴有效日期 |
@@ -224,6 +229,78 @@ npm run dev
 
 完整的请求示例和参数说明见 [HTTP API 文档](docs/HTTP_REQUESTS.md)。
 
+## AI Agent 集成
+
+本项目内置了 **Agent Skill**（`.claude/skills/baby-feed-assistant/`），可以将 HTTP API 接入 AI Agent 平台（如 Claude Code），实现用自然语言查询和记录宝宝的喂养数据。
+
+### 工作原理
+
+```
+用户 → "宝宝今天吃了多少？"
+  ↓
+AI Agent 加载 Skill（API 文档 + 调用规范）
+  ↓
+Agent 通过 HTTP API + API Key 访问 Baby Feed
+  ↓
+返回自然语言摘要："今天亲喂母乳 7 次，共 60 分钟..."
+```
+
+Skill 本质上是一份结构化的 API 使用文档（`SKILL.md`），告诉 Agent 如何调用各个接口、如何处理时间戳、如何组织返回结果。Agent 读取后即可自主完成数据查询和记录创建。
+
+### 支持的交互示例
+
+| 用户说 | Agent 行为 |
+|--------|-----------|
+| "宝宝今天状况怎么样" | 并行查询喂养/睡眠/换尿布/疫苗等，生成日报 |
+| "记录一下刚喂了 120ml 配方奶" | 调用 POST /api/feeding 创建记录 |
+| "最近一周体重变化趋势" | 查询 /api/stats 的 weightTrend，生成分析 |
+| "有什么备忘" | 查询未完成的备忘录列表 |
+
+### 接入步骤
+
+#### 1. 创建 API Key
+
+在 Baby Feed 应用的 **设置 → API Key 管理** 中创建密钥，获得 `bfk_` 开头的 Key。
+
+#### 2. 配置 Skill 凭证
+
+```bash
+cd .claude/skills/baby-feed-assistant/
+cp config.local.example config.local
+```
+
+编辑 `config.local`，填入实际值：
+
+```bash
+BABY_FEED_BASE_URL=https://your-baby-feed-instance.example.com
+BABY_FEED_API_KEY=bfk_your_api_key_here
+```
+
+> `config.local` 已在 `.gitignore` 中，不会被提交到仓库。
+
+#### 3. 在 AI Agent 中使用
+
+以 Claude Code 为例，在项目目录下启动后，Skill 会被自动发现。直接用自然语言提问即可：
+
+```
+> 宝宝今天吃了多少？
+> 记录体温 37.2
+> 最近睡眠情况怎么样？
+```
+
+### 适配其他 Agent 平台
+
+Skill 的核心是 `SKILL.md` 文件，包含完整的 API 调用规范。如需接入其他 AI Agent 平台：
+
+1. 将 `SKILL.md` 的内容作为系统提示或知识库注入 Agent
+2. 配置 Agent 可调用 HTTP 请求（curl 或等效工具）
+3. 提供 `BABY_FEED_BASE_URL` 和 `BABY_FEED_API_KEY` 作为环境变量
+
+关键要点（详见 `SKILL.md`）：
+- 所有写入时间戳必须带 `+08:00` 偏移量（如 `2026-05-15T15:00:00+08:00`）
+- API 返回的时间是 UTC（`Z` 后缀），展示时需转为北京时间
+- 查询参数中的 `date` 直接使用北京日期（`YYYY-MM-DD`）
+
 ## 文档
 
 | 文档 | 说明 |
@@ -231,6 +308,7 @@ npm run dev
 | [HTTP API 文档](docs/HTTP_REQUESTS.md) | 完整的 API 接口文档，含请求示例和参数说明 |
 | [技术栈与数据模型](docs/TECH_STACK.md) | 技术选型、数据模型、认证系统详情 |
 | [项目结构](docs/PROJECT_STRUCTURE.md) | 目录结构和文件说明 |
+| [Agent Skill](.claude/skills/baby-feed-assistant/SKILL.md) | AI Agent 集成的 API 调用规范和时间戳处理说明 |
 
 ## 常见问题
 
