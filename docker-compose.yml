@@ -7,6 +7,11 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    # 限制容器内存，防止 OOM 影响宿主机
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     environment:
       - NODE_ENV=production
       - DATABASE_URL=file:/app/data/baby-feed.db

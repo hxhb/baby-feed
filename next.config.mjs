@@ -11,6 +11,10 @@ const trustedCorsOrigin = (() => {
 
 const nextConfig = {
   output: 'standalone',
+  // 禁用内置图片优化（本项目未使用 next/image），避免打包 sharp (~33MB)
+  images: {
+    unoptimized: true,
+  },
   // 标记为外部包，确保 Next.js 从 node_modules 加载而非 bundle
   // 这些包要么含原生二进制（libsql），要么是其传递依赖链的一部分
   serverExternalPackages: [
@@ -111,6 +115,15 @@ const nextConfig = {
   experimental: {
     serverActions: {
       bodySizeLimit: '2mb',
+    },
+    // 从 standalone 输出中排除未使用的大包（减小镜像体积 ~45MB）
+    outputFileTracingExcludes: {
+      '*': [
+        'node_modules/@img/**',
+        'node_modules/sharp/**',
+        'node_modules/typescript/**',
+        'node_modules/caniuse-lite/**',
+      ],
     },
   },
 };
