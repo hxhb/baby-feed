@@ -7,7 +7,6 @@ import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
 import { getRateLimit } from '@/lib/rate-limit-config'
 import { noStoreHeaders, getBeijingDayRange, buildSleepAwareOrClause } from '@/lib/api-helpers'
 import { logError } from '@/lib/logger'
-import { emitHealthCreated } from '@/lib/webhook-service'
 
 export async function GET(request: NextRequest) {
   try {
@@ -224,11 +223,6 @@ export async function POST(request: NextRequest) {
         createdBy: session.user.id
       },
       include: { baby: true }
-    })
-
-    // Emit webhook event (fire and forget)
-    emitHealthCreated(session.user.id, record, record.baby).catch(error => {
-      logError('Failed to emit health created webhook', error)
     })
 
     revalidatePath('/')

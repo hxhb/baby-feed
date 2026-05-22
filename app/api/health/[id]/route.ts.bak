@@ -6,7 +6,6 @@ import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
 import { getRateLimit } from '@/lib/rate-limit-config'
 import { noStoreHeaders } from '@/lib/api-helpers'
 import { logError } from '@/lib/logger'
-import { emitHealthUpdated, emitHealthDeleted } from '@/lib/webhook-service'
 
 export async function PUT(
   request: NextRequest,
@@ -70,8 +69,7 @@ export async function PUT(
       where: {
         id,
         createdBy: session.user.id
-      },
-      include: { baby: true }
+      }
     })
 
     if (!existingRecord) {
@@ -170,11 +168,6 @@ export async function PUT(
       include: { baby: true }
     })
 
-    // Emit webhook event (fire and forget)
-    emitHealthUpdated(session.user.id, existingRecord, record, record.baby).catch(error => {
-      logError('Failed to emit health updated webhook', error)
-    })
-
     return NextResponse.json(record, { headers: noStoreHeaders })
   } catch (error) {
     logError('更新健康记录失败', error)
@@ -230,11 +223,6 @@ export async function DELETE(
 
     await prisma.healthRecord.delete({
       where: { id }
-    })
-
-    // Emit webhook event (fire and forget)
-    emitHealthDeleted(session.user.id, existingRecord).catch(error => {
-      logError('Failed to emit health deleted webhook', error)
     })
 
     return NextResponse.json({ success: true }, { headers: noStoreHeaders })

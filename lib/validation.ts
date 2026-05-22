@@ -507,3 +507,45 @@ export function validateSameOrigin(request: Request): ValidationResult {
 
   return { valid: false, error: '缺少合法的请求来源' }
 }
+
+export function validateUrl(value: unknown, fieldName: string = 'URL'): ValidationResult {
+  if (typeof value !== 'string') {
+    return { valid: false, error: `${fieldName} 必须是字符串` }
+  }
+
+  try {
+    const url = new URL(value)
+    // Ensure it's HTTP or HTTPS
+    if (!['http:', 'https:'].includes(url.protocol)) {
+      return { valid: false, error: `${fieldName} 必须使用 HTTP 或 HTTPS 协议` }
+    }
+
+    // Block private/internal network addresses (SSRF prevention)
+    const hostname = url.hostname.toLowerCase()
+    const blockedPatterns = [
+      /^localhost$/,
+      /^127\./,                          // 127.0.0.0/8
+      /^192\.168\./,                     // 192.168.0.0/16
+      /^10\./,                           // 10.0.0.0/8
+      /^172\.(1[6-9]|2[0-9]|3[01])\./,  // 172.16.0.0/12
+      /^169\.254\./,                     // Link-local 169.254.0.0/16
+      /^0\.0\.0\.0$/,
+      /^::1$/,                           // IPv6 localhost
+      /^fc00:/,                          // IPv6 private
+      /^fe80:/,                          // IPv6 link-local
+      /^fd[0-9a-f]{2}:/,                 // IPv6 unique local
+      /host\.docker\.internal$/,
+      /\.local$/,                        // mDNS / local domains
+    ]
+
+    for (const pattern of blockedPatterns) {
+      if (pattern.test(hostname)) {
+        return { valid: false, error: `${fieldName} 不能指向内部网络地址` }
+      }
+    }
+
+    return { valid: true }
+  } catch {
+    return { valid: false, error: `${fieldName} 格式不正确` }
+  }
+}

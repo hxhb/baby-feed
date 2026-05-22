@@ -64,6 +64,13 @@ const rateLimitConfig: Record<string, RateLimitRule> = {
   'admin-users-role':       { limit: 10,  windowMs: 15 * 60 * 1000 },
   'admin-settings-read':    { limit: 30,  windowMs: 60 * 1000 },
   'admin-settings-update':  { limit: 10,  windowMs: 15 * 60 * 1000 },
+
+  // ============ Webhooks ============
+  'webhook-list':           { limit: 60,  windowMs: 60 * 1000 },
+  'webhook-create':         { limit: 10,  windowMs: 10 * 60 * 1000 },
+  'webhook-update':         { limit: 20,  windowMs: 10 * 60 * 1000 },
+  'webhook-delete':         { limit: 10,  windowMs: 10 * 60 * 1000 },
+  'webhook-deliveries-list': { limit: 60, windowMs: 60 * 1000 },
 }
 
 // 默认规则：未配置的 action 使用此兜底值

@@ -7,7 +7,6 @@ import { noStoreHeaders } from '@/lib/api-helpers'
 import { logError } from '@/lib/logger'
 import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
 import { getRateLimit } from '@/lib/rate-limit-config'
-import { emitUserDeleted } from '@/lib/webhook-service'
 
 export async function GET(request: NextRequest) {
   const check = await requireAdmin(request)
@@ -93,18 +92,11 @@ export async function DELETE(request: NextRequest) {
 
     const targetUser = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, role: true, email: true, name: true }
+      select: { id: true, role: true }
     })
 
     if (!targetUser) {
       return NextResponse.json({ error: '用户不存在' }, { status: 404 })
-    }
-
-    // Get counts before deletion
-    const counts = {
-      babies: await prisma.baby.count({ where: { createdBy: userId } }),
-      feedingRecords: await prisma.feedingRecord.count({ where: { createdBy: userId } }),
-      healthRecords: await prisma.healthRecord.count({ where: { createdBy: userId } }),
     }
 
     await prisma.$transaction(async (tx) => {
@@ -112,19 +104,7 @@ export async function DELETE(request: NextRequest) {
       await tx.healthRecord.deleteMany({ where: { createdBy: userId } })
       await tx.baby.deleteMany({ where: { createdBy: userId } })
       await tx.apiKey.deleteMany({ where: { userId } })
-      await tx.webhookDelivery.deleteMany({
-        where: {
-          endpoint: { userId }
-        }
-      })
-      await tx.webhookEvent.deleteMany({ where: { userId } })
-      await tx.webhookEndpoint.deleteMany({ where: { userId } })
       await tx.user.delete({ where: { id: userId } })
-    })
-
-    // Emit webhook event to admin (fire and forget)
-    emitUserDeleted(check.session.user.id, targetUser, counts).catch(error => {
-      logError('Failed to emit user deleted webhook', error)
     })
 
     invalidateUserCache(userId)

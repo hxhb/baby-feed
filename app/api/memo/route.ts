@@ -7,6 +7,7 @@ import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
 import { getRateLimit } from '@/lib/rate-limit-config'
 import { noStoreHeaders } from '@/lib/api-helpers'
 import { logError } from '@/lib/logger'
+import { emitMemoCreated } from '@/lib/webhook-service'
 
 export async function GET(request: NextRequest) {
   try {
@@ -180,6 +181,12 @@ export async function POST(request: NextRequest) {
         completed: false,
         createdBy: session.user.id,
       },
+      include: { baby: true },
+    })
+
+    // Emit webhook event (fire and forget)
+    emitMemoCreated(session.user.id, record, record.baby).catch(error => {
+      logError('Failed to emit memo created webhook', error)
     })
 
     revalidatePath('/stats')

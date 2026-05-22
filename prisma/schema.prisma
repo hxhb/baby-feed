@@ -19,8 +19,10 @@ model User {
   babies          Baby[]
   feedingRecords  FeedingRecord[]
   healthRecords   HealthRecord[]
-  apiKeys         ApiKey[]
-  memos           Memo[]
+  apiKeys          ApiKey[]
+  memos            Memo[]
+  webhookEndpoints WebhookEndpoint[]
+  webhookEvents    WebhookEvent[]
 }
 
 model SiteSettings {
@@ -130,4 +132,94 @@ model Memo {
 
   @@index([createdBy, babyId, scheduledAt])
   @@index([babyId, completed, scheduledAt])
+}
+
+model WebhookEndpoint {
+  id          String    @id @default(cuid())
+  userId      String
+  url         String
+  description String?
+  // Webhook event types this endpoint subscribes to (JSON array of strings)
+  // e.g. ["feeding.created", "feeding.updated", "health.created", "user.deleted"]
+  events      String    @default("[]")
+  
+  // Signature secret for HMAC-SHA256 verification
+  secret      String
+  
+  // Active/inactive toggle
+  active      Boolean   @default(true)
+  
+  // Retry configuration
+  maxRetries  Int       @default(5)
+  retryDelay  Int       @default(60) // seconds
+  
+  // Metadata
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  lastTriedAt DateTime?
+  
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries  WebhookDelivery[]
+  
+  @@index([userId])
+  @@index([active])
+}
+
+model WebhookEvent {
+  id          String    @id @default(cuid())
+  userId      String
+  
+  // Event type: "feeding.created", "feeding.updated", "feeding.deleted", 
+  // "health.created", "health.updated", "health.deleted", "user.deleted", etc.
+  type        String
+  
+  // The complete event payload (JSON)
+  payload     String
+  
+  // Referenced record ID (for correlation)
+  recordId    String?
+  recordType  String?  // "FeedingRecord", "HealthRecord", "User"
+  
+  // Processing state
+  status      String   @default("pending") // pending, delivered, failed, archived
+  createdAt   DateTime @default(now())
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries  WebhookDelivery[]
+  
+  @@index([userId, status])
+  @@index([userId, createdAt])
+  @@index([recordId])
+}
+
+model WebhookDelivery {
+  id          String    @id @default(cuid())
+  
+  eventId     String
+  endpointId  String
+  
+  // Delivery attempt tracking
+  attemptNumber Int     @default(1)
+  status      String   @default("pending") // pending, success, failed, timeout
+  
+  // Response information
+  httpStatus  Int?
+  responseBody String?
+  errorMessage String?
+  
+  // Timing
+  sentAt      DateTime?
+  respondedAt DateTime?
+  nextRetryAt DateTime?
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  event       WebhookEvent      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  endpoint    WebhookEndpoint   @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  
+  @@index([eventId, endpointId])
+  @@index([status, nextRetryAt])
+  @@index([endpointId, status])
+  @@index([createdAt])
 }

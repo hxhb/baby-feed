@@ -38,6 +38,12 @@ export default withAuth(
         if (pathname === '/api/site/registration-status') {
           return true
         }
+
+        // Cron 路由使用自己的 CRON_SECRET 认证，绕过 NextAuth
+        // 精确匹配已知路径，避免未来新增 /api/cron/* 路由被意外放行
+        if (pathname === '/api/cron/webhook-runner') {
+          return true
+        }
         
         // 允许访问 PWA 资源和静态文件（精确匹配常见静态资源后缀）
         if (

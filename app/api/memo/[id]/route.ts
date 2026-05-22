@@ -7,6 +7,7 @@ import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
 import { getRateLimit } from '@/lib/rate-limit-config'
 import { noStoreHeaders } from '@/lib/api-helpers'
 import { logError } from '@/lib/logger'
+import { emitMemoUpdated, emitMemoDeleted } from '@/lib/webhook-service'
 
 export async function PUT(
   request: NextRequest,
@@ -135,6 +136,12 @@ export async function PUT(
     const record = await prisma.memo.update({
       where: { id },
       data: updateData,
+      include: { baby: true },
+    })
+
+    // Emit webhook event (fire and forget)
+    emitMemoUpdated(session.user.id, existingMemo, record, record.baby).catch(error => {
+      logError('Failed to emit memo updated webhook', error)
     })
 
     revalidatePath('/stats')
@@ -194,6 +201,11 @@ export async function DELETE(
 
     await prisma.memo.delete({
       where: { id },
+    })
+
+    // Emit webhook event (fire and forget)
+    emitMemoDeleted(session.user.id, existingMemo).catch(error => {
+      logError('Failed to emit memo deleted webhook', error)
     })
 
     revalidatePath('/stats')
