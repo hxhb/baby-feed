@@ -19,7 +19,8 @@ import {
   Syringe,
   Baby as BabyIcon,
   Moon,
-  UtensilsCrossed
+  UtensilsCrossed,
+  CalendarCheck
 } from 'lucide-react'
 interface BabyInfo {
   id: string
@@ -297,6 +298,16 @@ export default function FeedingForm({
       activeClassName: 'border-orange-500 bg-orange-50/80 text-orange-700',
       inactiveClassName: 'border-orange-100 bg-orange-50/80 text-orange-700 hover:border-orange-200 hover:bg-orange-100/70',
       onClick: () => setType('SOLID_FOOD')
+    },
+    {
+      key: 'MEMO',
+      title: '备忘',
+      icon: CalendarCheck,
+      iconClassName: 'text-indigo-500',
+      active: false,
+      activeClassName: 'border-indigo-500 bg-indigo-50/80 text-indigo-700',
+      inactiveClassName: 'border-indigo-100 bg-indigo-50/80 text-indigo-700 hover:border-indigo-200 hover:bg-indigo-100/70',
+      href: '/add?type=memo'
     }
   ]
 
@@ -415,9 +426,21 @@ export default function FeedingForm({
             {currentTypeMeta.title}
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-1.5">
+        <div className="grid grid-cols-4 gap-1.5">
           {feedingTypeCards.map(card => {
             const Icon = card.icon
+            if ('href' in card && card.href) {
+              return (
+                <Link
+                  key={card.key}
+                  href={card.href}
+                  className={`mobile-touch-target flex min-w-0 items-center justify-center gap-1 rounded-xl border py-2.5 transition ${card.inactiveClassName}`}
+                >
+                  <Icon size={16} className={`shrink-0 ${card.iconClassName}`} />
+                  <span className="truncate text-sm font-medium">{card.title}</span>
+                </Link>
+              )
+            }
             return (
               <button
                 key={card.key}

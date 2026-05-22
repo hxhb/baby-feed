@@ -4,16 +4,17 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { formatBeijingTime, getBeijingToday, extractDateStr, parseDateAsBeijing } from '@/lib/time'
 import { invalidateRequestCache } from '@/lib/client-request-cache'
 import Link from 'next/link'
-import { 
-  Baby as BabyIcon, 
-  PlusCircle, 
-  Droplets, 
-  Milk, 
+import {
+  Baby as BabyIcon,
+  PlusCircle,
+  Droplets,
+  Milk,
   Pill,
   Scale,
   Thermometer,
   ChevronRight,
-  Ruler
+  Ruler,
+  CalendarCheck
 } from 'lucide-react'
 import { getRecordIcon, getRecordTitle } from '@/lib/record-display'
 import type { DisplayRecord } from '@/lib/record-display'
@@ -428,17 +429,17 @@ export default function Dashboard({
             </div>
             <span className="text-[11px] font-semibold text-blue-700">奶粉</span>
           </Link>
-          <Link href="/add?type=ad" className="flex flex-col items-center py-3 bg-gradient-to-b from-orange-50 to-orange-100/80 rounded-button border border-orange-100/60 hover:shadow-pressed transition active:scale-95">
-            <div className="mb-1.5">
-              <Pill size={22} className="text-orange-500" />
-            </div>
-            <span className="text-[11px] font-semibold text-orange-700">AD滴剂</span>
-          </Link>
           <Link href="/add?type=health" className="flex flex-col items-center py-3 bg-gradient-to-b from-green-50 to-green-100/80 rounded-button border border-green-100/60 hover:shadow-pressed transition active:scale-95">
             <div className="mb-1.5">
               <Scale size={22} className="text-emerald-500" />
             </div>
             <span className="text-[11px] font-semibold text-green-700">健康</span>
+          </Link>
+          <Link href="/add?type=memo" className="flex flex-col items-center py-3 bg-gradient-to-b from-indigo-50 to-indigo-100/80 rounded-button border border-indigo-100/60 hover:shadow-pressed transition active:scale-95">
+            <div className="mb-1.5">
+              <CalendarCheck size={22} className="text-indigo-500" />
+            </div>
+            <span className="text-[11px] font-semibold text-indigo-700">备忘</span>
           </Link>
         </div>
       </div>

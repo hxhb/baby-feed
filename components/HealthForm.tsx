@@ -19,7 +19,8 @@ import {
   Droplets,
   Milk,
   Moon,
-  UtensilsCrossed
+  UtensilsCrossed,
+  CalendarCheck
 } from 'lucide-react'
 
 interface BabyInfo {
@@ -465,6 +466,7 @@ export default function HealthForm({
     { href: '/add?type=breast', label: '母乳', icon: Droplets, iconClassName: 'text-pink-500', cardClassName: 'border-pink-100 bg-pink-50/80 text-pink-700 hover:border-pink-200 hover:bg-pink-100/70' },
     { href: '/add?type=formula', label: '奶粉', icon: Milk, iconClassName: 'text-blue-500', cardClassName: 'border-blue-100 bg-blue-50/80 text-blue-700 hover:border-blue-200 hover:bg-blue-100/70' },
     { href: '/add?type=solid_food', label: '辅食', icon: UtensilsCrossed, iconClassName: 'text-orange-500', cardClassName: 'border-orange-100 bg-orange-50/80 text-orange-700 hover:border-orange-200 hover:bg-orange-100/70' },
+    { href: '/add?type=memo', label: '备忘', icon: CalendarCheck, iconClassName: 'text-indigo-500', cardClassName: 'border-indigo-100 bg-indigo-50/80 text-indigo-700 hover:border-indigo-200 hover:bg-indigo-100/70' },
   ]
 
   const getColorClasses = (color: string, isSelected: boolean) => {
@@ -525,7 +527,7 @@ export default function HealthForm({
             {selectedTypeMeta.label}
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-1.5">
+        <div className="grid grid-cols-4 gap-1.5">
           {feedingTypeLinks.map(item => {
             const Icon = item.icon
             return (

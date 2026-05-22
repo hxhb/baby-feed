@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import FeedingForm from '@/components/FeedingForm'
 import HealthForm from '@/components/HealthForm'
+import MemoForm from '@/components/MemoForm'
 import type { PreloadedBaby } from '@/lib/server-babies'
 
 interface Props {
@@ -56,6 +57,7 @@ export default function AddPageClient({ initialBabies }: Props) {
   const searchParams = useSearchParams()
   const type = searchParams.get('type')
   const isHealthView = !type || ['health', 'weight', 'height', 'temperature', 'medication', 'vaccine', 'diaper', 'ad', 'sleep'].includes(type)
+  const isMemoView = type === 'memo'
   const [sharedDraft, setSharedDraft] = useState<AddRecordSharedDraft>(emptySharedDraft)
 
   useEffect(() => {
@@ -110,7 +112,14 @@ export default function AddPageClient({ initialBabies }: Props) {
 
   return (
     <div className="mx-auto max-w-4xl px-2.5 py-3 sm:px-4 sm:py-5">
-      {isHealthView ? (
+      {isMemoView ? (
+        <MemoForm
+          initialBabies={initialBabies}
+          initialSharedDraft={sharedDraft}
+          onSharedDraftChange={handleSharedDraftChange}
+          onRecordSaved={handleRecordSaved}
+        />
+      ) : isHealthView ? (
         <HealthForm
           initialType={getHealthInitialType(type)}
           initialBabies={initialBabies}

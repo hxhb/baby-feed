@@ -318,8 +318,53 @@ export async function processWebhookDeliveries(options?: { maxDeliveries?: numbe
 }
 
 /**
+ * Clean up old webhook deliveries (1-day retention)
+ *
+ * Removes delivery records older than `daysToKeep` (default 1 day)
+ * and orphaned events that have no remaining deliveries.
+ * This is cheap to run on every cron tick due to indexed createdAt column.
+ */
+export async function cleanupOldDeliveries(daysToKeep: number = 1): Promise<{
+  deletedDeliveries: number
+  deletedEvents: number
+}> {
+  const cutoffDate = new Date()
+  cutoffDate.setDate(cutoffDate.getDate() - daysToKeep)
+
+  try {
+    // Delete old deliveries
+    const deliveriesResult = await prisma.webhookDelivery.deleteMany({
+      where: {
+        createdAt: { lt: cutoffDate },
+      },
+    })
+
+    // Delete orphaned events (events with no remaining deliveries that are already processed)
+    let deletedEvents = 0
+    if (deliveriesResult.count > 0) {
+      const eventsResult = await prisma.webhookEvent.deleteMany({
+        where: {
+          createdAt: { lt: cutoffDate },
+          status: { in: ['delivered', 'failed', 'archived'] },
+          deliveries: { none: {} },
+        },
+      })
+      deletedEvents = eventsResult.count
+    }
+
+    return {
+      deletedDeliveries: deliveriesResult.count,
+      deletedEvents,
+    }
+  } catch (error) {
+    logError('Error cleaning up old deliveries', error)
+    return { deletedDeliveries: 0, deletedEvents: 0 }
+  }
+}
+
+/**
  * Clean up old webhook events and deliveries
- * 
+ *
  * Removes events and deliveries older than `daysToKeep` (default 30 days)
  * Call this periodically to maintain database performance
  */

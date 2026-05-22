@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { processWebhookDeliveries, cleanupOldWebhookRecords } from '@/lib/webhook-runner'
+import { processWebhookDeliveries, cleanupOldDeliveries, cleanupOldWebhookRecords } from '@/lib/webhook-runner'
 import { logError } from '@/lib/logger'
 import crypto from 'crypto'
 import { buildIpActionKey, enforceRateLimit } from '@/lib/rate-limit'
@@ -66,19 +66,22 @@ export async function GET(request: NextRequest) {
     // Process webhook deliveries
     const deliveryStats = await processWebhookDeliveries({ maxDeliveries: 100 })
 
-    // Probabilistically clean up old records (~1% of runs)
-    if (Math.random() < 0.01) {
-      const cleanupStats = await cleanupOldWebhookRecords(30)
-      return NextResponse.json({
-        success: true,
-        deliveries: deliveryStats,
-        cleanup: cleanupStats,
-      })
+    // Always clean up deliveries older than 1 day (cheap indexed query)
+    const deliveryCleanup = await cleanupOldDeliveries(1)
+
+    // Probabilistically clean up old event records (~10% of runs)
+    let eventCleanup: { deletedEvents: number; deletedDeliveries: number } | undefined
+    if (Math.random() < 0.10) {
+      eventCleanup = await cleanupOldWebhookRecords(7)
     }
 
     return NextResponse.json({
       success: true,
       deliveries: deliveryStats,
+      cleanup: {
+        deliveries: deliveryCleanup,
+        ...(eventCleanup ? { events: eventCleanup } : {}),
+      },
     })
   } catch (error) {
     logError('Webhook runner cron failed', error)

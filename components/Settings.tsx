@@ -51,6 +51,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
   const [editingBaby, setEditingBaby] = useState<BabyInfo | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [openMenuBabyId, setOpenMenuBabyId] = useState<string | null>(null)
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false)
   const { copyToClipboard } = useCopyToast()
   
   // 宝宝表单
@@ -406,34 +407,47 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
             <p className="font-semibold text-slate-900 text-lg truncate">{displayName}</p>
             <p className="text-sm text-slate-500 truncate">{userEmail}</p>
           </div>
+          {/* 修改用户名/密码 下拉按钮 */}
+          <div className="relative shrink-0">
+            <button
+              onClick={() => setAccountMenuOpen(!accountMenuOpen)}
+              className="mobile-touch-target inline-flex items-center justify-center rounded-button bg-slate-50 p-2.5 text-slate-500 transition hover:bg-slate-100"
+              aria-label="账户操作"
+            >
+              <MoreVertical size={18} />
+            </button>
+            {accountMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setAccountMenuOpen(false)} />
+                <div className="absolute right-0 top-full z-20 mt-1 w-36 rounded-element border border-slate-200 bg-white py-1 shadow-elevated">
+                  <button
+                    onClick={() => {
+                      setAccountMenuOpen(false)
+                      setNewName(displayName)
+                      setActiveModal('editName')
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition"
+                  >
+                    <UserPen size={14} />
+                    修改用户名
+                  </button>
+                  <button
+                    onClick={() => {
+                      setAccountMenuOpen(false)
+                      setActiveModal('changePassword')
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition"
+                  >
+                    <KeyRound size={14} />
+                    修改密码
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         <div className="space-y-2 pt-2 border-t border-gray-100">
-          <button
-            onClick={() => {
-              setNewName(displayName)
-              setActiveModal('editName')
-            }}
-            className="mobile-touch-target w-full flex items-center justify-between rounded-xl px-2 py-3 text-left transition group hover:bg-gray-50"
-          >
-            <div className="flex items-center space-x-3">
-              <UserPen size={18} className="text-slate-400 group-hover:text-blue-500 transition" />
-              <span className="text-slate-700">修改用户名</span>
-            </div>
-            <span className="text-slate-400 text-sm">›</span>
-          </button>
-
-          <button
-            onClick={() => setActiveModal('changePassword')}
-            className="mobile-touch-target w-full flex items-center justify-between rounded-xl px-2 py-3 text-left transition group hover:bg-gray-50"
-          >
-            <div className="flex items-center space-x-3">
-              <KeyRound size={18} className="text-slate-400 group-hover:text-blue-500 transition" />
-              <span className="text-slate-700">修改密码</span>
-            </div>
-            <span className="text-slate-400 text-sm">›</span>
-          </button>
-
           <button
             onClick={() => router.push('/settings/api-keys')}
             className="mobile-touch-target w-full flex items-center justify-between rounded-xl px-2 py-3 text-left transition group hover:bg-gray-50"
@@ -456,17 +470,6 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
             <span className="text-slate-400 text-sm">›</span>
           </button>
 
-          <button
-            onClick={handleLogout}
-            className="mobile-touch-target w-full flex items-center justify-between rounded-xl px-2 py-3 text-left transition group hover:bg-gray-50"
-          >
-            <div className="flex items-center space-x-3">
-              <LogOut size={18} className="text-slate-400 group-hover:text-orange-500 transition" />
-              <span className="text-slate-700">退出登录</span>
-            </div>
-            <span className="text-slate-400 text-sm">›</span>
-          </button>
-
           {isAdmin && (
             <button
               onClick={() => router.push('/admin')}
@@ -479,6 +482,17 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
               <span className="text-slate-400 text-sm">›</span>
             </button>
           )}
+
+          <button
+            onClick={handleLogout}
+            className="mobile-touch-target w-full flex items-center justify-between rounded-xl px-2 py-3 text-left transition group hover:bg-gray-50"
+          >
+            <div className="flex items-center space-x-3">
+              <LogOut size={18} className="text-slate-400 group-hover:text-orange-500 transition" />
+              <span className="text-slate-700">退出登录</span>
+            </div>
+            <span className="text-slate-400 text-sm">›</span>
+          </button>
         </div>
       </div>
 

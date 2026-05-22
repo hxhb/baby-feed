@@ -44,6 +44,7 @@ interface DeliveryLog {
   errorMessage: string | null
   sentAt: string | null
   createdAt: string
+  summary?: string
   event: {
     id: string
     type: string
@@ -105,6 +106,8 @@ export default function WebhookManager({ onBack }: Props) {
   const [deliveryLogs, setDeliveryLogs] = useState<DeliveryLog[]>([])
   const [deliveryLoading, setDeliveryLoading] = useState(false)
   const [menuOpen, setMenuOpen] = useState<string | null>(null)
+  const [visibleUrls, setVisibleUrls] = useState<Set<string>>(new Set())
+  const [clearingDeliveries, setClearingDeliveries] = useState<string | null>(null)
   const { copyToClipboard } = useCopyToast()
 
   const fetchEndpoints = useCallback(async () => {
@@ -225,6 +228,45 @@ export default function WebhookManager({ onBack }: Props) {
     }
   }
 
+  const handleClearDeliveries = async (endpointId: string) => {
+    if (!confirm('确定要清理此 Webhook 的所有投递日志吗？')) return
+
+    setClearingDeliveries(endpointId)
+    setMenuOpen(null)
+    try {
+      const response = await fetch(`/api/webhooks/deliveries?endpointId=${endpointId}`, { method: 'DELETE' })
+      if (response.ok) {
+        // Refresh delivery logs if this endpoint is expanded
+        if (expandedEndpoint === endpointId) {
+          setDeliveryLogs([])
+        }
+        // Update the deliveries count in endpoint list
+        setEndpoints(prev =>
+          prev.map(ep => (ep.id === endpointId ? { ...ep, deliveriesCount: 0 } : ep))
+        )
+      } else {
+        const data = await response.json()
+        alert(data.error || '清理失败')
+      }
+    } catch {
+      alert('清理失败')
+    } finally {
+      setClearingDeliveries(null)
+    }
+  }
+
+  const toggleUrlVisibility = (endpointId: string) => {
+    setVisibleUrls(prev => {
+      const next = new Set(prev)
+      if (next.has(endpointId)) {
+        next.delete(endpointId)
+      } else {
+        next.add(endpointId)
+      }
+      return next
+    })
+  }
+
   const toggleEvent = (event: string) => {
     if (event === '*') {
       setNewEvents(newEvents.includes('*') ? [] : ['*'])
@@ -332,16 +374,37 @@ export default function WebhookManager({ onBack }: Props) {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
-                      {/* URL + Status */}
+                      {/* Name + Status */}
                       <div className="flex items-center gap-2">
                         <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${endpoint.active ? 'bg-emerald-500' : 'bg-slate-300'}`} />
                         <p className="text-sm font-medium text-slate-800 truncate">
-                          {endpoint.url}
+                          {endpoint.description || '未命名 Webhook'}
                         </p>
                       </div>
-                      {endpoint.description && (
-                        <p className="text-xs text-slate-500 mt-1 ml-4">{endpoint.description}</p>
-                      )}
+
+                      {/* URL (hidden by default) */}
+                      <div className="mt-1 ml-4">
+                        {visibleUrls.has(endpoint.id) ? (
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-xs text-slate-500 truncate">{endpoint.url}</p>
+                            <button
+                              type="button"
+                              onClick={() => toggleUrlVisibility(endpoint.id)}
+                              className="text-[11px] text-blue-500 hover:text-blue-600 font-medium flex-shrink-0"
+                            >
+                              隐藏
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => toggleUrlVisibility(endpoint.id)}
+                            className="text-[11px] text-blue-500 hover:text-blue-600 font-medium"
+                          >
+                            显示地址
+                          </button>
+                        )}
+                      </div>
 
                       {/* Event tags */}
                       <div className="flex flex-wrap gap-1 mt-2.5 ml-4">
@@ -396,6 +459,14 @@ export default function WebhookManager({ onBack }: Props) {
                             投递日志
                           </button>
                           <button
+                            onClick={() => handleClearDeliveries(endpoint.id)}
+                            disabled={clearingDeliveries === endpoint.id}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition"
+                          >
+                            <RefreshCw size={14} />
+                            清理日志
+                          </button>
+                          <button
                             onClick={() => handleDelete(endpoint.id, endpoint.url)}
                             disabled={deleteLoading === endpoint.id}
                             className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition"
@@ -447,6 +518,9 @@ export default function WebhookManager({ onBack }: Props) {
                                   : '—'}
                               </span>
                             </div>
+                            {log.summary && (
+                              <p className="mt-0.5 ml-4 text-slate-500 truncate">{log.summary}</p>
+                            )}
                             {log.errorMessage && (
                               <p className="mt-1 text-red-500 break-all ml-4">{log.errorMessage}</p>
                             )}
