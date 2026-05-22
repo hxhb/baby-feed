@@ -12,8 +12,13 @@ import {
   ToggleRight,
   ArrowLeft,
   UserCog,
-  Database
+  Database,
+  Link2,
+  Copy,
+  Check,
+  UserPlus
 } from 'lucide-react'
+import { useCopyToast } from '@/components/CopyToast'
 
 interface UserInfo {
   id: string
@@ -39,6 +44,9 @@ export default function AdminPanel({ currentUserId, onBack }: Props) {
   const [allowRegistration, setAllowRegistration] = useState(true)
   const [settingsLoading, setSettingsLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [inviteCodes, setInviteCodes] = useState<Array<{ code: string; createdBy: string; createdAt: string; usedBy: string | null; usedAt: string | null }>>([])
+  const [inviteLoading, setInviteLoading] = useState(false)
+  const { copyToClipboard } = useCopyToast()
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -68,10 +76,23 @@ export default function AdminPanel({ currentUserId, onBack }: Props) {
     }
   }, [])
 
+  const fetchInviteCodes = useCallback(async () => {
+    try {
+      const response = await fetch('/api/admin/invite')
+      if (response.ok) {
+        const data = await response.json()
+        setInviteCodes(data)
+      }
+    } catch (error) {
+      console.error('获取邀请码失败:', error)
+    }
+  }, [])
+
   useEffect(() => {
     fetchUsers()
     fetchSettings()
-  }, [fetchUsers, fetchSettings])
+    fetchInviteCodes()
+  }, [fetchUsers, fetchSettings, fetchInviteCodes])
 
   const handleToggleRegistration = async () => {
     const newValue = !allowRegistration
@@ -137,6 +158,45 @@ export default function AdminPanel({ currentUserId, onBack }: Props) {
     }
   }
 
+  const handleCreateInvite = async () => {
+    setInviteLoading(true)
+    try {
+      const response = await fetch('/api/admin/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      if (response.ok) {
+        const data = await response.json()
+        await copyToClipboard(data.url, '邀请链接已复制')
+        fetchInviteCodes()
+      } else {
+        const data = await response.json()
+        alert(data.error || '创建失败')
+      }
+    } catch {
+      alert('创建失败')
+    } finally {
+      setInviteLoading(false)
+    }
+  }
+
+  const handleDeleteInvite = async (code: string) => {
+    if (!confirm('确定要删除这个邀请码吗？')) return
+    try {
+      const response = await fetch(`/api/admin/invite/${code}`, { method: 'DELETE' })
+      if (response.ok) {
+        setInviteCodes(prev => prev.filter(c => c.code !== code))
+      }
+    } catch {
+      alert('删除失败')
+    }
+  }
+
+  const handleCopyInviteUrl = async (code: string) => {
+    const baseUrl = window.location.origin
+    await copyToClipboard(`${baseUrl}/register?code=${code}`, '邀请链接已复制')
+  }
+
   if (loading || settingsLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -188,6 +248,72 @@ export default function AdminPanel({ currentUserId, onBack }: Props) {
             )}
           </button>
         </div>
+      </div>
+
+      {/* 邀请注册 */}
+      <div className="bg-white rounded-2xl p-5 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-gray-900 flex items-center space-x-2">
+            <UserPlus size={18} className="text-gray-500" />
+            <span>邀请注册</span>
+          </h2>
+          <button
+            onClick={handleCreateInvite}
+            disabled={inviteLoading}
+            className="inline-flex items-center rounded-xl bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100 disabled:opacity-50"
+          >
+            <Link2 size={14} className="mr-1.5" />
+            {inviteLoading ? '生成中...' : '生成邀请链接'}
+          </button>
+        </div>
+
+        <p className="text-sm text-gray-500 mb-3">
+          生成一次性邀请链接，即使关闭了注册，被邀请人也可以通过该链接注册账号。链接用后即废。
+        </p>
+
+        {inviteCodes.length === 0 ? (
+          <div className="text-center py-4 text-sm text-gray-400">
+            暂无邀请码，点击上方按钮生成
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {inviteCodes.map(invite => (
+              <div
+                key={invite.code}
+                className={`flex items-center justify-between rounded-xl border p-3 ${
+                  invite.usedBy ? 'border-gray-100 bg-gray-50 opacity-60' : 'border-blue-100 bg-blue-50/50'
+                }`}
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-mono text-gray-600 truncate">{invite.code.slice(0, 8)}••••</p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">
+                    {invite.usedBy
+                      ? `已使用 · ${new Date(invite.usedAt!).toLocaleDateString('zh-CN')}`
+                      : `未使用 · 创建于 ${new Date(invite.createdAt).toLocaleDateString('zh-CN')}`}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 ml-2">
+                  {!invite.usedBy && (
+                    <button
+                      onClick={() => handleCopyInviteUrl(invite.code)}
+                      className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition"
+                      title="复制邀请链接"
+                    >
+                      <Copy size={14} />
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleDeleteInvite(invite.code)}
+                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
+                    title="删除邀请码"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 用户列表 */}

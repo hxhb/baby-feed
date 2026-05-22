@@ -13,8 +13,11 @@ import {
   X,
   Clock,
   ArrowLeft,
-  Shield
+  Shield,
+  FileText,
+  ExternalLink
 } from 'lucide-react'
+import { useCopyToast } from '@/components/CopyToast'
 
 interface ApiKeyInfo {
   id: string
@@ -38,8 +41,8 @@ export default function ApiKeyManager({ onBack }: Props) {
   const [newKeyExpiry, setNewKeyExpiry] = useState<string>('0') // 0 = 永不过期
   const [createLoading, setCreateLoading] = useState(false)
   const [newlyCreatedKey, setNewlyCreatedKey] = useState('')
-  const [copied, setCopied] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
+  const { copyToClipboard } = useCopyToast()
 
   const fetchKeys = useCallback(async () => {
     try {
@@ -119,23 +122,7 @@ export default function ApiKeyManager({ onBack }: Props) {
   }
 
   const handleCopy = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      // 回退方案
-      const textArea = document.createElement('textarea')
-      textArea.value = text
-      textArea.style.position = 'fixed'
-      textArea.style.left = '-9999px'
-      document.body.appendChild(textArea)
-      textArea.select()
-      document.execCommand('copy')
-      document.body.removeChild(textArea)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    }
+    await copyToClipboard(text, 'API Key 已复制')
   }
 
   const isExpired = (expiresAt: string | null) => {
@@ -180,6 +167,23 @@ export default function ApiKeyManager({ onBack }: Props) {
             </p>
           </div>
         </div>
+      </div>
+
+      {/* API 文档链接 */}
+      <div className="bg-white rounded-card p-4 shadow-card border border-blue-50">
+        <a
+          href="https://github.com/hxhb/baby-feed/blob/master/docs/HTTP_REQUESTS.md"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-3 text-blue-600 hover:text-blue-700 transition"
+        >
+          <FileText size={20} className="shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold">API 接口文档</p>
+            <p className="text-xs text-slate-500 mt-0.5">查看所有支持的 HTTP API 端点和请求格式</p>
+          </div>
+          <ExternalLink size={16} className="shrink-0 text-slate-400" />
+        </a>
       </div>
 
       {/* Key 列表 */}
@@ -403,13 +407,9 @@ export default function ApiKeyManager({ onBack }: Props) {
                 className="absolute top-3 right-3 p-1.5 text-gray-400 hover:text-white rounded transition"
                 title="复制"
               >
-                {copied ? <Check size={16} className="text-green-400" /> : <Copy size={16} />}
+                {<Copy size={16} />}
               </button>
             </div>
-
-            {copied && (
-              <p className="text-sm text-green-600 mt-2 text-center">✓ 已复制到剪贴板</p>
-            )}
 
             <button
               onClick={() => {

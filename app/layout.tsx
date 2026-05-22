@@ -73,6 +73,27 @@ export default async function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        {/* Splash screen — hidden after React hydrates */}
+        <div id="splash" className="splash-screen">
+          <div className="splash-logo">
+            <svg width="80" height="80" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ borderRadius: '20px', boxShadow: '0 8px 32px rgba(59,130,246,0.3)' }}>
+              <defs>
+                <linearGradient id="splash-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" style={{ stopColor: '#3b82f6' }} />
+                  <stop offset="100%" style={{ stopColor: '#f472b6' }} />
+                </linearGradient>
+              </defs>
+              <rect width="56" height="56" rx="12" ry="12" fill="url(#splash-bg)" />
+              <rect x="15" y="18" width="24" height="32" rx="8" fill="white" opacity="0.95" />
+              <rect x="20" y="9" width="14" height="10" rx="5" fill="white" opacity="0.95" />
+              <path d="M23 9 Q27 3.5 31 9" fill="white" opacity="0.95" stroke="white" strokeWidth="1.5" />
+              <rect x="17" y="30" width="20" height="18" rx="6.5" fill="rgba(244,114,182,0.25)" />
+              <path d="M27 33 C25 31 22.5 31.8 22.5 33.8 C22.5 35.8 27 38.5 27 38.5 C27 38.5 31.5 35.8 31.5 33.8 C31.5 31.8 29 31 27 33Z" fill="rgba(59,130,246,0.5)" />
+            </svg>
+          </div>
+          <p style={{ marginTop: '20px', fontSize: '22px', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.5px' }}>Baby Feed</p>
+          <p style={{ marginTop: '4px', fontSize: '13px', color: '#475569' }}>宝宝喂养记录</p>
+        </div>
         <Providers session={session}>
           {children}
         </Providers>
@@ -91,6 +112,13 @@ export default async function RootLayout({
                   );
                 });
               }
+              // Dismiss splash screen after hydration
+              requestAnimationFrame(function() {
+                setTimeout(function() {
+                  var splash = document.getElementById('splash');
+                  if (splash) splash.classList.add('hidden');
+                }, 300);
+              });
             `,
           }}
         />

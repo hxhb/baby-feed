@@ -6,11 +6,13 @@ import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
 import { extractDateStr, parseDateAsBeijing } from '@/lib/time'
-import { 
-  Baby, 
-  PlusCircle, 
-  Trash2, 
+import { useCopyToast } from '@/components/CopyToast'
+import {
+  Baby,
+  PlusCircle,
+  Trash2,
   Edit2,
+  Copy,
   X,
   Key,
   KeyRound,
@@ -20,7 +22,8 @@ import {
   Eye,
   EyeOff,
   LogOut,
-  UserCog
+  UserCog,
+  MoreVertical
 } from 'lucide-react'
 
 interface BabyInfo {
@@ -46,6 +49,8 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
   const [activeModal, setActiveModal] = useState<ModalType>(null)
   const [editingBaby, setEditingBaby] = useState<BabyInfo | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [openMenuBabyId, setOpenMenuBabyId] = useState<string | null>(null)
+  const { copyToClipboard } = useCopyToast()
   
   // 宝宝表单
   const [babyName, setBabyName] = useState('')
@@ -191,6 +196,10 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
       console.error('更新失败:', error)
       alert('更新失败，请重试')
     }
+  }
+
+  const handleCopyBabyId = async (id: string) => {
+    await copyToClipboard(id, '宝宝 ID 已复制')
   }
 
   const handleDeleteBaby = async (id: string) => {
@@ -386,15 +395,15 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
   return (
     <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 space-y-4 sm:space-y-5">
       {/* 用户信息卡片 */}
-      <div className="bg-white rounded-2xl p-5 shadow-sm sm:p-6 lg:p-7">
-        <h2 className="text-lg font-bold text-gray-900 mb-4">账户信息</h2>
+      <div className="bg-white rounded-card p-5 shadow-card border border-blue-50 sm:p-6 lg:p-7">
+        <h2 className="text-lg font-bold text-slate-900 mb-4">账户信息</h2>
         <div className="flex items-center space-x-4 mb-4">
           <div className="w-14 h-14 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white text-xl font-bold">
             {displayName?.charAt(0)?.toUpperCase() || '?'}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-semibold text-gray-900 text-lg truncate">{displayName}</p>
-            <p className="text-sm text-gray-500 truncate">{userEmail}</p>
+            <p className="font-semibold text-slate-900 text-lg truncate">{displayName}</p>
+            <p className="text-sm text-slate-500 truncate">{userEmail}</p>
           </div>
         </div>
 
@@ -407,10 +416,10 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
             className="mobile-touch-target w-full flex items-center justify-between rounded-xl px-2 py-3 text-left transition group hover:bg-gray-50"
           >
             <div className="flex items-center space-x-3">
-              <UserPen size={18} className="text-gray-400 group-hover:text-blue-500 transition" />
-              <span className="text-gray-700">修改用户名</span>
+              <UserPen size={18} className="text-slate-400 group-hover:text-blue-500 transition" />
+              <span className="text-slate-700">修改用户名</span>
             </div>
-            <span className="text-gray-400 text-sm">›</span>
+            <span className="text-slate-400 text-sm">›</span>
           </button>
 
           <button
@@ -418,10 +427,10 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
             className="mobile-touch-target w-full flex items-center justify-between rounded-xl px-2 py-3 text-left transition group hover:bg-gray-50"
           >
             <div className="flex items-center space-x-3">
-              <KeyRound size={18} className="text-gray-400 group-hover:text-blue-500 transition" />
-              <span className="text-gray-700">修改密码</span>
+              <KeyRound size={18} className="text-slate-400 group-hover:text-blue-500 transition" />
+              <span className="text-slate-700">修改密码</span>
             </div>
-            <span className="text-gray-400 text-sm">›</span>
+            <span className="text-slate-400 text-sm">›</span>
           </button>
 
           <button
@@ -429,10 +438,10 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
             className="mobile-touch-target w-full flex items-center justify-between rounded-xl px-2 py-3 text-left transition group hover:bg-gray-50"
           >
             <div className="flex items-center space-x-3">
-              <Key size={18} className="text-gray-400 group-hover:text-blue-500 transition" />
-              <span className="text-gray-700">API Key 管理</span>
+              <Key size={18} className="text-slate-400 group-hover:text-blue-500 transition" />
+              <span className="text-slate-700">API Key 管理</span>
             </div>
-            <span className="text-gray-400 text-sm">›</span>
+            <span className="text-slate-400 text-sm">›</span>
           </button>
 
           <button
@@ -440,10 +449,10 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
             className="mobile-touch-target w-full flex items-center justify-between rounded-xl px-2 py-3 text-left transition group hover:bg-gray-50"
           >
             <div className="flex items-center space-x-3">
-              <LogOut size={18} className="text-gray-400 group-hover:text-orange-500 transition" />
-              <span className="text-gray-700">退出登录</span>
+              <LogOut size={18} className="text-slate-400 group-hover:text-orange-500 transition" />
+              <span className="text-slate-700">退出登录</span>
             </div>
-            <span className="text-gray-400 text-sm">›</span>
+            <span className="text-slate-400 text-sm">›</span>
           </button>
 
           {isAdmin && (
@@ -452,19 +461,19 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
               className="mobile-touch-target w-full flex items-center justify-between rounded-xl px-2 py-3 text-left transition group hover:bg-gray-50"
             >
               <div className="flex items-center space-x-3">
-                <UserCog size={18} className="text-gray-400 group-hover:text-purple-500 transition" />
-                <span className="text-gray-700">站点管理</span>
+                <UserCog size={18} className="text-slate-400 group-hover:text-purple-500 transition" />
+                <span className="text-slate-700">站点管理</span>
               </div>
-              <span className="text-gray-400 text-sm">›</span>
+              <span className="text-slate-400 text-sm">›</span>
             </button>
           )}
         </div>
       </div>
 
       {/* 宝宝管理 */}
-      <div className="bg-white rounded-2xl p-5 shadow-sm sm:p-6 lg:p-7">
+      <div className="bg-white rounded-card p-5 shadow-card border border-blue-50 sm:p-6 lg:p-7">
         <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-lg font-bold text-gray-900">宝宝管理</h2>
+          <h2 className="text-lg font-bold text-slate-900">宝宝管理</h2>
           <button
             onClick={() => {
               setBabyName('')
@@ -480,7 +489,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
         </div>
 
         {babies.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
+          <div className="text-center py-8 text-slate-500">
             <Baby size={48} className="mx-auto mb-2 text-gray-300" />
             <p>还没有添加宝宝</p>
           </div>
@@ -497,7 +506,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <p className="text-sm font-semibold text-gray-900 break-words">{baby.name}</p>
+                      <p className="text-sm font-semibold text-slate-900 break-words">{baby.name}</p>
                       <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${baby.gender === 'MALE' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}`}>
                         {baby.gender === 'MALE' ? '男宝' : '女宝'}
                       </span>
@@ -508,23 +517,42 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
                       <span>创建于 {format(parseDateAsBeijing(baby.createdAt), 'yyyy年MM月dd日', { locale: zhCN })}</span>
                     </div>
                   </div>
-                  <div className="flex shrink-0 items-center gap-1">
+                  <div className="relative shrink-0">
                     <button
-                      onClick={() => openEditBabyModal(baby)}
-                      className="mobile-touch-target inline-flex items-center justify-center rounded-lg bg-white p-2 text-blue-700 transition hover:bg-blue-50"
-                      aria-label={`编辑${baby.name}`}
-                      title="编辑资料"
+                      onClick={() => setOpenMenuBabyId(openMenuBabyId === baby.id ? null : baby.id)}
+                      className="mobile-touch-target inline-flex items-center justify-center rounded-button bg-white p-2 text-slate-500 transition hover:bg-slate-100"
+                      aria-label="更多操作"
                     >
-                      <Edit2 size={15} />
+                      <MoreVertical size={18} />
                     </button>
-                    <button
-                      onClick={() => handleDeleteBaby(baby.id)}
-                      className="mobile-touch-target inline-flex items-center justify-center rounded-lg bg-white p-2 text-red-600 transition hover:bg-red-50"
-                      aria-label={`删除${baby.name}`}
-                      title="删除宝宝"
-                    >
-                      <Trash2 size={15} />
-                    </button>
+                    {openMenuBabyId === baby.id && (
+                      <>
+                        <div className="fixed inset-0 z-10" onClick={() => setOpenMenuBabyId(null)} />
+                        <div className="absolute right-0 top-full z-20 mt-1 w-36 rounded-element border border-slate-200 bg-white py-1 shadow-elevated">
+                          <button
+                            onClick={() => { handleCopyBabyId(baby.id); setOpenMenuBabyId(null) }}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition"
+                          >
+                            <Copy size={14} />
+                            复制 ID
+                          </button>
+                          <button
+                            onClick={() => { openEditBabyModal(baby); setOpenMenuBabyId(null) }}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition"
+                          >
+                            <Edit2 size={14} />
+                            编辑资料
+                          </button>
+                          <button
+                            onClick={() => { handleDeleteBaby(baby.id); setOpenMenuBabyId(null) }}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition"
+                          >
+                            <Trash2 size={14} />
+                            删除宝宝
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -534,9 +562,9 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
       </div>
 
       {/* 危险区域 */}
-      <div className="bg-white rounded-2xl p-5 shadow-sm border border-red-100 sm:p-6 lg:p-7">
+      <div className="bg-white rounded-card p-5 shadow-card border border-red-100 sm:p-6 lg:p-7">
         <h2 className="text-lg font-bold text-red-600 mb-2">危险操作</h2>
-        <p className="text-sm text-gray-500 mb-4">
+        <p className="text-sm text-slate-500 mb-4">
           注销账户后，所有数据将被永久删除且无法恢复。
         </p>
         <button
@@ -559,12 +587,12 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
           >
             <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-gray-200 sm:hidden" />
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-gray-900">
+              <h3 className="text-xl font-bold text-slate-900">
                 {activeModal === 'editBaby' ? '编辑宝宝' : '添加宝宝'}
               </h3>
               <button
                 onClick={closeModal}
-                className="mobile-touch-target inline-flex items-center justify-center rounded-full p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                className="mobile-touch-target inline-flex items-center justify-center rounded-full p-2 text-slate-400 transition hover:bg-gray-100 hover:text-slate-600"
               >
                 <X size={20} />
               </button>
@@ -572,7 +600,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
 
             <form onSubmit={activeModal === 'editBaby' ? handleUpdateBaby : handleAddBaby} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
                   宝宝姓名
                 </label>
                 <input
@@ -586,7 +614,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
                   出生日期
                 </label>
                 <input
@@ -599,7 +627,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
                   性别
                 </label>
                 <div className="grid grid-cols-2 gap-3">
@@ -630,7 +658,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
 
               <button
                 type="submit"
-                className="mobile-touch-target w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition"
+                className="mobile-touch-target w-full py-3 px-4 gradient-primary shadow-elevated text-white font-medium rounded-xl transition"
               >
                 {activeModal === 'editBaby' ? '保存修改' : '添加宝宝'}
               </button>
@@ -648,8 +676,8 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
           >
             <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-gray-200 sm:hidden" />
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-gray-900">修改用户名</h3>
-              <button onClick={closeModal} className="mobile-touch-target inline-flex items-center justify-center rounded-full p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600">
+              <h3 className="text-xl font-bold text-slate-900">修改用户名</h3>
+              <button onClick={closeModal} className="mobile-touch-target inline-flex items-center justify-center rounded-full p-2 text-slate-400 transition hover:bg-gray-100 hover:text-slate-600">
                 <X size={20} />
               </button>
             </div>
@@ -659,12 +687,12 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
                 <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
                   <Check size={32} className="text-green-600" />
                 </div>
-                <p className="text-lg font-medium text-gray-900">用户名修改成功</p>
+                <p className="text-lg font-medium text-slate-900">用户名修改成功</p>
               </div>
             ) : (
               <form onSubmit={handleUpdateName} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
                     新用户名
                   </label>
                   <input
@@ -685,7 +713,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
                 <button
                   type="submit"
                   disabled={nameLoading}
-                  className="mobile-touch-target w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium rounded-xl transition"
+                  className="mobile-touch-target w-full py-3 px-4 gradient-primary shadow-elevated disabled:opacity-50 text-white font-medium rounded-xl transition"
                 >
                   {nameLoading ? '保存中...' : '保存'}
                 </button>
@@ -704,8 +732,8 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
           >
             <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-gray-200 sm:hidden" />
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-gray-900">修改密码</h3>
-              <button onClick={closeModal} className="mobile-touch-target inline-flex items-center justify-center rounded-full p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600">
+              <h3 className="text-xl font-bold text-slate-900">修改密码</h3>
+              <button onClick={closeModal} className="mobile-touch-target inline-flex items-center justify-center rounded-full p-2 text-slate-400 transition hover:bg-gray-100 hover:text-slate-600">
                 <X size={20} />
               </button>
             </div>
@@ -715,12 +743,12 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
                 <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
                   <Check size={32} className="text-green-600" />
                 </div>
-                <p className="text-lg font-medium text-gray-900">密码修改成功</p>
+                <p className="text-lg font-medium text-slate-900">密码修改成功</p>
               </div>
             ) : (
               <form onSubmit={handleChangePassword} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
                     当前密码
                   </label>
                   <div className="relative">
@@ -735,7 +763,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
                     <button
                       type="button"
                       onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                      className="mobile-touch-target absolute right-2 top-1/2 inline-flex -translate-y-1/2 items-center justify-center rounded-full p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                      className="mobile-touch-target absolute right-2 top-1/2 inline-flex -translate-y-1/2 items-center justify-center rounded-full p-2 text-slate-400 transition hover:bg-gray-100 hover:text-slate-600"
                     >
                       {showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
@@ -743,7 +771,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
                     新密码
                   </label>
                   <div className="relative">
@@ -759,16 +787,16 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
                     <button
                       type="button"
                       onClick={() => setShowNewPassword(!showNewPassword)}
-                      className="mobile-touch-target absolute right-2 top-1/2 inline-flex -translate-y-1/2 items-center justify-center rounded-full p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                      className="mobile-touch-target absolute right-2 top-1/2 inline-flex -translate-y-1/2 items-center justify-center rounded-full p-2 text-slate-400 transition hover:bg-gray-100 hover:text-slate-600"
                     >
                       {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                   </div>
-                  <p className="text-xs text-gray-400 mt-1">至少 8 位，包含字母和数字</p>
+                  <p className="text-xs text-slate-400 mt-1">至少 8 位，包含字母和数字</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
                     确认新密码
                   </label>
                   <input
@@ -788,7 +816,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
                 <button
                   type="submit"
                   disabled={passwordLoading}
-                  className="mobile-touch-target w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium rounded-xl transition"
+                  className="mobile-touch-target w-full py-3 px-4 gradient-primary shadow-elevated disabled:opacity-50 text-white font-medium rounded-xl transition"
                 >
                   {passwordLoading ? '修改中...' : '修改密码'}
                 </button>
@@ -808,7 +836,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
             <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-gray-200 sm:hidden" />
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-bold text-red-600">注销账户</h3>
-              <button onClick={closeModal} className="mobile-touch-target inline-flex items-center justify-center rounded-full p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600">
+              <button onClick={closeModal} className="mobile-touch-target inline-flex items-center justify-center rounded-full p-2 text-slate-400 transition hover:bg-gray-100 hover:text-slate-600">
                 <X size={20} />
               </button>
             </div>
@@ -831,7 +859,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
 
             <form onSubmit={handleDeleteAccount} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
                   输入密码以确认身份
                 </label>
                 <input
@@ -845,7 +873,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 mb-2">
                   输入 <span className="font-bold text-red-600">确认注销</span> 以确认操作
                 </label>
                 <input
@@ -865,7 +893,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
               <button
                 type="submit"
                 disabled={deleteLoading || deleteConfirmText !== '确认注销'}
-                className="mobile-touch-target w-full py-3 px-4 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 disabled:text-gray-500 text-white font-medium rounded-xl transition"
+                className="mobile-touch-target w-full py-3 px-4 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 disabled:text-slate-500 text-white font-medium rounded-xl transition"
               >
                 {deleteLoading ? '正在注销...' : '确认注销账户'}
               </button>

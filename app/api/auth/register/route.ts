@@ -6,14 +6,20 @@ import { enforceRateLimit, buildIpActionKey } from '@/lib/rate-limit'
 import { getRateLimit } from '@/lib/rate-limit-config'
 import { safeParseBody, validatePassword } from '@/lib/validation'
 import { getAllowRegistration } from '@/lib/site-settings'
+import { validateInviteCode, consumeInviteCode } from '@/lib/invite'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export async function POST(request: NextRequest) {
   try {
+    const url = new URL(request.url)
+    const inviteCode = url.searchParams.get('code')
+
     const allowRegistration = await getAllowRegistration()
     if (!allowRegistration) {
-      return NextResponse.json({ error: '管理员已关闭注册功能' }, { status: 403 })
+      if (!inviteCode || !(await validateInviteCode(inviteCode))) {
+        return NextResponse.json({ error: '管理员已关闭注册功能' }, { status: 403 })
+      }
     }
 
     const registerRateLimit = enforceRateLimit({
@@ -76,6 +82,11 @@ export async function POST(request: NextRequest) {
         name: name.trim()
       }
     })
+
+    // Consume invite code after successful registration
+    if (inviteCode) {
+      await consumeInviteCode(inviteCode, user.id)
+    }
 
     return NextResponse.json({
       id: user.id,

@@ -273,7 +273,7 @@ export default function Dashboard({
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-brand-100 border-t-brand-500"></div>
       </div>
     )
   }
@@ -287,7 +287,7 @@ export default function Dashboard({
           <p className="text-gray-600 mb-6">请先添加宝宝信息开始记录</p>
           <Link
             href="/settings"
-            className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+            className="inline-flex items-center px-6 py-3 gradient-primary text-white rounded-button shadow-elevated hover:opacity-90 transition"
           >
             <PlusCircle size={20} className="mr-2" />
             添加宝宝
@@ -309,8 +309,8 @@ export default function Dashboard({
               onClick={() => handleSelectBaby(baby.id)}
               className={`mobile-touch-target rounded-full whitespace-nowrap px-4 py-2.5 text-sm transition ${
                 baby.id === resolvedSelectedBabyId
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50'
+                  ? 'gradient-primary text-white shadow-elevated'
+                  : 'bg-white text-slate-600 shadow-card hover:shadow-pressed'
               }`}
             >
               {baby.name}
@@ -320,7 +320,7 @@ export default function Dashboard({
       )}
 
       {selectedBaby && (
-        <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm">
+        <div className="bg-white rounded-card p-4 sm:p-6 shadow-card border border-blue-50">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-pink-100 to-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
               <BabyIcon size={24} className="text-blue-600 sm:hidden" />
@@ -337,58 +337,58 @@ export default function Dashboard({
       )}
 
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-white rounded-xl p-3 shadow-sm">
+        <div className="bg-white rounded-card p-3 shadow-card border border-blue-50">
           <div className="flex items-center justify-between mb-1.5">
-            <Droplets size={18} className="text-pink-500" />
-            <span className="text-xs text-gray-500">母乳</span>
+            <Droplets size={20} className="text-pink-500" />
+            <span className="text-xs text-slate-400 font-medium">母乳</span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">
+          <p className="text-2xl font-extrabold text-slate-900 tracking-tight">
             {(stats?.breastFeedingCount || 0) + (stats?.breastBottleCount || 0)}
           </p>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-slate-500">
             亲喂{stats?.breastFeedingCount || 0}次 · {stats?.totalBreastDuration || 0}分钟
           </p>
           {(stats?.breastBottleCount || 0) > 0 && (
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-slate-500">
               瓶喂{stats?.breastBottleCount || 0}次（{stats?.totalBreastMilkAmount || 0}ml）
             </p>
           )}
         </div>
 
-        <div className="bg-white rounded-xl p-3 shadow-sm">
+        <div className="bg-white rounded-card p-3 shadow-card border border-blue-50">
           <div className="flex items-center justify-between mb-1.5">
-            <Milk size={18} className="text-blue-500" />
-            <span className="text-xs text-gray-500">奶粉</span>
+            <Milk size={20} className="text-blue-500" />
+            <span className="text-xs text-slate-400 font-medium">奶粉</span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">{stats?.formulaCount || 0}</p>
-          <p className="text-xs text-gray-500">次 · {stats?.totalFormulaAmount || 0}ml</p>
+          <p className="text-2xl font-extrabold text-slate-900 tracking-tight">{stats?.formulaCount || 0}</p>
+          <p className="text-xs text-slate-500">次 · {stats?.totalFormulaAmount || 0}ml</p>
         </div>
 
-        <div className="bg-white rounded-xl p-3 shadow-sm">
+        <div className="bg-white rounded-card p-3 shadow-card border border-blue-50">
           <div className="flex items-center justify-between mb-1.5">
-            <Pill size={18} className="text-orange-500" />
-            <span className="text-xs text-gray-500">AD</span>
+            <Pill size={20} className="text-orange-500" />
+            <span className="text-xs text-slate-400 font-medium">AD</span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">
+          <p className="text-2xl font-extrabold text-slate-900 tracking-tight">
             {stats?.adGiven ? '✓' : '○'}
           </p>
-          <p className="text-xs text-gray-500">{stats?.adGiven ? '已服用' : '未服用'}</p>
+          <p className="text-xs text-slate-500">{stats?.adGiven ? '已服用' : '未服用'}</p>
         </div>
 
-        <div className="bg-white rounded-xl p-3 shadow-sm">
+        <div className="bg-white rounded-card p-3 shadow-card border border-blue-50">
           <div className="flex items-center justify-between mb-1.5">
-            <BabyIcon size={18} className="text-amber-500" />
-            <span className="text-xs text-gray-500">大小便</span>
+            <BabyIcon size={20} className="text-amber-500" />
+            <span className="text-xs text-slate-400 font-medium">大小便</span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">
+          <p className="text-2xl font-extrabold text-slate-900 tracking-tight">
             {stats?.peeCount || 0} / {stats?.poopCount || 0}
           </p>
-          <p className="text-xs text-gray-500">小便 / 大便</p>
+          <p className="text-xs text-slate-500">小便 / 大便</p>
         </div>
       </div>
 
       {stats && (stats.temperature || stats.weight || stats.height) && (
-        <div className="bg-white rounded-2xl p-3 shadow-sm">
+        <div className="bg-white rounded-card p-3 shadow-card border border-blue-50">
           <h3 className="text-xs font-medium text-gray-500 mb-2">今日健康数据</h3>
           <div className="flex flex-wrap gap-2">
             {stats.temperature && (
@@ -413,31 +413,39 @@ export default function Dashboard({
         </div>
       )}
 
-      <div className="bg-white rounded-2xl p-4 shadow-sm">
-        <h3 className="text-base font-bold text-gray-900 mb-3">快捷记录</h3>
+      <div className="bg-white rounded-card p-4 shadow-card border border-blue-50">
+        <h3 className="text-base font-bold text-slate-900 mb-3">快捷记录</h3>
         <div className="grid grid-cols-4 gap-2">
-          <Link href="/add?type=breast" className="flex flex-col items-center py-3 bg-pink-50 rounded-xl hover:bg-pink-100 transition">
-            <Droplets size={22} className="text-pink-500 mb-1" />
-            <span className="text-xs font-medium text-gray-700">母乳</span>
+          <Link href="/add?type=breast" className="flex flex-col items-center py-3 bg-gradient-to-b from-pink-50 to-pink-100/80 rounded-button border border-pink-100/60 hover:shadow-pressed transition active:scale-95">
+            <div className="mb-1.5">
+              <Droplets size={22} className="text-pink-500" />
+            </div>
+            <span className="text-[11px] font-semibold text-pink-700">母乳</span>
           </Link>
-          <Link href="/add?type=formula" className="flex flex-col items-center py-3 bg-blue-50 rounded-xl hover:bg-blue-100 transition">
-            <Milk size={22} className="text-blue-500 mb-1" />
-            <span className="text-xs font-medium text-gray-700">奶粉</span>
+          <Link href="/add?type=formula" className="flex flex-col items-center py-3 bg-gradient-to-b from-blue-50 to-blue-100/80 rounded-button border border-blue-100/60 hover:shadow-pressed transition active:scale-95">
+            <div className="mb-1.5">
+              <Milk size={22} className="text-blue-500" />
+            </div>
+            <span className="text-[11px] font-semibold text-blue-700">奶粉</span>
           </Link>
-          <Link href="/add?type=ad" className="flex flex-col items-center py-3 bg-orange-50 rounded-xl hover:bg-orange-100 transition">
-            <Pill size={22} className="text-orange-500 mb-1" />
-            <span className="text-xs font-medium text-gray-700">AD滴剂</span>
+          <Link href="/add?type=ad" className="flex flex-col items-center py-3 bg-gradient-to-b from-orange-50 to-orange-100/80 rounded-button border border-orange-100/60 hover:shadow-pressed transition active:scale-95">
+            <div className="mb-1.5">
+              <Pill size={22} className="text-orange-500" />
+            </div>
+            <span className="text-[11px] font-semibold text-orange-700">AD滴剂</span>
           </Link>
-          <Link href="/add?type=health" className="flex flex-col items-center py-3 bg-green-50 rounded-xl hover:bg-green-100 transition">
-            <Scale size={22} className="text-green-500 mb-1" />
-            <span className="text-xs font-medium text-gray-700">健康</span>
+          <Link href="/add?type=health" className="flex flex-col items-center py-3 bg-gradient-to-b from-green-50 to-green-100/80 rounded-button border border-green-100/60 hover:shadow-pressed transition active:scale-95">
+            <div className="mb-1.5">
+              <Scale size={22} className="text-emerald-500" />
+            </div>
+            <span className="text-[11px] font-semibold text-green-700">健康</span>
           </Link>
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl p-4 shadow-sm">
+      <div className="bg-white rounded-card p-4 shadow-card border border-blue-50">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-base font-bold text-gray-900">今日记录</h3>
+          <h3 className="text-base font-bold text-slate-900">今日记录</h3>
           <Link href="/timeline" className="text-sm text-blue-600 hover:text-blue-700 flex items-center">
             全部 <ChevronRight size={16} />
           </Link>
@@ -461,10 +469,10 @@ export default function Dashboard({
                 return (
                   <div
                     key={record.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                    className="flex items-center justify-between p-3 bg-slate-50/80 rounded-element border border-slate-100/60"
                   >
                     <div className="flex items-center space-x-3 min-w-0 flex-1">
-                      <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                      <div className="w-9 h-9 rounded-full bg-white shadow-sm flex items-center justify-center flex-shrink-0">
                         {getRecordIcon(record.type)}
                       </div>
                       <div className="min-w-0 flex-1">

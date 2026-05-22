@@ -39,7 +39,7 @@ interface StatsSegmentedTabsProps {
 }
 
 export function StatsPanel({ children, className = '' }: StatsPanelProps) {
-  return <div className={`rounded-2xl bg-white p-4 shadow-sm ${className}`.trim()}>{children}</div>
+  return <div className={`rounded-card bg-white p-4 shadow-card border border-blue-50 ${className}`.trim()}>{children}</div>
 }
 
 export function StatsFeatureCard({
@@ -47,11 +47,11 @@ export function StatsFeatureCard({
   title,
   icon: Icon,
   className = '',
-  iconClassName = 'text-gray-500',
-  titleClassName = 'text-sm font-semibold text-gray-900',
+  iconClassName = 'text-white',
+  titleClassName = 'text-sm font-semibold text-slate-900',
 }: StatsFeatureCardProps) {
   return (
-    <div className={`rounded-2xl bg-white p-4 shadow-sm ${className}`.trim()}>
+    <div className={`rounded-card bg-white p-4 shadow-card border border-blue-50 ${className}`.trim()}>
       <div className="mb-2 flex items-center gap-2">
         <Icon size={16} className={iconClassName} />
         <h3 className={titleClassName}>{title}</h3>
@@ -65,7 +65,7 @@ export function StatsEmptyState({
   icon: Icon,
   title,
   description,
-  className = 'py-8 text-center text-gray-400',
+  className = 'py-8 text-center text-slate-400',
 }: StatsEmptyStateProps) {
   return (
     <div className={className}>
@@ -83,7 +83,7 @@ export function StatsSegmentedTabs({
   className = '',
 }: StatsSegmentedTabsProps) {
   return (
-    <div className={`flex flex-wrap gap-2 rounded-2xl bg-gray-50 p-1 ${className}`.trim()}>
+    <div className={`flex flex-wrap gap-2 rounded-card bg-slate-50 p-1 ${className}`.trim()}>
       {items.map(item => {
         const active = item.key === value
 
@@ -93,12 +93,12 @@ export function StatsSegmentedTabs({
             type="button"
             onClick={() => !item.disabled && onChange(item.key)}
             disabled={item.disabled}
-            className={`min-w-0 flex-1 rounded-xl px-3 py-2 text-sm font-medium transition sm:flex-none sm:px-4 ${
+            className={`min-w-0 flex-1 rounded-button px-3 py-2 text-sm font-medium transition sm:flex-none sm:px-4 ${
               active
-                ? 'bg-white text-blue-700 shadow-sm'
+                ? 'bg-white text-blue-600 shadow-card'
                 : item.disabled
-                  ? 'cursor-not-allowed text-gray-400'
-                  : 'text-gray-600 hover:bg-white hover:text-gray-900'
+                  ? 'cursor-not-allowed text-slate-300'
+                  : 'text-slate-500 hover:bg-white/60 hover:text-slate-700'
             }`}
             title={item.description}
           >

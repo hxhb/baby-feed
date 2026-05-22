@@ -3,6 +3,7 @@
 import type { Session } from 'next-auth'
 import { SessionProvider } from 'next-auth/react'
 import Navbar from './Navbar'
+import { CopyToastProvider } from './CopyToast'
 
 export function Providers({
   children,
@@ -13,10 +14,12 @@ export function Providers({
 }) {
   return (
     <SessionProvider session={session}>
-      <Navbar />
-      <main className="min-h-screen bg-gray-50 pb-safe-tabbar md:pb-0">
-        {children}
-      </main>
+      <CopyToastProvider>
+        <Navbar />
+        <main className="min-h-screen bg-gray-50 pb-safe-tabbar md:pb-0">
+          {children}
+        </main>
+      </CopyToastProvider>
     </SessionProvider>
   )
 }

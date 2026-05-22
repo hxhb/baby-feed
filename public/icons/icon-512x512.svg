@@ -1,44 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 56">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#93c5fd"/>
-      <stop offset="50%" style="stop-color:#60a5fa"/>
-      <stop offset="100%" style="stop-color:#3b82f6"/>
+      <stop offset="0%" style="stop-color:#3b82f6"/>
+      <stop offset="100%" style="stop-color:#f472b6"/>
     </linearGradient>
-    <linearGradient id="milk" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" style="stop-color:#fef3c7"/>
-      <stop offset="100%" style="stop-color:#fbbf24"/>
-    </linearGradient>
-    <filter id="shadow">
-      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#1e40af" flood-opacity="0.15"/>
-    </filter>
   </defs>
-  <!-- 背景圆角矩形 -->
-  <rect width="512" height="512" rx="100" ry="100" fill="url(#bg)"/>
-  <!-- 柔光效果 -->
-  <ellipse cx="200" cy="150" rx="160" ry="100" fill="white" opacity="0.08"/>
-  <!-- 奶瓶组 -->
-  <g filter="url(#shadow)">
-    <!-- 奶瓶主体 -->
-    <rect x="176" y="172" width="160" height="216" rx="32" ry="32" fill="white" opacity="0.95"/>
-    <!-- 奶瓶瓶口 -->
-    <rect x="206" y="124" width="100" height="56" rx="16" ry="16" fill="white" opacity="0.95"/>
-    <!-- 奶嘴 -->
-    <path d="M232 124 Q256 80 280 124" fill="white" opacity="0.95" stroke="white" stroke-width="4"/>
-  </g>
-  <!-- 奶液 -->
-  <rect x="184" y="270" width="144" height="110" rx="24" ry="24" fill="url(#milk)" opacity="0.5"/>
-  <!-- 刻度线 -->
-  <line x1="184" y1="218" x2="222" y2="218" stroke="#93c5fd" stroke-width="4" stroke-linecap="round"/>
-  <line x1="184" y1="244" x2="210" y2="244" stroke="#93c5fd" stroke-width="4" stroke-linecap="round"/>
-  <line x1="184" y1="270" x2="222" y2="270" stroke="#93c5fd" stroke-width="4" stroke-linecap="round"/>
-  <line x1="184" y1="296" x2="210" y2="296" stroke="#93c5fd" stroke-width="4" stroke-linecap="round"/>
-  <line x1="184" y1="322" x2="222" y2="322" stroke="#93c5fd" stroke-width="4" stroke-linecap="round"/>
-  <!-- 心形装饰 -->
-  <path d="M362 388 C362 378 378 370 385 378 C392 370 408 378 408 388 C408 402 385 416 385 416 C385 416 362 402 362 388Z" fill="#f9a8d4" opacity="0.85"/>
-  <!-- 小星星装饰 -->
-  <circle cx="120" cy="120" r="8" fill="white" opacity="0.35"/>
-  <circle cx="400" cy="140" r="6" fill="white" opacity="0.25"/>
-  <circle cx="110" cy="370" r="6" fill="white" opacity="0.2"/>
-  <circle cx="410" cy="110" r="4" fill="white" opacity="0.3"/>
+  <rect width="56" height="56" rx="12" ry="12" fill="url(#bg)"/>
+  <rect x="15" y="18" width="24" height="32" rx="8" fill="white" opacity="0.95"/>
+  <rect x="20" y="9" width="14" height="10" rx="5" fill="white" opacity="0.95"/>
+  <path d="M23 9 Q27 3.5 31 9" fill="white" opacity="0.95" stroke="white" stroke-width="1.5"/>
+  <rect x="17" y="30" width="20" height="18" rx="6.5" fill="rgba(244,114,182,0.25)"/>
+  <path d="M27 33 C25 31 22.5 31.8 22.5 33.8 C22.5 35.8 27 38.5 27 38.5 C27 38.5 31.5 35.8 31.5 33.8 C31.5 31.8 29 31 27 33Z" fill="rgba(59,130,246,0.5)"/>
 </svg>

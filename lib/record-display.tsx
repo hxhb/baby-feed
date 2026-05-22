@@ -76,26 +76,27 @@ export function formatBreastFeedingDetails(record: FeedingRecordDisplay) {
 export function getRecordIcon(type: string, size: number = 20) {
   switch (type) {
     case 'BREAST_MILK':
-    case 'BREAST_MILK_BOTTLE':
       return <Droplets size={size} className="text-pink-500" />
+    case 'BREAST_MILK_BOTTLE':
+      return <Milk size={size} className="text-purple-500" />
     case 'FORMULA':
       return <Milk size={size} className="text-blue-500" />
     case 'AD_VITAMIN':
       return <Pill size={size} className="text-orange-500" />
     case 'WEIGHT':
-      return <Scale size={size} className="text-green-500" />
+      return <Scale size={size} className="text-emerald-500" />
     case 'HEIGHT':
-      return <Ruler size={size} className="text-blue-500" />
+      return <Ruler size={size} className="text-cyan-500" />
     case 'TEMPERATURE':
       return <Thermometer size={size} className="text-red-500" />
     case 'MEDICATION':
-      return <Pill size={size} className="text-purple-500" />
+      return <Pill size={size} className="text-violet-500" />
     case 'VACCINE':
       return <Syringe size={size} className="text-teal-500" />
     case 'DIAPER':
       return <BabyIcon size={size} className="text-amber-500" />
     case 'SLEEP':
-      return <Moon size={size} className="text-indigo-500" />
+      return <Moon size={size} className="text-violet-500" />
     case 'SOLID_FOOD':
       return <UtensilsCrossed size={size} className="text-orange-500" />
     default:

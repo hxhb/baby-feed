@@ -236,7 +236,7 @@ export default function StatsComponent({
     const ageStr = rawDate ? formatBabyAge(rawDate) : timestamp ? formatBabyAge(timestamp) : null
     return (
       <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs shadow-md">
-        <p className="font-semibold text-gray-900">{label}{ageStr ? <span className="ml-1.5 font-normal text-gray-400">({ageStr})</span> : null}</p>
+        <p className="font-semibold text-slate-900">{label}{ageStr ? <span className="ml-1.5 font-normal text-slate-400">({ageStr})</span> : null}</p>
         {formatItems(payload.map(p => ({ name: p.name, value: p.value })))}
       </div>
     )
@@ -373,8 +373,8 @@ export default function StatsComponent({
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">
         <StatsPanel className="py-16 text-center">
-          <h2 className="mb-2 text-2xl font-bold text-gray-900">还没有添加宝宝</h2>
-          <p className="text-gray-600">请先添加宝宝信息查看统计数据</p>
+          <h2 className="mb-2 text-2xl font-bold text-slate-900">还没有添加宝宝</h2>
+          <p className="text-slate-600">请先添加宝宝信息查看统计数据</p>
         </StatsPanel>
       </div>
     )
@@ -774,7 +774,7 @@ export default function StatsComponent({
   const totalVaccineTypes = vaccineProgressSummary.length
   const completedVaccineTypes = vaccineProgressSummary.filter(v => v.isCompleted).length
   const recentVaccineCard = (
-    <div className="rounded-2xl border border-teal-100 bg-gradient-to-br from-teal-50/80 to-white p-2.5 shadow-sm">
+    <div className="rounded-card border border-teal-100 bg-gradient-to-br from-teal-50/80 to-white p-2.5 shadow-card">
         <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 text-teal-600">
           <Syringe size={14} />
@@ -851,8 +851,8 @@ export default function StatsComponent({
               onClick={() => onSelectBaby(baby.id)}
               className={`px-4 py-2 rounded-full whitespace-nowrap transition text-sm ${
                 baby.id === selectedBabyId
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50'
+                  ? 'gradient-primary text-white shadow-elevated'
+                  : 'bg-white text-slate-600 shadow-card hover:shadow-pressed'
               }`}
             >
               {baby.name}
@@ -872,15 +872,15 @@ export default function StatsComponent({
                 className="w-full sm:flex-1"
               />
               <div className="w-full sm:ml-auto sm:w-auto sm:shrink-0">
-                <div className="grid grid-cols-3 gap-2 rounded-2xl bg-gray-100 p-1">
+                <div className="grid grid-cols-3 gap-2 rounded-card bg-slate-100 p-1">
                   {[7, 14, 30].map(d => (
                     <button
                       key={d}
                       onClick={() => setDays(d)}
-                      className={`rounded-2xl px-2 py-2 text-sm font-medium transition sm:px-4 ${
+                      className={`rounded-card px-2 py-2 text-sm font-medium transition sm:px-4 ${
                         days === d
-                          ? 'bg-white text-blue-700 shadow-sm'
-                          : 'text-gray-600 hover:bg-white/80'
+                          ? 'bg-white text-blue-600 shadow-card'
+                          : 'text-slate-500 hover:bg-white/60'
                       }`}
                     >
                       {d}天
@@ -897,19 +897,19 @@ export default function StatsComponent({
                 <div>
                   <div className="flex items-center gap-2">
                     <ChartColumn size={18} className="text-blue-600" />
-                    <h3 className="text-base font-bold text-gray-900">趋势工作台</h3>
+                    <h3 className="text-base font-bold text-slate-900">趋势工作台</h3>
                   </div>
-                  <p className="mt-1 text-sm text-gray-500">
+                  <p className="mt-1 text-sm text-slate-500">
                     当前周期内的母乳、奶粉、喂养热力图、体重、身高、大小便、喂养结构、BMI、左右乳时长、睡眠数据。
                   </p>
                 </div>
 
                 <div className="mt-4 grid gap-4 xl:grid-cols-2">
-                  <div className="min-w-0 rounded-2xl border border-pink-100 bg-gradient-to-br from-pink-50/30 to-blue-50/30 p-3 xl:col-span-2">
+                  <div className="min-w-0 rounded-card border border-pink-100 bg-gradient-to-br from-pink-50/30 to-blue-50/30 p-3 xl:col-span-2">
                     <div className="mb-3 flex items-center justify-between gap-2">
                       <div>
-                        <p className="text-sm font-semibold text-gray-900">喂养趋势</p>
-                        <p className="mt-1 text-xs text-gray-500">母乳亲喂 + 瓶喂母乳 + 奶粉</p>
+                        <p className="text-sm font-semibold text-slate-900">喂养趋势</p>
+                        <p className="mt-1 text-xs text-slate-500">母乳亲喂 + 瓶喂母乳 + 奶粉</p>
                       </div>
                     </div>
                     <StableResponsiveChart className="min-w-0 h-56 sm:h-72 -ml-2">
@@ -927,7 +927,7 @@ export default function StatsComponent({
                               else if (name.includes('瓶喂')) { dotColor = '#a855f7'; if (d) countStr = `（${d.瓶喂次数}次）` }
                               else if (name.includes('奶粉')) { dotColor = palette.blue; if (d) countStr = `（${d.奶粉次数}次）` }
                               return (
-                                <p key={name} className="mt-0.5 text-gray-600">
+                                <p key={name} className="mt-0.5 text-slate-600">
                                   <span style={{ color: dotColor }}>●</span> {name}：{name.includes('分钟') ? `${value}分钟` : `${value}ml`}{countStr}
                                 </p>
                               )
@@ -949,9 +949,9 @@ export default function StatsComponent({
                   </div>
 
                   {/* Feeding heatmap */}
-                  <div className="min-w-0 rounded-2xl border border-orange-100 bg-gradient-to-br from-orange-50/40 to-amber-50/30 p-3">
+                  <div className="min-w-0 rounded-card border border-orange-100 bg-gradient-to-br from-orange-50/40 to-amber-50/30 p-3">
                     <div className="mb-3">
-                      <p className="text-sm font-semibold text-gray-900">喂养时刻热力图</p>
+                      <p className="text-sm font-semibold text-slate-900">喂养时刻热力图</p>
                       <p className="mt-1 text-xs text-orange-700">颜色越深代表该时段喂养次数越多</p>
                     </div>
                     {(() => {
@@ -1086,10 +1086,10 @@ export default function StatsComponent({
                   </div>
 
                   {/* Sleep duration trend - side by side with heatmap on PC */}
-                  <div className="min-w-0 rounded-2xl border border-indigo-100 bg-indigo-50/30 p-3">
+                  <div className="min-w-0 rounded-card border border-indigo-100 bg-indigo-50/30 p-3">
                     <div className="mb-3 flex items-center justify-between gap-2">
                       <div>
-                        <p className="text-sm font-semibold text-gray-900">每日睡眠趋势</p>
+                        <p className="text-sm font-semibold text-slate-900">每日睡眠趋势</p>
                         <p className="mt-1 text-xs text-indigo-700">按自然日统计睡眠时长与次数</p>
                       </div>
                     </div>
@@ -1130,7 +1130,7 @@ export default function StatsComponent({
                               const ageStr = d.rawDate ? formatBabyAge(d.rawDate) : null
                               return (
                                 <div className="rounded-lg border border-indigo-100 bg-white px-3 py-2 text-xs shadow-md">
-                                  <p className="font-semibold text-gray-900">{label}{ageStr ? <span className="ml-1.5 font-normal text-gray-400">({ageStr})</span> : null}</p>
+                                  <p className="font-semibold text-slate-900">{label}{ageStr ? <span className="ml-1.5 font-normal text-slate-400">({ageStr})</span> : null}</p>
                                   <p className="mt-1 text-indigo-600">时长：{durationStr}</p>
                                   <p className="text-purple-600">次数：{d.睡眠次数}次</p>
                                 </div>
@@ -1151,10 +1151,10 @@ export default function StatsComponent({
                     )}
                   </div>
 
-                  <div className="min-w-0 rounded-2xl border border-teal-100 bg-teal-50/40 p-3">
+                  <div className="min-w-0 rounded-card border border-teal-100 bg-teal-50/40 p-3">
                     <div className="mb-3 flex items-center justify-between gap-2">
                       <div>
-                        <p className="text-sm font-semibold text-gray-900">体重趋势</p>
+                        <p className="text-sm font-semibold text-slate-900">体重趋势</p>
                         <p className="mt-1 text-xs text-teal-700">按记录时间查看增长轨迹</p>
                       </div>
                     </div>
@@ -1186,7 +1186,7 @@ export default function StatsComponent({
                             const ageStr = ts ? formatBabyAge(ts) : null
                             return (
                               <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs shadow-md">
-                                <p className="font-semibold text-gray-900">{formatTrendTooltipLabel(ts)}{ageStr ? <span className="ml-1.5 font-normal text-gray-400">({ageStr})</span> : null}</p>
+                                <p className="font-semibold text-slate-900">{formatTrendTooltipLabel(ts)}{ageStr ? <span className="ml-1.5 font-normal text-slate-400">({ageStr})</span> : null}</p>
                                 <p className="mt-0.5 text-teal-600">体重：{p.payload[0].value} kg</p>
                               </div>
                             )
@@ -1215,10 +1215,10 @@ export default function StatsComponent({
                     )}
                   </div>
 
-                  <div className="min-w-0 rounded-2xl border border-indigo-100 bg-indigo-50/40 p-3">
+                  <div className="min-w-0 rounded-card border border-indigo-100 bg-indigo-50/40 p-3">
                     <div className="mb-3 flex items-center justify-between gap-2">
                       <div>
-                        <p className="text-sm font-semibold text-gray-900">身高趋势</p>
+                        <p className="text-sm font-semibold text-slate-900">身高趋势</p>
                         <p className="mt-1 text-xs text-indigo-700">按记录时间查看身高变化</p>
                       </div>
                     </div>
@@ -1250,7 +1250,7 @@ export default function StatsComponent({
                             const ageStr = ts ? formatBabyAge(ts) : null
                             return (
                               <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs shadow-md">
-                                <p className="font-semibold text-gray-900">{formatTrendTooltipLabel(ts)}{ageStr ? <span className="ml-1.5 font-normal text-gray-400">({ageStr})</span> : null}</p>
+                                <p className="font-semibold text-slate-900">{formatTrendTooltipLabel(ts)}{ageStr ? <span className="ml-1.5 font-normal text-slate-400">({ageStr})</span> : null}</p>
                                 <p className="mt-0.5 text-indigo-600">身高：{p.payload[0].value} cm</p>
                               </div>
                             )
@@ -1280,10 +1280,10 @@ export default function StatsComponent({
                   </div>
 
                   {/* BMI trend */}
-                  <div className="min-w-0 rounded-2xl border border-emerald-100 bg-emerald-50/30 p-3">
+                  <div className="min-w-0 rounded-card border border-emerald-100 bg-emerald-50/30 p-3">
                     <div className="mb-3 flex items-center justify-between gap-2">
                       <div>
-                        <p className="text-sm font-semibold text-gray-900">BMI 趋势</p>
+                        <p className="text-sm font-semibold text-slate-900">BMI 趋势</p>
                         <p className="mt-1 text-xs text-emerald-700">体重(kg) ÷ 身高(m)² 综合评估</p>
                       </div>
                     </div>
@@ -1314,9 +1314,9 @@ export default function StatsComponent({
                               const ageStr = formatBabyAge(data.timestamp)
                               return (
                                 <div className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs shadow-md">
-                                  <p className="mb-1 font-medium text-gray-700">{formatTrendTooltipLabel(data.timestamp)}{ageStr ? <span className="ml-1.5 font-normal text-gray-400">({ageStr})</span> : null}</p>
+                                  <p className="mb-1 font-medium text-slate-700">{formatTrendTooltipLabel(data.timestamp)}{ageStr ? <span className="ml-1.5 font-normal text-slate-400">({ageStr})</span> : null}</p>
                                   <p className="text-emerald-600">BMI: <span className="font-semibold">{data.BMI}</span></p>
-                                  <p className="mt-0.5 text-gray-500">体重: {data.weight}kg · 身高: {data.height}cm</p>
+                                  <p className="mt-0.5 text-slate-500">体重: {data.weight}kg · 身高: {data.height}cm</p>
                                 </div>
                               )
                             }}
@@ -1352,7 +1352,7 @@ export default function StatsComponent({
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5">
                     <Syringe size={15} className="text-teal-500" />
-                    <h3 className="text-sm font-bold text-gray-900">疫苗记录</h3>
+                    <h3 className="text-sm font-bold text-slate-900">疫苗记录</h3>
                   </div>
                   {vaccineProgressSummary.length > 0 && (
                     <div className="flex items-center gap-1.5">
@@ -1374,7 +1374,7 @@ export default function StatsComponent({
                             <div className="flex items-center gap-2">
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-1.5">
-                                  <p className="text-sm font-bold text-gray-900 truncate">{item.vaccineName}</p>
+                                  <p className="text-sm font-bold text-slate-900 truncate">{item.vaccineName}</p>
                                   <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold bg-amber-200 text-amber-800">
                                     差{item.remainingDoses}针
                                   </span>
@@ -1388,7 +1388,7 @@ export default function StatsComponent({
                               {/* Mini progress indicator */}
                               {item.latestDoseNumber && item.totalDoses && (
                                 <div className="shrink-0 w-12">
-                                  <div className="flex h-2 overflow-hidden rounded-full bg-gray-100">
+                                  <div className="flex h-2 overflow-hidden rounded-full bg-slate-100">
                                     <div className="rounded-full transition-all bg-teal-500" style={{ width: `${Math.round((item.latestDoseNumber / item.totalDoses) * 100)}%` }} />
                                   </div>
                                   <p className="mt-0.5 text-center text-[10px] text-slate-400">{item.latestDoseNumber}/{item.totalDoses}</p>
@@ -1426,7 +1426,7 @@ export default function StatsComponent({
                         <button
                           type="button"
                           onClick={() => setShowCompletedVaccines(!showCompletedVaccines)}
-                          className="flex w-full items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-medium text-gray-400 transition hover:bg-gray-50 hover:text-gray-600"
+                          className="flex w-full items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-medium text-slate-400 transition hover:bg-slate-50 hover:text-slate-600"
                         >
                           {showCompletedVaccines ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                           已完成 ({completedVaccineTypes})
@@ -1439,7 +1439,7 @@ export default function StatsComponent({
                                 <div className="flex items-center gap-2">
                                   <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-1.5">
-                                      <p className="text-sm font-bold text-gray-900 truncate">{item.vaccineName}</p>
+                                      <p className="text-sm font-bold text-slate-900 truncate">{item.vaccineName}</p>
                                       <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold bg-emerald-200 text-emerald-800">
                                         已完成
                                       </span>
@@ -1453,7 +1453,7 @@ export default function StatsComponent({
                                   {/* Mini progress indicator */}
                                   {item.latestDoseNumber && item.totalDoses && (
                                     <div className="shrink-0 w-12">
-                                      <div className="flex h-2 overflow-hidden rounded-full bg-gray-100">
+                                      <div className="flex h-2 overflow-hidden rounded-full bg-slate-100">
                                         <div className="rounded-full transition-all bg-emerald-500" style={{ width: `${Math.round((item.latestDoseNumber / item.totalDoses) * 100)}%` }} />
                                       </div>
                                       <p className="mt-0.5 text-center text-[10px] text-slate-400">{item.latestDoseNumber}/{item.totalDoses}</p>
@@ -1510,18 +1510,18 @@ export default function StatsComponent({
 
               {/* Baby age banner */}
               {babyAgeLabel && (
-                <div className="flex items-center gap-2.5 rounded-2xl bg-gradient-to-r from-pink-50 to-purple-50 border border-pink-100 px-3.5 py-2.5">
+                <div className="flex items-center gap-2.5 rounded-card bg-gradient-to-r from-pink-50 to-purple-50 border border-pink-100 px-3.5 py-2.5">
                   <BabyIcon size={16} className="shrink-0 text-pink-500" />
-                  <p className="text-sm font-medium text-gray-700">
+                  <p className="text-sm font-medium text-slate-700">
                     <span className="font-bold text-pink-600">{stats.baby.name}</span>
                     {' · '}当前月龄 <span className="font-bold text-purple-600">{babyAgeLabel}</span>
-                    {babyAgeDays !== null && <span className="text-gray-400"> ({babyAgeDays}天)</span>}
+                    {babyAgeDays !== null && <span className="text-slate-400"> ({babyAgeDays}天)</span>}
                   </p>
                 </div>
               )}
 
               {/* Feeding insights */}
-              <div className="rounded-2xl border border-blue-100 bg-gradient-to-br from-white via-blue-50/40 to-sky-50/60 p-3 shadow-sm">
+              <div className="rounded-card border border-blue-100 bg-gradient-to-br from-white via-blue-50/40 to-sky-50/60 p-3 shadow-card">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 text-blue-700">
                     <Milk size={15} />
@@ -1604,7 +1604,7 @@ export default function StatsComponent({
                         <p className="text-[11px] text-slate-500">左右乳喂养比例</p>
                         <p className="text-xs font-bold text-slate-600">{formatMinutes(totalLeftBreast)} / {formatMinutes(totalRightBreast)}</p>
                       </div>
-                      <div className="mt-1.5 flex h-2.5 overflow-hidden rounded-full bg-gray-100">
+                      <div className="mt-1.5 flex h-2.5 overflow-hidden rounded-full bg-slate-100">
                         <div className="bg-pink-400 transition-all" style={{ width: `${leftBreastPct}%` }} />
                         <div className="bg-rose-200 transition-all" style={{ width: `${rightBreastPct}%` }} />
                       </div>
@@ -1634,7 +1634,7 @@ export default function StatsComponent({
               <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
 
                 {/* Growth insight */}
-                <div className="col-span-2 lg:col-span-1 rounded-2xl border border-emerald-100 bg-white p-2.5 shadow-sm">
+                <div className="col-span-2 lg:col-span-1 rounded-card border border-emerald-100 bg-white p-2.5 shadow-card">
                   <div className="flex items-center gap-1.5 text-emerald-600">
                     <TrendingUp size={14} />
                     <p className="text-sm font-bold">成长洞察</p>
@@ -1646,7 +1646,7 @@ export default function StatsComponent({
                         {latestWeightRecord ? `${latestWeightRecord.weight}kg` : '-'}
                       </p>
                       <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${
-                        latestWeightChange === null ? 'bg-gray-100 text-slate-400'
+                        latestWeightChange === null ? 'bg-slate-100 text-slate-400'
                         : latestWeightChange >= 0 ? 'bg-teal-600 text-white' : 'bg-amber-500 text-white'
                       }`}>
                         {latestWeightChange !== null ? `${latestWeightChange >= 0 ? '+' : ''}${latestWeightChange}kg` : '暂无'}
@@ -1661,7 +1661,7 @@ export default function StatsComponent({
                         {latestHeightRecord ? `${latestHeightRecord.height}cm` : '-'}
                       </p>
                       <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${
-                        latestHeightChange === null ? 'bg-gray-100 text-slate-400'
+                        latestHeightChange === null ? 'bg-slate-100 text-slate-400'
                         : latestHeightChange >= 0 ? 'bg-blue-600 text-white' : 'bg-amber-500 text-white'
                       }`}>
                         {latestHeightChange !== null ? `${latestHeightChange >= 0 ? '+' : ''}${latestHeightChange}cm` : '暂无'}
@@ -1680,7 +1680,7 @@ export default function StatsComponent({
                 </div>
 
                 {/* Diaper insight */}
-                <div className="rounded-2xl border border-violet-100 bg-white p-2.5 shadow-sm">
+                <div className="rounded-card border border-violet-100 bg-white p-2.5 shadow-card">
                   <div className="flex items-center gap-1.5 text-violet-600">
                     <Droplets size={14} />
                     <p className="text-sm font-bold">大小便</p>
@@ -1710,7 +1710,7 @@ export default function StatsComponent({
                 </div>
 
                 {/* Health reminder */}
-                <div className="rounded-2xl border border-amber-100 bg-white p-2.5 shadow-sm">
+                <div className="rounded-card border border-amber-100 bg-white p-2.5 shadow-card">
                   <div className="flex items-center gap-1.5 text-amber-600">
                     <Thermometer size={14} />
                     <p className="text-sm font-bold">健康提醒</p>
@@ -1759,10 +1759,10 @@ export default function StatsComponent({
               {/* Trend charts moved from dashboard */}
               <div className="grid gap-2.5 xl:grid-cols-2">
                 {/* Diaper trend */}
-                <div className="min-w-0 rounded-2xl border border-amber-100 bg-amber-50/30 p-3">
+                <div className="min-w-0 rounded-card border border-amber-100 bg-amber-50/30 p-3">
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">大小便趋势</p>
+                      <p className="text-sm font-semibold text-slate-900">大小便趋势</p>
                       <p className="mt-1 text-xs text-amber-700">每日大小便次数变化</p>
                     </div>
                   </div>
@@ -1775,7 +1775,7 @@ export default function StatsComponent({
                         <Tooltip content={(props) => renderTooltipWithAge(props as unknown as Parameters<typeof renderTooltipWithAge>[0], (items) => (
                           <>
                             {items.map(({ name, value }) => (
-                              <p key={name} className="mt-0.5 text-gray-600">{name}：{value}次</p>
+                              <p key={name} className="mt-0.5 text-slate-600">{name}：{value}次</p>
                             ))}
                           </>
                         ))} />
@@ -1798,10 +1798,10 @@ export default function StatsComponent({
                 </div>
 
                 {/* Feeding structure trend */}
-                <div className="min-w-0 rounded-2xl border border-purple-100 bg-purple-50/30 p-3">
+                <div className="min-w-0 rounded-card border border-purple-100 bg-purple-50/30 p-3">
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">喂养结构趋势</p>
+                      <p className="text-sm font-semibold text-slate-900">喂养结构趋势</p>
                       <p className="mt-1 text-xs text-purple-700">亲喂 / 瓶喂 / 奶粉次数变化</p>
                     </div>
                   </div>
@@ -1814,7 +1814,7 @@ export default function StatsComponent({
                         <Tooltip content={(props) => renderTooltipWithAge(props as unknown as Parameters<typeof renderTooltipWithAge>[0], (items) => (
                           <>
                             {items.map(({ name, value }) => (
-                              <p key={name} className="mt-0.5 text-gray-600">{name}：{value}次</p>
+                              <p key={name} className="mt-0.5 text-slate-600">{name}：{value}次</p>
                             ))}
                           </>
                         ))} />
@@ -1849,10 +1849,10 @@ export default function StatsComponent({
                 </div>
 
                 {/* Left/right breast duration trend */}
-                <div className="min-w-0 rounded-2xl border border-rose-100 bg-rose-50/30 p-3">
+                <div className="min-w-0 rounded-card border border-rose-100 bg-rose-50/30 p-3">
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">左右乳时长趋势</p>
+                      <p className="text-sm font-semibold text-slate-900">左右乳时长趋势</p>
                       <p className="mt-1 text-xs text-rose-700">每日左右侧亲喂时长(分钟)</p>
                     </div>
                   </div>
@@ -1865,7 +1865,7 @@ export default function StatsComponent({
                         <Tooltip content={(props) => renderTooltipWithAge(props as unknown as Parameters<typeof renderTooltipWithAge>[0], (items) => (
                           <>
                             {items.map(({ name, value }) => (
-                              <p key={name} className="mt-0.5 text-gray-600">{name}：{value}分钟</p>
+                              <p key={name} className="mt-0.5 text-slate-600">{name}：{value}分钟</p>
                             ))}
                           </>
                         ))} />
@@ -1890,7 +1890,7 @@ export default function StatsComponent({
 
               {/* Medication records - only show if there are records */}
               {medicationRecords.length > 0 && (
-                <div className="rounded-2xl border border-purple-100 bg-white p-2.5 shadow-sm">
+                <div className="rounded-card border border-purple-100 bg-white p-2.5 shadow-card">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5 text-purple-600">
                       <Pill size={14} />
@@ -2002,9 +2002,9 @@ export default function StatsComponent({
                   const genderLabel = gender === 'FEMALE' ? '女' : '男'
 
                   return (
-                    <div className="min-w-0 rounded-2xl border border-cyan-100 bg-gradient-to-br from-cyan-50/40 to-teal-50/30 p-3">
+                    <div className="min-w-0 rounded-card border border-cyan-100 bg-gradient-to-br from-cyan-50/40 to-teal-50/30 p-3">
                       <div className="mb-3">
-                        <p className="text-sm font-semibold text-gray-900">📏 体重-月龄 WHO 成长曲线（{genderLabel}）</p>
+                        <p className="text-sm font-semibold text-slate-900">📏 体重-月龄 WHO 成长曲线（{genderLabel}）</p>
                         <p className="mt-1 text-xs text-cyan-700">宝宝体重与 WHO 标准百分位（P3–P97）对比</p>
                       </div>
                       <StableResponsiveChart className="min-w-0 h-64 sm:h-80 -ml-2">
@@ -2046,11 +2046,11 @@ export default function StatsComponent({
                               const ageDisplay = months > 0 ? `${months}月${days}天` : `${Math.round(ageMonths * 30.4375)}天`
                               return (
                                 <div className="rounded-lg border border-cyan-200 bg-white px-3 py-2 text-xs shadow-md">
-                                  <p className="mb-1 font-medium text-gray-700">{data.label || `${ageMonths.toFixed(1)}月龄`}<span className="ml-1.5 font-normal text-gray-400">({ageDisplay})</span></p>
+                                  <p className="mb-1 font-medium text-slate-700">{data.label || `${ageMonths.toFixed(1)}月龄`}<span className="ml-1.5 font-normal text-slate-400">({ageDisplay})</span></p>
                                   {data.宝宝体重 !== undefined && (
                                     <p className="text-teal-600 font-bold">宝宝: {data.宝宝体重} kg</p>
                                   )}
-                                  <div className="mt-1 space-y-0.5 text-gray-500">
+                                  <div className="mt-1 space-y-0.5 text-slate-500">
                                     <p>P97: {data.P97}kg</p>
                                     <p>P85: {data.P85}kg</p>
                                     <p className="font-medium text-cyan-600">P50: {data.P50}kg（中位数）</p>
@@ -2168,9 +2168,9 @@ export default function StatsComponent({
                   const genderLabel = gender === 'FEMALE' ? '女' : '男'
 
                   return (
-                    <div className="min-w-0 rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50/40 to-indigo-50/30 p-3">
+                    <div className="min-w-0 rounded-card border border-violet-100 bg-gradient-to-br from-violet-50/40 to-indigo-50/30 p-3">
                       <div className="mb-3">
-                        <p className="text-sm font-semibold text-gray-900">📏 身高-月龄 WHO 成长曲线（{genderLabel}）</p>
+                        <p className="text-sm font-semibold text-slate-900">📏 身高-月龄 WHO 成长曲线（{genderLabel}）</p>
                         <p className="mt-1 text-xs text-violet-700">宝宝身高与 WHO 标准百分位（P3–P97）对比</p>
                       </div>
                       <StableResponsiveChart className="min-w-0 h-64 sm:h-80 -ml-2">
@@ -2212,11 +2212,11 @@ export default function StatsComponent({
                               const ageDisplay = months > 0 ? `${months}月${days}天` : `${Math.round(ageMonths * 30.4375)}天`
                               return (
                                 <div className="rounded-lg border border-violet-200 bg-white px-3 py-2 text-xs shadow-md">
-                                  <p className="mb-1 font-medium text-gray-700">{data.label || `${ageMonths.toFixed(1)}月龄`}<span className="ml-1.5 font-normal text-gray-400">({ageDisplay})</span></p>
+                                  <p className="mb-1 font-medium text-slate-700">{data.label || `${ageMonths.toFixed(1)}月龄`}<span className="ml-1.5 font-normal text-slate-400">({ageDisplay})</span></p>
                                   {data.宝宝身高 !== undefined && (
                                     <p className="text-indigo-600 font-bold">宝宝: {data.宝宝身高} cm</p>
                                   )}
-                                  <div className="mt-1 space-y-0.5 text-gray-500">
+                                  <div className="mt-1 space-y-0.5 text-slate-500">
                                     <p>P97: {data.P97}cm</p>
                                     <p>P85: {data.P85}cm</p>
                                     <p className="font-medium text-violet-600">P50: {data.P50}cm（中位数）</p>

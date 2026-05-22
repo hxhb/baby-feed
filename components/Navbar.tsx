@@ -112,7 +112,7 @@ export default function Navbar() {
                     onTouchStart={() => prefetchRoute(item.href)}
                     className={`flex items-center space-x-1 px-4 py-2 rounded-lg transition ${
                       isActive
-                        ? 'bg-blue-50 text-blue-600'
+                        ? 'bg-gradient-to-r from-blue-50 to-sky-50 text-blue-600 shadow-pressed'
                         : 'text-gray-600 hover:bg-gray-50'
                     }`}
                   >
@@ -134,7 +134,7 @@ export default function Navbar() {
         </div>
       </nav>
 
-      <nav className="md:hidden fixed inset-x-0 bottom-0 z-50 border-t border-gray-200/80 bg-white/98 backdrop-blur-xl supports-[backdrop-filter]:bg-white/92">
+      <nav className="md:hidden fixed inset-x-0 bottom-0 z-50 rounded-t-[28px] border-t border-blue-100/60 bg-white/98 backdrop-blur-xl shadow-nav supports-[backdrop-filter]:bg-white/92">
         <div className="mx-auto flex max-w-md items-end justify-between gap-1 px-2 pt-2 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]">
           {navItems.map((item) => {
             const Icon = item.icon
@@ -153,12 +153,10 @@ export default function Navbar() {
                   onTouchStart={() => prefetchRoute(item.href)}
                   className="flex min-w-[5rem] flex-col items-center justify-end self-start pt-0.5"
                 >
-                  <div className={`mobile-touch-target -mt-5 flex h-14 w-14 items-center justify-center rounded-full shadow-lg ring-4 ring-gray-50 transition-transform active:scale-95 ${
-                    isActive ? 'bg-blue-600' : 'bg-blue-500'
-                  }`}>
-                    <Icon size={26} className="text-white" />
+                  <div className={`mobile-touch-target -mt-5 flex h-[52px] w-[52px] items-center justify-center rounded-full gradient-primary shadow-elevated ring-4 ring-white transition-transform active:scale-95`}>
+                    <Icon size={24} className="text-white" />
                   </div>
-                  <span className={`mt-1 text-[11px] font-semibold ${isActive ? 'text-blue-600' : 'text-gray-500'}`}>
+                  <span className={`mt-1 text-[11px] font-semibold ${isActive ? 'text-blue-600' : 'text-slate-400'}`}>
                     {item.label}
                   </span>
                 </Link>
@@ -176,12 +174,16 @@ export default function Navbar() {
                 onTouchStart={() => prefetchRoute(item.href)}
                 className={`mobile-touch-target flex min-h-[4.25rem] min-w-[4.5rem] flex-1 flex-col items-center justify-center rounded-2xl px-2 py-2 transition active:scale-95 ${
                   isActive
-                    ? 'bg-blue-50 text-blue-600'
-                    : 'text-gray-400'
+                    ? 'text-blue-600'
+                    : 'text-slate-400'
                 }`}
               >
-                <Icon size={20} />
-                <span className="mt-1 text-[11px] font-medium">{item.label}</span>
+                <div className={`flex h-[30px] w-[44px] items-center justify-center rounded-[15px] ${
+                  isActive ? 'bg-gradient-to-br from-blue-50 to-sky-50' : ''
+                }`}>
+                  <Icon size={20} className={isActive ? 'fill-blue-600 text-blue-600' : ''} />
+                </div>
+                <span className={`mt-1 text-[11px] ${isActive ? 'font-semibold' : 'font-medium'}`}>{item.label}</span>
               </Link>
             )
           })}

@@ -214,7 +214,7 @@ const TimelineRecordItem = memo(function TimelineRecordItem({
     : getSleepRecordDisplayTime(record as HealthRecord, viewingDateStr)
 
   return (
-    <div className="flex items-center justify-between p-3 sm:p-4 hover:bg-gray-50 transition">
+    <div className="flex items-center justify-between p-3 sm:p-4 bg-white rounded-element border border-slate-100/60 transition">
       <div className="flex items-center space-x-3 min-w-0 flex-1">
         <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
           {getRecordIcon(record.type)}
@@ -261,7 +261,7 @@ const TimelineRecordSection = memo(function TimelineRecordSection({
         <div className="flex-1 h-px bg-gray-100"></div>
         <span className="text-xs text-gray-400">{records.length}条</span>
       </div>
-      <div className="divide-y divide-gray-100">
+      <div className="space-y-1.5 px-3 pb-3">
         {records.map((record) => (
           <TimelineRecordItem key={record.id} record={record} viewingDateStr={viewingDateStr} onEdit={onEdit} onDelete={onDelete} />
         ))}
@@ -775,7 +775,7 @@ export default function TimelineComponent({
         </div>
       )}
 
-      <div className="bg-white rounded-2xl p-3 shadow-sm">
+      <div className="bg-white rounded-card p-3 shadow-card border border-blue-50">
         <div className="flex items-center justify-between gap-2">
           <button
             onClick={goToPreviousDay}
@@ -901,7 +901,7 @@ export default function TimelineComponent({
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl p-3 shadow-sm">
+      <div className="bg-white rounded-card p-3 shadow-card border border-blue-50">
         <h3 className="font-bold text-gray-900 mb-2 text-sm">当日统计</h3>
         <div className="grid grid-cols-5 gap-1.5 text-center">
           <div>
@@ -944,7 +944,7 @@ export default function TimelineComponent({
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-white rounded-card shadow-card border border-blue-50 overflow-hidden">
         <div className="flex items-center justify-between px-3 pt-3 pb-1 min-h-8">
           <div className="text-xs text-gray-400">共 {records.length} 条记录</div>
           {isFetchingRecords && (

@@ -129,7 +129,7 @@ export default function MemoSection({ memoRecords: initialMemos, babyId }: Props
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
             <ClipboardList size={15} className="text-indigo-500" />
-            <h3 className="text-sm font-bold text-gray-900">备忘录</h3>
+            <h3 className="text-sm font-bold text-slate-900">备忘录</h3>
           </div>
           <div className="flex items-center gap-1.5">
             {pendingMemos.length > 0 && (
@@ -173,7 +173,7 @@ export default function MemoSection({ memoRecords: initialMemos, babyId }: Props
                 <button
                   type="button"
                   onClick={() => setShowCompleted(!showCompleted)}
-                  className="flex w-full items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-medium text-gray-400 transition hover:bg-gray-50 hover:text-gray-600"
+                  className="flex w-full items-center gap-1 rounded-button px-2 py-1.5 text-[11px] font-medium text-slate-400 transition hover:bg-gray-50 hover:text-slate-600"
                 >
                   {showCompleted ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                   已完成 ({completedMemos.length})
@@ -267,19 +267,19 @@ function MemoItem({ memo, onToggle, onEdit, onDelete, toggling, deleting }: Memo
 
         {/* Content */}
         <div className="min-w-0 flex-1">
-          <p className={`text-sm font-medium ${memo.completed ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+          <p className={`text-sm font-medium ${memo.completed ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
             {memo.title}
           </p>
           <div className="mt-0.5 flex items-center gap-1.5 text-[11px]">
             {overdue && (
               <span className="font-bold text-red-500">已过期</span>
             )}
-            <span className={memo.completed ? 'text-gray-400' : overdue ? 'text-red-400' : 'text-slate-500'}>
+            <span className={memo.completed ? 'text-slate-400' : overdue ? 'text-red-400' : 'text-slate-500'}>
               {formatMemoDate(memo.scheduledAt)}
             </span>
           </div>
           {memo.content && (
-            <p className={`mt-1 text-xs leading-relaxed ${memo.completed ? 'text-gray-400' : 'text-gray-600'}`}>
+            <p className={`mt-1 text-xs leading-relaxed ${memo.completed ? 'text-slate-400' : 'text-slate-600'}`}>
               {memo.content}
             </p>
           )}
@@ -290,7 +290,7 @@ function MemoItem({ memo, onToggle, onEdit, onDelete, toggling, deleting }: Memo
           <button
             type="button"
             onClick={onEdit}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-button text-slate-400 transition hover:bg-gray-100 hover:text-slate-600"
             title="编辑"
           >
             <Pencil size={13} />
@@ -299,7 +299,7 @@ function MemoItem({ memo, onToggle, onEdit, onDelete, toggling, deleting }: Memo
             type="button"
             onClick={onDelete}
             disabled={deleting}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-button text-slate-400 transition hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
             title="删除"
           >
             <Trash2 size={13} />

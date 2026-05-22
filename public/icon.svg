@@ -1,15 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#60a5fa"/>
-      <stop offset="100%" style="stop-color:#3b82f6"/>
+      <stop offset="0%" style="stop-color:#3b82f6"/>
+      <stop offset="100%" style="stop-color:#f472b6"/>
     </linearGradient>
   </defs>
   <rect width="32" height="32" rx="7" ry="7" fill="url(#bg)"/>
-  <rect x="11" y="10" width="10" height="14" rx="2.5" ry="2.5" fill="white" opacity="0.95"/>
-  <rect x="12.8" y="7" width="6.4" height="4" rx="1.2" ry="1.2" fill="white" opacity="0.95"/>
-  <path d="M14.5 7 Q16 4.5 17.5 7" fill="white" opacity="0.95" stroke="white" stroke-width="0.5"/>
-  <rect x="11.8" y="16.5" width="8.4" height="6.5" rx="1.8" ry="1.8" fill="#fbbf24" opacity="0.55"/>
-  <line x1="11.8" y1="13" x2="14" y2="13" stroke="#93c5fd" stroke-width="0.6" stroke-linecap="round"/>
-  <line x1="11.8" y1="15" x2="13.2" y2="15" stroke="#93c5fd" stroke-width="0.6" stroke-linecap="round"/>
+  <rect x="10" y="11" width="12" height="16" rx="4" fill="white" opacity="0.95"/>
+  <rect x="12" y="6" width="7" height="6" rx="2.5" fill="white" opacity="0.95"/>
+  <path d="M13.5 6 Q15.5 3 17.5 6" fill="white" opacity="0.95" stroke="white" stroke-width="0.8"/>
+  <rect x="11" y="18" width="10" height="8" rx="3.5" fill="rgba(244,114,182,0.25)"/>
+  <path d="M16 20 C15 19 13.5 19.4 13.5 20.5 C13.5 21.6 16 23 16 23 C16 23 18.5 21.6 18.5 20.5 C18.5 19.4 17 19 16 20Z" fill="rgba(59,130,246,0.5)"/>
 </svg>

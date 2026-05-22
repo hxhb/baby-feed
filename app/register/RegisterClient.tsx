@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
 type RegisterClientProps = {
@@ -10,12 +10,17 @@ type RegisterClientProps = {
 
 export default function RegisterClient({ allowRegistration }: RegisterClientProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const inviteCode = searchParams.get('code')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // Allow registration if globally enabled OR if a valid invite code is present
+  const canRegister = allowRegistration || !!inviteCode
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -34,7 +39,10 @@ export default function RegisterClient({ allowRegistration }: RegisterClientProp
     setLoading(true)
 
     try {
-      const response = await fetch('/api/auth/register', {
+      const url = inviteCode
+        ? `/api/auth/register?code=${encodeURIComponent(inviteCode)}`
+        : '/api/auth/register'
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, password })
@@ -54,7 +62,7 @@ export default function RegisterClient({ allowRegistration }: RegisterClientProp
     }
   }
 
-  if (!allowRegistration) {
+  if (!canRegister) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-pink-50 px-4">
         <div className="max-w-md w-full space-y-8">
@@ -70,7 +78,7 @@ export default function RegisterClient({ allowRegistration }: RegisterClientProp
             <h2 className="text-xl font-bold text-gray-900 mb-2">注册已关闭</h2>
             <p className="text-gray-500 mb-6">
               管理员已关闭新用户注册功能。<br />
-              如需使用，请联系管理员。
+              如需使用，请联系管理员获取邀请链接。
             </p>
             <Link
               href="/login"
@@ -89,10 +97,18 @@ export default function RegisterClient({ allowRegistration }: RegisterClientProp
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">🍼 Baby Feed</h1>
-          <p className="text-gray-600">创建您的账号</p>
+          <p className="text-gray-600">
+            {inviteCode ? '通过邀请链接注册' : '创建您的账号'}
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-6 bg-white p-8 rounded-2xl shadow-lg">
+          {inviteCode && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-700">
+              您正在通过邀请链接注册，请填写以下信息完成注册。
+            </div>
+          )}
+
           <div className="space-y-4">
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">

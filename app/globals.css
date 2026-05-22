@@ -3,16 +3,16 @@
 @tailwind utilities;
 
 :root {
-  --background: #f9fafb;
-  --foreground: #171717;
+  --background: #f0f9ff;
+  --foreground: #0f172a;
   color-scheme: light;
 }
 
 /* 强制亮色模式，防止系统夜间模式影响 */
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #f9fafb;
-    --foreground: #171717;
+    --background: #f0f9ff;
+    --foreground: #0f172a;
     color-scheme: light;
   }
 }
@@ -154,4 +154,70 @@ textarea {
   .text-balance {
     text-wrap: balance;
   }
+}
+
+/* Design system gradient utilities */
+.gradient-primary {
+  background: linear-gradient(135deg, #3b82f6, #06b6d4);
+}
+
+.gradient-icon {
+  background: linear-gradient(135deg, #3b82f6, #f472b6);
+}
+
+.gradient-breast {
+  background: linear-gradient(135deg, #f472b6, #ec4899);
+}
+
+.gradient-formula {
+  background: linear-gradient(135deg, #60a5fa, #3b82f6);
+}
+
+.gradient-ad {
+  background: linear-gradient(135deg, #fb923c, #f97316);
+}
+
+.gradient-health {
+  background: linear-gradient(135deg, #34d399, #10b981);
+}
+
+.gradient-sleep {
+  background: linear-gradient(135deg, #a78bfa, #8b5cf6);
+}
+
+.gradient-diaper {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+}
+
+/* Splash screen */
+.splash-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, #f0f9ff 0%, #e0f2fe 50%, #bae6fd 100%);
+  transition: opacity 0.4s ease, visibility 0.4s ease;
+}
+
+.splash-screen.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.splash-logo {
+  animation: splash-fade-in 0.6s ease forwards;
+}
+
+@keyframes splash-fade-in {
+  from { opacity: 0; transform: scale(0.9) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
