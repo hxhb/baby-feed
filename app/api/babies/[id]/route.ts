@@ -206,6 +206,18 @@ export async function DELETE(
       where: { id }
     })
 
+    // If the deleted baby was the user's active baby, clear it
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { activeBabyId: true }
+    })
+    if (user?.activeBabyId === id) {
+      await prisma.user.update({
+        where: { id: session.user.id },
+        data: { activeBabyId: null }
+      })
+    }
+
     return NextResponse.json({ success: true }, { headers: noStoreHeaders })
   } catch (error) {
     logError('删除婴儿信息失败', error)

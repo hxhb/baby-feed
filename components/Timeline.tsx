@@ -9,11 +9,12 @@ import { splitDurationByBeijingDay } from '@/lib/api-helpers'
 import { dedupeRequest, invalidateRequestCache } from '@/lib/client-request-cache'
 import type { PreloadedTimelineRecord } from '@/lib/server-timeline'
 import Link from 'next/link'
-import { 
+import {
   ChevronLeft,
   ChevronRight,
   Trash2,
   Pencil,
+  MoreVertical,
 } from 'lucide-react'
 import { getRecordIcon, getRecordTitle } from '@/lib/record-display'
 import type { DisplayRecord } from '@/lib/record-display'
@@ -199,19 +200,21 @@ const TimelineRecordItem = memo(function TimelineRecordItem({
   viewingDateStr,
   onEdit,
   onDelete,
+  menuOpenId,
+  onMenuToggle,
 }: {
   record: TimelineRecord
   viewingDateStr: string
   onEdit: (record: TimelineRecord) => void
   onDelete: (id: string, type: 'feeding' | 'health') => void
+  menuOpenId: string | null
+  onMenuToggle: (id: string | null) => void
 }) {
   const isFeeding = record.recordType === 'feeding'
-  // For sleep records, show the contextually appropriate time:
-  // - sleepStartTime when viewing the date the sleep started
-  // - sleepEndTime (wake-up) when viewing a cross-midnight record from the wake-up date
   const time = isFeeding
     ? record.startTime
     : getSleepRecordDisplayTime(record as HealthRecord, viewingDateStr)
+  const isMenuOpen = menuOpenId === record.id
 
   return (
     <div className="flex items-center justify-between p-3 sm:p-4 bg-white rounded-element border border-slate-100/60 transition">
@@ -227,13 +230,34 @@ const TimelineRecordItem = memo(function TimelineRecordItem({
           </p>
         </div>
       </div>
-      <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-        <button type="button" onClick={() => onEdit(record)} className="p-2 text-gray-400 hover:text-blue-500 transition" title="编辑">
-          <Pencil size={15} />
+      <div className="relative flex-shrink-0 ml-2">
+        <button
+          type="button"
+          onClick={() => onMenuToggle(isMenuOpen ? null : record.id)}
+          className="mobile-touch-target p-2 text-gray-400 hover:text-slate-600 hover:bg-slate-100 rounded-element transition"
+        >
+          <MoreVertical size={16} />
         </button>
-        <button type="button" onClick={() => onDelete(record.id, isFeeding ? 'feeding' : 'health')} className="p-2 text-gray-400 hover:text-red-500 transition" title="删除">
-          <Trash2 size={15} />
-        </button>
+        {isMenuOpen && (
+          <div className="absolute right-0 top-full mt-1 z-20 bg-white rounded-element shadow-elevated border border-slate-100 py-1 min-w-[100px]">
+            <button
+              type="button"
+              onClick={() => { onMenuToggle(null); onEdit(record) }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition"
+            >
+              <Pencil size={14} />
+              编辑
+            </button>
+            <button
+              type="button"
+              onClick={() => { onMenuToggle(null); onDelete(record.id, isFeeding ? 'feeding' : 'health') }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition"
+            >
+              <Trash2 size={14} />
+              删除
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -245,12 +269,16 @@ const TimelineRecordSection = memo(function TimelineRecordSection({
   viewingDateStr,
   onEdit,
   onDelete,
+  menuOpenId,
+  onMenuToggle,
 }: {
   label: string
   records: TimelineRecord[]
   viewingDateStr: string
   onEdit: (record: TimelineRecord) => void
   onDelete: (id: string, type: 'feeding' | 'health') => void
+  menuOpenId: string | null
+  onMenuToggle: (id: string | null) => void
 }) {
   if (records.length === 0) return null
 
@@ -263,7 +291,7 @@ const TimelineRecordSection = memo(function TimelineRecordSection({
       </div>
       <div className="space-y-1.5 px-3 pb-3">
         {records.map((record) => (
-          <TimelineRecordItem key={record.id} record={record} viewingDateStr={viewingDateStr} onEdit={onEdit} onDelete={onDelete} />
+          <TimelineRecordItem key={record.id} record={record} viewingDateStr={viewingDateStr} onEdit={onEdit} onDelete={onDelete} menuOpenId={menuOpenId} onMenuToggle={onMenuToggle} />
         ))}
       </div>
     </div>
@@ -290,6 +318,7 @@ export default function TimelineComponent({
   const [isCalendarOpen, setIsCalendarOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; type: 'feeding' | 'health' } | null>(null)
   const [editingRecord, setEditingRecord] = useState<TimelineRecord | null>(null)
+  const [recordMenuOpenId, setRecordMenuOpenId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const latestRequestKeyRef = useRef<string | null>(null)
   const datePickerWrapperRef = useRef<HTMLDivElement | null>(null)
@@ -301,10 +330,13 @@ export default function TimelineComponent({
 
   // If a record was just saved, bypass SSR initial data and force a fresh fetch
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.sessionStorage.getItem('record_saved')) {
-      window.sessionStorage.removeItem('record_saved')
-      invalidateRequestCache()
-      setFreshFetch(true)
+    if (typeof window !== 'undefined') {
+      const savedTs = window.sessionStorage.getItem('record_saved_ts')
+      if (savedTs) {
+        window.sessionStorage.removeItem('record_saved_ts')
+        invalidateRequestCache()
+        setFreshFetch(true)
+      }
     }
   }, [])
 
@@ -564,10 +596,6 @@ export default function TimelineComponent({
     }
   }
 
-  const handleBabyHover = useCallback((babyId: string) => {
-    prefetchDate(babyId, currentDateStr)
-  }, [currentDateStr, prefetchDate])
-
   const goToPreviousDay = useCallback(() => {
     const previousDateStr = findAdjacentValidDate(validDates, currentDateStr, 'prev')
     if (!previousDateStr) {
@@ -754,26 +782,6 @@ export default function TimelineComponent({
 
   return (
     <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 space-y-4">
-      {babies.length > 1 && (
-        <div className="mobile-scroll-row flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
-          {babies.map(baby => (
-            <button
-              key={baby.id}
-              onClick={() => onSelectBaby(baby.id)}
-              onMouseEnter={() => handleBabyHover(baby.id)}
-              onFocus={() => handleBabyHover(baby.id)}
-              onTouchStart={() => handleBabyHover(baby.id)}
-              className={`mobile-touch-target rounded-full whitespace-nowrap px-4 py-2.5 text-sm transition ${
-                baby.id === selectedBabyId
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              {baby.name}
-            </button>
-          ))}
-        </div>
-      )}
 
       <div className="bg-white rounded-card p-3 shadow-card border border-blue-50">
         <div className="flex items-center justify-between gap-2">
@@ -962,12 +970,16 @@ export default function TimelineComponent({
             </div>
           ) : (
             <div>
-              <TimelineRecordSection label="下午" records={afternoon} viewingDateStr={currentDateStr} onEdit={handleEditStart} onDelete={handleDeleteClick} />
-              <TimelineRecordSection label="上午" records={morning} viewingDateStr={currentDateStr} onEdit={handleEditStart} onDelete={handleDeleteClick} />
+              <TimelineRecordSection label="下午" records={afternoon} viewingDateStr={currentDateStr} onEdit={handleEditStart} onDelete={handleDeleteClick} menuOpenId={recordMenuOpenId} onMenuToggle={setRecordMenuOpenId} />
+              <TimelineRecordSection label="上午" records={morning} viewingDateStr={currentDateStr} onEdit={handleEditStart} onDelete={handleDeleteClick} menuOpenId={recordMenuOpenId} onMenuToggle={setRecordMenuOpenId} />
             </div>
           )}
         </div>
       </div>
+
+      {recordMenuOpenId && (
+        <div className="fixed inset-0 z-10" onClick={() => setRecordMenuOpenId(null)} />
+      )}
 
       {deleteTarget && (
         <DeleteConfirmDialog onConfirm={handleDeleteConfirm} onCancel={() => setDeleteTarget(null)} />

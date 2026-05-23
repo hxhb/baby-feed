@@ -14,7 +14,7 @@ async function getServerSession() {
 }
 
 export default async function SettingsPage() {
-  const [session, initialBabies] = await Promise.all([
+  const [session, babiesResult] = await Promise.all([
     getServerSession(),
     getPreloadedBabies(),
   ])
@@ -27,7 +27,8 @@ export default async function SettingsPage() {
     <Settings
       userName={session.user.name}
       userEmail={session.user.email}
-      initialBabies={initialBabies}
+      initialBabies={babiesResult.babies}
+      activeBabyId={babiesResult.activeBabyId}
     />
   )
 }

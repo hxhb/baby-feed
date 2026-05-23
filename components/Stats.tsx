@@ -289,8 +289,7 @@ export default function StatsComponent({
 
   // If a record was just saved, bypass SSR initial data and force a fresh fetch
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.sessionStorage.getItem('record_saved')) {
-      window.sessionStorage.removeItem('record_saved')
+    if (typeof window !== 'undefined' && window.sessionStorage.getItem('record_saved_ts')) {
       invalidateRequestCache()
       setFreshFetch(true)
     }
@@ -843,23 +842,6 @@ export default function StatsComponent({
 
   return (
     <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 space-y-4">
-      {babies.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
-          {babies.map(baby => (
-            <button
-              key={baby.id}
-              onClick={() => onSelectBaby(baby.id)}
-              className={`px-4 py-2 rounded-full whitespace-nowrap transition text-sm ${
-                baby.id === selectedBabyId
-                  ? 'gradient-primary text-white shadow-elevated'
-                  : 'bg-white text-slate-600 shadow-card hover:shadow-pressed'
-              }`}
-            >
-              {baby.name}
-            </button>
-          ))}
-        </div>
-      )}
 
       {stats && (
         <>

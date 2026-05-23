@@ -34,6 +34,7 @@ export async function GET(request: NextRequest) {
         id: true,
         email: true,
         name: true,
+        activeBabyId: true,
         createdAt: true,
       }
     })
@@ -80,24 +81,51 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: parseError || '请求体格式不正确' }, { status: 400, headers: noStoreHeaders })
     }
 
-    const { name } = body
+    const { name, activeBabyId } = body
 
-    if (!name || typeof name !== 'string') {
-      return NextResponse.json({ error: '请输入用户名' }, { status: 400, headers: noStoreHeaders })
+    const updateData: Record<string, unknown> = {}
+
+    // Handle name update
+    if (name !== undefined) {
+      if (!name || typeof name !== 'string') {
+        return NextResponse.json({ error: '请输入用户名' }, { status: 400, headers: noStoreHeaders })
+      }
+      const trimmedName = name.trim()
+      if (trimmedName.length < 1 || trimmedName.length > 50) {
+        return NextResponse.json({ error: '用户名长度需在 1-50 个字符之间' }, { status: 400, headers: noStoreHeaders })
+      }
+      updateData.name = trimmedName
     }
 
-    const trimmedName = name.trim()
-    if (trimmedName.length < 1 || trimmedName.length > 50) {
-      return NextResponse.json({ error: '用户名长度需在 1-50 个字符之间' }, { status: 400, headers: noStoreHeaders })
+    // Handle activeBabyId update
+    if (activeBabyId !== undefined) {
+      if (activeBabyId !== null && typeof activeBabyId !== 'string') {
+        return NextResponse.json({ error: 'activeBabyId 格式不正确' }, { status: 400, headers: noStoreHeaders })
+      }
+      if (activeBabyId) {
+        // Verify the baby belongs to this user
+        const baby = await prisma.baby.findFirst({
+          where: { id: activeBabyId, createdBy: session.user.id }
+        })
+        if (!baby) {
+          return NextResponse.json({ error: '宝宝不存在' }, { status: 404, headers: noStoreHeaders })
+        }
+      }
+      updateData.activeBabyId = activeBabyId
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: '没有需要更新的字段' }, { status: 400, headers: noStoreHeaders })
     }
 
     const updatedUser = await prisma.user.update({
       where: { id: session.user.id },
-      data: { name: trimmedName },
+      data: updateData,
       select: {
         id: true,
         email: true,
         name: true,
+        activeBabyId: true,
       }
     })
 

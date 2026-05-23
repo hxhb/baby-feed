@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { getBeijingToday } from '@/lib/time'
 import { getBeijingDayRange } from '@/lib/api-helpers'
-import { getPreloadedBabies } from '@/lib/server-babies'
+import { getPreloadedBabies, type PreloadedBaby } from '@/lib/server-babies'
 import { getServerSession } from '@/lib/server-auth'
 
 export interface PreloadedDashboardFeedingRecord {
@@ -37,7 +37,7 @@ export interface PreloadedDashboardHealthRecord {
 }
 
 export interface PreloadedDashboardData {
-  initialBabies: Awaited<ReturnType<typeof getPreloadedBabies>>
+  initialBabies: PreloadedBaby[]
   initialSelectedBabyId: string | null
   initialTodayRecords: PreloadedDashboardFeedingRecord[]
   initialTodayHealthRecords: PreloadedDashboardHealthRecord[]
@@ -55,11 +55,11 @@ export async function getPreloadedDashboardData(): Promise<PreloadedDashboardDat
   }
 
   const initialBabies = await getPreloadedBabies()
-  const initialSelectedBabyId = initialBabies[0]?.id ?? null
+  const initialSelectedBabyId = initialBabies.activeBabyId || initialBabies.babies[0]?.id || null
 
   if (!initialSelectedBabyId) {
     return {
-      initialBabies,
+      initialBabies: initialBabies.babies,
       initialSelectedBabyId: null,
       initialTodayRecords: [],
       initialTodayHealthRecords: [],
@@ -117,7 +117,7 @@ export async function getPreloadedDashboardData(): Promise<PreloadedDashboardDat
   ])
 
   return {
-    initialBabies,
+    initialBabies: initialBabies.babies,
     initialSelectedBabyId,
     initialTodayRecords: feedingRecords.map((record) => ({
       id: record.id,

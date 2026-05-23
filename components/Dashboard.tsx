@@ -141,12 +141,13 @@ export default function Dashboard({
 
   // If a record was just saved, bypass SSR initial data and force a fresh fetch
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.sessionStorage.getItem('record_saved')) {
-      window.sessionStorage.removeItem('record_saved')
-      setFreshFetch(true)
-      // Immediately invalidate caches and trigger fetch in next tick
-      if (resolvedSelectedBabyId) {
-        invalidateRequestCache()
+    if (typeof window !== 'undefined') {
+      const savedTs = window.sessionStorage.getItem('record_saved_ts')
+      if (savedTs) {
+        setFreshFetch(true)
+        if (resolvedSelectedBabyId) {
+          invalidateRequestCache()
+        }
       }
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -302,23 +303,6 @@ export default function Dashboard({
 
   return (
     <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 space-y-4">
-      {babies.length > 1 && (
-        <div className="mobile-scroll-row flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
-          {babies.map(baby => (
-            <button
-              key={baby.id}
-              onClick={() => handleSelectBaby(baby.id)}
-              className={`mobile-touch-target rounded-full whitespace-nowrap px-4 py-2.5 text-sm transition ${
-                baby.id === resolvedSelectedBabyId
-                  ? 'gradient-primary text-white shadow-elevated'
-                  : 'bg-white text-slate-600 shadow-card hover:shadow-pressed'
-              }`}
-            >
-              {baby.name}
-            </button>
-          ))}
-        </div>
-      )}
 
       {selectedBaby && (
         <div className="bg-white rounded-card p-4 sm:p-6 shadow-card border border-blue-50">

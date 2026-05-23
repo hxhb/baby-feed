@@ -39,11 +39,12 @@ interface Props {
   userName: string
   userEmail: string
   initialBabies?: BabyInfo[]
+  activeBabyId?: string | null
 }
 
 type ModalType = 'addBaby' | 'editBaby' | 'editName' | 'changePassword' | 'deleteAccount' | null
 
-export default function SettingsComponent({ userName, userEmail, initialBabies = [] }: Props) {
+export default function SettingsComponent({ userName, userEmail, initialBabies = [], activeBabyId: initialActiveBabyId }: Props) {
   const router = useRouter()
   const [babies, setBabies] = useState<BabyInfo[]>(initialBabies)
   const [loading, setLoading] = useState(initialBabies.length === 0)
@@ -52,6 +53,9 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
   const [isAdmin, setIsAdmin] = useState(false)
   const [openMenuBabyId, setOpenMenuBabyId] = useState<string | null>(null)
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
+  const [currentActiveBabyId, setCurrentActiveBabyId] = useState<string | null>(
+    initialActiveBabyId ?? (initialBabies.length > 0 ? initialBabies[0].id : null)
+  )
   const { copyToClipboard } = useCopyToast()
   
   // 宝宝表单
@@ -210,6 +214,19 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
     try {
       const response = await fetch(`/api/babies/${id}`, { method: 'DELETE' })
       if (response.ok) {
+        // If the deleted baby was active, reset to first remaining baby
+        if (currentActiveBabyId === id) {
+          const remaining = babies.filter(b => b.id !== id)
+          const newActiveId = remaining.length > 0 ? remaining[0].id : null
+          setCurrentActiveBabyId(newActiveId)
+          if (newActiveId) {
+            fetch('/api/user/profile', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ activeBabyId: newActiveId })
+            }).catch(() => {})
+          }
+        }
         fetchBabies()
       }
     } catch (error) {
@@ -223,6 +240,22 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
     setBirthDate(extractDateStr(baby.birthDate))
     setGender(baby.gender as 'MALE' | 'FEMALE')
     setActiveModal('editBaby')
+  }
+
+  const handleSetActiveBaby = async (babyId: string) => {
+    setOpenMenuBabyId(null)
+    try {
+      const response = await fetch('/api/user/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ activeBabyId: babyId })
+      })
+      if (response.ok) {
+        setCurrentActiveBabyId(babyId)
+      }
+    } catch (error) {
+      console.error('设置活动宝宝失败:', error)
+    }
   }
 
   // =============== 修改用户名 ===============
@@ -524,7 +557,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
             {babies.map(baby => (
               <div
                 key={baby.id}
-                className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2.5 shadow-sm shadow-slate-100"
+                className={`rounded-xl border px-3 py-2.5 shadow-sm ${currentActiveBabyId === baby.id ? 'border-blue-300 bg-blue-50/50 shadow-blue-100' : 'border-slate-200 bg-slate-50/80 shadow-slate-100'}`}
               >
                 <div className="flex items-start gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-pink-100 to-blue-100">
@@ -536,6 +569,11 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
                       <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${baby.gender === 'MALE' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}`}>
                         {baby.gender === 'MALE' ? '男宝' : '女宝'}
                       </span>
+                      {currentActiveBabyId === baby.id && (
+                        <span className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-700">
+                          活动
+                        </span>
+                      )}
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
                       <span>出生 {format(parseDateAsBeijing(baby.birthDate), 'yyyy年MM月dd日', { locale: zhCN })}</span>
@@ -555,6 +593,15 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
                       <>
                         <div className="fixed inset-0 z-10" onClick={() => setOpenMenuBabyId(null)} />
                         <div className="absolute right-0 top-full z-20 mt-1 w-36 rounded-element border border-slate-200 bg-white py-1 shadow-elevated">
+                          {currentActiveBabyId !== baby.id && (
+                            <button
+                              onClick={() => handleSetActiveBaby(baby.id)}
+                              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 transition"
+                            >
+                              <Check size={14} />
+                              设为活动
+                            </button>
+                          )}
                           <button
                             onClick={() => { handleCopyBabyId(baby.id); setOpenMenuBabyId(null) }}
                             className="flex w-full items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition"

@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { getPreloadedBabies } from '@/lib/server-babies'
+import { getPreloadedBabies, type PreloadedBaby } from '@/lib/server-babies'
 import { getServerSession } from '@/lib/server-auth'
 import { getBeijingToday } from '@/lib/time'
 import { getBeijingDateStr, getBeijingDayRange, buildSleepAwareOrClause } from '@/lib/api-helpers'
@@ -53,7 +53,7 @@ export interface PreloadedTimelineHealthRecord {
 export type PreloadedTimelineRecord = PreloadedTimelineFeedingRecord | PreloadedTimelineHealthRecord
 
 export interface PreloadedTimelinePageData {
-  initialBabies: Awaited<ReturnType<typeof getPreloadedBabies>>
+  initialBabies: PreloadedBaby[]
   initialSelectedBabyId: string | null
   initialDate: string
   initialRecords: PreloadedTimelineRecord[]
@@ -210,12 +210,12 @@ export async function getPreloadedTimelinePageData(): Promise<PreloadedTimelineP
     }
   }
 
-  const initialBabies = await getPreloadedBabies()
-  const initialSelectedBabyId = initialBabies[0]?.id ?? null
+  const babiesResult = await getPreloadedBabies()
+  const initialSelectedBabyId = babiesResult.activeBabyId || babiesResult.babies[0]?.id || null
 
   if (!initialSelectedBabyId) {
     return {
-      initialBabies,
+      initialBabies: babiesResult.babies,
       initialSelectedBabyId: null,
       initialDate,
       initialRecords: [],
@@ -229,7 +229,7 @@ export async function getPreloadedTimelinePageData(): Promise<PreloadedTimelineP
   ])
 
   return {
-    initialBabies,
+    initialBabies: babiesResult.babies,
     initialSelectedBabyId,
     initialDate,
     initialRecords,

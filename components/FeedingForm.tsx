@@ -1,14 +1,13 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { getBeijingNow, toBeijingISO } from '@/lib/time'
 import { invalidateRecordRelatedCaches } from '@/lib/cache-helpers'
 import { buildFeedingRecordPayload, getFeedingValidationMessage, getBreastModeFromType, type BreastMode, type FeedingFieldValues, type FeedingType } from '@/lib/feeding-records'
 import FeedingRecordFields from '@/components/FeedingRecordFields'
 import RecordActionBar from '@/components/RecordActionBar'
-import RecordTabBar from '@/components/RecordTabBar'
+import RecordTabBar, { type ActiveTab } from '@/components/RecordTabBar'
 import { RecordNotesField, RecordTimeField } from '@/components/RecordMetaFields'
 import {
   Droplets,
@@ -42,6 +41,8 @@ interface Props {
   initialSharedDraft?: SharedDraft
   onSharedDraftChange?: (draft: SharedDraft) => void
   onRecordSaved?: () => void
+  activeTab: ActiveTab
+  onTabChange: (tab: ActiveTab) => void
 }
 
 const FEEDING_DRAFT_STORAGE_KEY = 'baby-feed:add-record-feeding-draft'
@@ -61,7 +62,9 @@ export default function FeedingForm({
   initialBabies = [],
   initialSharedDraft,
   onSharedDraftChange,
-  onRecordSaved
+  onRecordSaved,
+  activeTab,
+  onTabChange
 }: Props) {
   const router = useRouter()
   const [babies, setBabies] = useState<BabyInfo[]>(initialBabies)
@@ -348,7 +351,7 @@ export default function FeedingForm({
     if (saved) {
       invalidateRecordRelatedCaches(babyId)
       window.sessionStorage.removeItem(FEEDING_DRAFT_STORAGE_KEY)
-      window.sessionStorage.setItem('record_saved', '1')
+      window.sessionStorage.setItem('record_saved_ts', String(Date.now()))
       onRecordSaved?.()
       try {
         router.replace('/')
@@ -361,42 +364,12 @@ export default function FeedingForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3.5 pb-3 sm:space-y-4 sm:pb-0">
-      {/* 宝宝选择 + 一级分类 */}
-      <div className="rounded-2xl border border-gray-100 bg-white p-3.5 shadow-sm sm:p-4 space-y-3.5">
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700">
-            选择宝宝
-          </label>
-          {babies.length > 0 ? (
-            <select
-              value={babyId}
-              onChange={(e) => setBabyId(e.target.value)}
-              className="w-full rounded-xl border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 outline-none transition focus:border-transparent focus:ring-2 focus:ring-blue-500"
-            >
-              {babies.map(baby => (
-                <option key={baby.id} value={baby.id}>{baby.name}</option>
-              ))}
-            </select>
-          ) : (
-            <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-3.5 py-3 text-sm text-gray-500">
-              <p>请先在设置中添加宝宝</p>
-              <Link
-                href="/settings"
-                className="mobile-touch-target mt-1.5 inline-flex items-center rounded-xl px-1 text-sm font-medium text-blue-600 transition hover:text-blue-700"
-              >
-                前往设置
-              </Link>
-            </div>
-          )}
-        </div>
-
-        {/* 一级分类：喂养 / 健康 / 备忘 */}
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700">
-            记录类型
-          </label>
-          <RecordTabBar />
-        </div>
+      {/* 一级分类：喂养 / 健康 / 备忘 */}
+      <div className="rounded-2xl border border-gray-100 bg-white p-3.5 shadow-sm sm:p-4">
+        <label className="mb-1.5 block text-sm font-medium text-gray-700">
+          记录类型
+        </label>
+        <RecordTabBar activeTab={activeTab} onTabChange={onTabChange} />
       </div>
 
       {/* 二级分类：喂养子类型 */}

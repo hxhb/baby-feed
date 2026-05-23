@@ -3,7 +3,7 @@ import AddPageClient from './AddPageClient'
 import { getPreloadedBabies } from '@/lib/server-babies'
 
 export default async function AddPage() {
-  const initialBabies = await getPreloadedBabies()
+  const { babies, activeBabyId } = await getPreloadedBabies()
 
   return (
     <Suspense fallback={
@@ -11,7 +11,7 @@ export default async function AddPage() {
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     }>
-      <AddPageClient initialBabies={initialBabies} />
+      <AddPageClient initialBabies={babies} activeBabyId={activeBabyId} />
     </Suspense>
   )
 }

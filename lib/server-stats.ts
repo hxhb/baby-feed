@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { getPreloadedBabies } from '@/lib/server-babies'
+import { getPreloadedBabies, type PreloadedBaby } from '@/lib/server-babies'
 import { getServerSession } from '@/lib/server-auth'
 import { getBeijingDateStr, getBeijingDayRange, getBeijingTodayStr, getBeijingDaysAgoStr, splitDurationByBeijingDay, buildSleepAwareOrClause } from '@/lib/api-helpers'
 
@@ -82,7 +82,7 @@ export interface PreloadedStatsData {
 }
 
 export interface PreloadedStatsPageData {
-  initialBabies: Awaited<ReturnType<typeof getPreloadedBabies>>
+  initialBabies: PreloadedBaby[]
   initialSelectedBabyId: string | null
   initialStats: PreloadedStatsData | null
 }
@@ -433,12 +433,12 @@ export async function getPreloadedStatsPageData(): Promise<PreloadedStatsPageDat
     }
   }
 
-  const initialBabies = await getPreloadedBabies()
-  const initialSelectedBabyId = initialBabies[0]?.id ?? null
+  const babiesResult = await getPreloadedBabies()
+  const initialSelectedBabyId = babiesResult.activeBabyId || babiesResult.babies[0]?.id || null
 
   if (!initialSelectedBabyId) {
     return {
-      initialBabies,
+      initialBabies: babiesResult.babies,
       initialSelectedBabyId: null,
       initialStats: null,
     }
@@ -447,7 +447,7 @@ export async function getPreloadedStatsPageData(): Promise<PreloadedStatsPageDat
   const initialStats = await getPreloadedStatsForBaby(session.user.id, initialSelectedBabyId)
 
   return {
-    initialBabies,
+    initialBabies: babiesResult.babies,
     initialSelectedBabyId,
     initialStats,
   }

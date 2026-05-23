@@ -6,9 +6,11 @@ import FeedingForm from '@/components/FeedingForm'
 import HealthForm from '@/components/HealthForm'
 import MemoForm from '@/components/MemoForm'
 import type { PreloadedBaby } from '@/lib/server-babies'
+import type { ActiveTab } from '@/components/RecordTabBar'
 
 interface Props {
   initialBabies: PreloadedBaby[]
+  activeBabyId: string | null
 }
 
 type AddRecordSharedDraft = {
@@ -28,24 +30,15 @@ const emptySharedDraft: AddRecordSharedDraft = {
 
 function getHealthInitialType(type: string | null): HealthInitialType | undefined {
   switch (type) {
-    case 'weight':
-      return 'WEIGHT'
-    case 'height':
-      return 'HEIGHT'
-    case 'temperature':
-      return 'TEMPERATURE'
-    case 'medication':
-      return 'MEDICATION'
-    case 'vaccine':
-      return 'VACCINE'
-    case 'diaper':
-      return 'DIAPER'
-    case 'ad':
-      return 'AD_VITAMIN'
-    case 'sleep':
-      return 'SLEEP'
-    default:
-      return undefined
+    case 'weight': return 'WEIGHT'
+    case 'height': return 'HEIGHT'
+    case 'temperature': return 'TEMPERATURE'
+    case 'medication': return 'MEDICATION'
+    case 'vaccine': return 'VACCINE'
+    case 'diaper': return 'DIAPER'
+    case 'ad': return 'AD_VITAMIN'
+    case 'sleep': return 'SLEEP'
+    default: return undefined
   }
 }
 
@@ -53,26 +46,23 @@ function isEmptySharedDraft(draft: AddRecordSharedDraft) {
   return !draft.babyId && !draft.eventTime && !draft.notes
 }
 
-type ActiveTab = 'feeding' | 'health' | 'memo'
-
 function getActiveTab(type: string | null): ActiveTab {
   if (type === 'memo') return 'memo'
   if (!type || ['breast', 'breast_bottle', 'formula', 'solid_food'].includes(type)) return 'feeding'
   return 'health'
 }
 
-export default function AddPageClient({ initialBabies }: Props) {
+export default function AddPageClient({ initialBabies, activeBabyId }: Props) {
   const searchParams = useSearchParams()
   const type = searchParams.get('type')
-  const activeTab = getActiveTab(type)
-  const [sharedDraft, setSharedDraft] = useState<AddRecordSharedDraft>(emptySharedDraft)
+  const [activeTab, setActiveTab] = useState<ActiveTab>(getActiveTab(type))
+  const resolvedBabyId = activeBabyId || (initialBabies.length > 0 ? initialBabies[0].id : '')
+  const [sharedDraft, setSharedDraft] = useState<AddRecordSharedDraft>({ ...emptySharedDraft, babyId: resolvedBabyId })
 
   useEffect(() => {
     try {
       const rawDraft = window.sessionStorage.getItem(SHARED_DRAFT_STORAGE_KEY)
-      if (!rawDraft) {
-        return
-      }
+      if (!rawDraft) return
 
       const parsedDraft = JSON.parse(rawDraft) as Partial<AddRecordSharedDraft>
       setSharedDraft({
@@ -91,7 +81,6 @@ export default function AddPageClient({ initialBabies }: Props) {
         window.sessionStorage.removeItem(SHARED_DRAFT_STORAGE_KEY)
         return
       }
-
       window.sessionStorage.setItem(SHARED_DRAFT_STORAGE_KEY, JSON.stringify(sharedDraft))
     } catch (error) {
       console.error('保存添加记录草稿失败:', error)
@@ -107,7 +96,6 @@ export default function AddPageClient({ initialBabies }: Props) {
       ) {
         return currentDraft
       }
-
       return nextDraft
     })
   }, [])
@@ -115,6 +103,12 @@ export default function AddPageClient({ initialBabies }: Props) {
   const handleRecordSaved = useCallback(() => {
     setSharedDraft(emptySharedDraft)
     window.sessionStorage.removeItem(SHARED_DRAFT_STORAGE_KEY)
+  }, [])
+
+  const handleTabChange = useCallback((tab: ActiveTab) => {
+    setActiveTab(tab)
+    const href = tab === 'feeding' ? '/add?type=breast' : tab === 'health' ? '/add?type=health' : '/add?type=memo'
+    window.history.replaceState(null, '', href)
   }, [])
 
   return (
@@ -125,6 +119,8 @@ export default function AddPageClient({ initialBabies }: Props) {
           initialSharedDraft={sharedDraft}
           onSharedDraftChange={handleSharedDraftChange}
           onRecordSaved={handleRecordSaved}
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
         />
       ) : activeTab === 'health' ? (
         <HealthForm
@@ -133,6 +129,8 @@ export default function AddPageClient({ initialBabies }: Props) {
           initialSharedDraft={sharedDraft}
           onSharedDraftChange={handleSharedDraftChange}
           onRecordSaved={handleRecordSaved}
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
         />
       ) : (
         <FeedingForm
@@ -141,6 +139,8 @@ export default function AddPageClient({ initialBabies }: Props) {
           initialSharedDraft={sharedDraft}
           onSharedDraftChange={handleSharedDraftChange}
           onRecordSaved={handleRecordSaved}
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
         />
       )}
     </div>
