@@ -8,19 +8,12 @@ import { invalidateRecordRelatedCaches } from '@/lib/cache-helpers'
 import { buildFeedingRecordPayload, getFeedingValidationMessage, getBreastModeFromType, type BreastMode, type FeedingFieldValues, type FeedingType } from '@/lib/feeding-records'
 import FeedingRecordFields from '@/components/FeedingRecordFields'
 import RecordActionBar from '@/components/RecordActionBar'
+import RecordTabBar from '@/components/RecordTabBar'
 import { RecordNotesField, RecordTimeField } from '@/components/RecordMetaFields'
 import {
   Droplets,
   Milk,
-  Scale,
-  Pill,
-  Thermometer,
-  Ruler,
-  Syringe,
-  Baby as BabyIcon,
-  Moon,
-  UtensilsCrossed,
-  CalendarCheck
+  UtensilsCrossed
 } from 'lucide-react'
 interface BabyInfo {
   id: string
@@ -298,28 +291,7 @@ export default function FeedingForm({
       activeClassName: 'border-orange-500 bg-orange-50/80 text-orange-700',
       inactiveClassName: 'border-orange-100 bg-orange-50/80 text-orange-700 hover:border-orange-200 hover:bg-orange-100/70',
       onClick: () => setType('SOLID_FOOD')
-    },
-    {
-      key: 'MEMO',
-      title: '备忘',
-      icon: CalendarCheck,
-      iconClassName: 'text-indigo-500',
-      active: false,
-      activeClassName: 'border-indigo-500 bg-indigo-50/80 text-indigo-700',
-      inactiveClassName: 'border-indigo-100 bg-indigo-50/80 text-indigo-700 hover:border-indigo-200 hover:bg-indigo-100/70',
-      href: '/add?type=memo'
     }
-  ]
-
-  const healthTypeLinks = [
-    { href: '/add?type=weight', label: '体重', icon: Scale, iconClassName: 'text-green-500' },
-    { href: '/add?type=height', label: '身高', icon: Ruler, iconClassName: 'text-blue-500' },
-    { href: '/add?type=temperature', label: '体温', icon: Thermometer, iconClassName: 'text-red-500' },
-    { href: '/add?type=ad', label: 'AD', icon: Pill, iconClassName: 'text-orange-500' },
-    { href: '/add?type=medication', label: '服药', icon: Pill, iconClassName: 'text-purple-500' },
-    { href: '/add?type=vaccine', label: '疫苗', icon: Syringe, iconClassName: 'text-teal-500' },
-    { href: '/add?type=diaper', label: '大小便', icon: BabyIcon, iconClassName: 'text-amber-500' },
-    { href: '/add?type=sleep', label: '睡眠', icon: Moon, iconClassName: 'text-indigo-500' },
   ]
 
   const currentTypeMeta = type === 'FORMULA'
@@ -389,58 +361,58 @@ export default function FeedingForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3.5 pb-3 sm:space-y-4 sm:pb-0">
-      <div className="rounded-2xl border border-gray-100 bg-white p-3.5 shadow-sm sm:p-4">
-        <label className="mb-1.5 block text-sm font-medium text-gray-700">
-          选择宝宝
-        </label>
-        {babies.length > 0 ? (
-          <select
-            value={babyId}
-            onChange={(e) => setBabyId(e.target.value)}
-            className="w-full rounded-xl border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 outline-none transition focus:border-transparent focus:ring-2 focus:ring-blue-500"
-          >
-            {babies.map(baby => (
-              <option key={baby.id} value={baby.id}>{baby.name}</option>
-            ))}
-          </select>
-        ) : (
-          <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-3.5 py-3 text-sm text-gray-500">
-            <p>请先在设置中添加宝宝</p>
-            <Link
-              href="/settings"
-              className="mobile-touch-target mt-1.5 inline-flex items-center rounded-xl px-1 text-sm font-medium text-blue-600 transition hover:text-blue-700"
+      {/* 宝宝选择 + 一级分类 */}
+      <div className="rounded-2xl border border-gray-100 bg-white p-3.5 shadow-sm sm:p-4 space-y-3.5">
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-gray-700">
+            选择宝宝
+          </label>
+          {babies.length > 0 ? (
+            <select
+              value={babyId}
+              onChange={(e) => setBabyId(e.target.value)}
+              className="w-full rounded-xl border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 outline-none transition focus:border-transparent focus:ring-2 focus:ring-blue-500"
             >
-              前往设置
-            </Link>
-          </div>
-        )}
+              {babies.map(baby => (
+                <option key={baby.id} value={baby.id}>{baby.name}</option>
+              ))}
+            </select>
+          ) : (
+            <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-3.5 py-3 text-sm text-gray-500">
+              <p>请先在设置中添加宝宝</p>
+              <Link
+                href="/settings"
+                className="mobile-touch-target mt-1.5 inline-flex items-center rounded-xl px-1 text-sm font-medium text-blue-600 transition hover:text-blue-700"
+              >
+                前往设置
+              </Link>
+            </div>
+          )}
+        </div>
+
+        {/* 一级分类：喂养 / 健康 / 备忘 */}
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-gray-700">
+            记录类型
+          </label>
+          <RecordTabBar />
+        </div>
       </div>
 
+      {/* 二级分类：喂养子类型 */}
       <div className="rounded-2xl border border-gray-100 bg-white p-3.5 shadow-sm sm:p-4">
         <div className="mb-2 flex items-center justify-between gap-3">
           <label className="block text-sm font-medium text-gray-700">
-            记录类型
+            喂养类型
           </label>
           <div className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium sm:hidden ${currentTypeMeta.badgeClassName}`}>
             <CurrentTypeIcon size={14} className={currentTypeMeta.iconClassName} />
             {currentTypeMeta.title}
           </div>
         </div>
-        <div className="grid grid-cols-4 gap-1.5">
+        <div className="grid grid-cols-3 gap-1.5">
           {feedingTypeCards.map(card => {
             const Icon = card.icon
-            if ('href' in card && card.href) {
-              return (
-                <Link
-                  key={card.key}
-                  href={card.href}
-                  className={`mobile-touch-target flex min-w-0 items-center justify-center gap-1 rounded-xl border py-2.5 transition ${card.inactiveClassName}`}
-                >
-                  <Icon size={16} className={`shrink-0 ${card.iconClassName}`} />
-                  <span className="truncate text-sm font-medium">{card.title}</span>
-                </Link>
-              )
-            }
             return (
               <button
                 key={card.key}
@@ -453,31 +425,6 @@ export default function FeedingForm({
               </button>
             )
           })}
-        </div>
-        <div className="mt-3 rounded-2xl bg-gray-50/80 p-2.5 sm:p-3">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <span className="text-sm font-medium text-gray-700">健康</span>
-            <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-gray-500">
-              默认展开
-            </span>
-          </div>
-          <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
-            {healthTypeLinks.map(item => {
-              const Icon = item.icon
-              return (
-                <Link
-                  key={`${item.href}-${item.label}`}
-                  href={item.href}
-                  className="mobile-touch-target flex min-h-[68px] flex-col items-center justify-center rounded-xl border-2 border-gray-200 bg-white px-2 py-2 transition hover:border-gray-300 sm:bg-transparent"
-                >
-                  <Icon size={18} className={item.iconClassName} />
-                  <span className="mt-1 text-[11px] font-medium leading-4 text-gray-600">
-                    {item.label}
-                  </span>
-                </Link>
-              )
-            })}
-          </div>
         </div>
       </div>
 

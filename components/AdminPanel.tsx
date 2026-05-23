@@ -212,9 +212,9 @@ export default function AdminPanel({ currentUserId, onBack }: Props) {
         {onBack && (
           <button
             onClick={onBack}
-            className="p-2 hover:bg-gray-100 rounded-lg transition"
+            className="mobile-touch-target rounded-element p-2 transition hover:bg-slate-100 active:scale-95"
           >
-            <ArrowLeft size={20} />
+            <ArrowLeft size={20} className="text-slate-600" />
           </button>
         )}
         <div className="flex items-center space-x-2">

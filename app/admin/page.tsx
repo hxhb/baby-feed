@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import AdminPanel from '@/components/AdminPanel'
+import AdminPageClient from './AdminPageClient'
 import { requireServerAdmin } from '@/lib/admin'
 
 export default async function AdminPage() {
@@ -9,5 +9,5 @@ export default async function AdminPage() {
     redirect(check.status === 401 ? '/login' : '/')
   }
 
-  return <AdminPanel currentUserId={check.session.user.id} />
+  return <AdminPageClient currentUserId={check.session.user.id} />
 }

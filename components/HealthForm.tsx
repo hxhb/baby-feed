@@ -8,6 +8,7 @@ import { invalidateRecordRelatedCaches } from '@/lib/cache-helpers'
 import { buildHealthRecordPayload, buildVaccineSuggestions, findSelectedVaccineSuggestion, type HealthFieldValues, type HealthType, type VaccineSuggestion } from '@/lib/health-records'
 import HealthRecordFields, { getHealthFieldValidationMessage } from '@/components/HealthRecordFields'
 import RecordActionBar from '@/components/RecordActionBar'
+import RecordTabBar from '@/components/RecordTabBar'
 import { RecordNotesField, RecordTimeField } from '@/components/RecordMetaFields'
 import {
   Scale,
@@ -16,11 +17,7 @@ import {
   Ruler,
   Syringe,
   Baby as BabyIcon,
-  Droplets,
-  Milk,
-  Moon,
-  UtensilsCrossed,
-  CalendarCheck
+  Moon
 } from 'lucide-react'
 
 interface BabyInfo {
@@ -462,13 +459,6 @@ export default function HealthForm({
     { value: 'SLEEP', label: '睡眠', icon: Moon, color: 'indigo', hint: '记录宝宝入睡和醒来时间，追踪睡眠规律。' },
   ] as const
 
-  const feedingTypeLinks = [
-    { href: '/add?type=breast', label: '母乳', icon: Droplets, iconClassName: 'text-pink-500', cardClassName: 'border-pink-100 bg-pink-50/80 text-pink-700 hover:border-pink-200 hover:bg-pink-100/70' },
-    { href: '/add?type=formula', label: '奶粉', icon: Milk, iconClassName: 'text-blue-500', cardClassName: 'border-blue-100 bg-blue-50/80 text-blue-700 hover:border-blue-200 hover:bg-blue-100/70' },
-    { href: '/add?type=solid_food', label: '辅食', icon: UtensilsCrossed, iconClassName: 'text-orange-500', cardClassName: 'border-orange-100 bg-orange-50/80 text-orange-700 hover:border-orange-200 hover:bg-orange-100/70' },
-    { href: '/add?type=memo', label: '备忘', icon: CalendarCheck, iconClassName: 'text-indigo-500', cardClassName: 'border-indigo-100 bg-indigo-50/80 text-indigo-700 hover:border-indigo-200 hover:bg-indigo-100/70' },
-  ]
-
   const getColorClasses = (color: string, isSelected: boolean) => {
       const colors: Record<string, { border: string; bg: string; text: string; icon: string }> = {
       green: { border: 'border-green-500', bg: 'bg-green-50', text: 'text-green-700', icon: 'text-green-500' },
@@ -490,88 +480,76 @@ export default function HealthForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3.5 pb-3 sm:space-y-4 sm:pb-0">
-      <div className="rounded-2xl border border-gray-100 bg-white p-3.5 shadow-sm sm:p-4">
-        <label className="mb-1.5 block text-sm font-medium text-gray-700">
-          选择宝宝
-        </label>
-        {babies.length > 0 ? (
-          <select
-            value={babyId}
-            onChange={(e) => setBabyId(e.target.value)}
-            className="w-full rounded-xl border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 outline-none transition focus:border-transparent focus:ring-2 focus:ring-blue-500"
-          >
-            {babies.map(baby => (
-              <option key={baby.id} value={baby.id}>{baby.name}</option>
-            ))}
-          </select>
-        ) : (
-          <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-3.5 py-3 text-sm text-gray-500">
-            <p>请先在设置中添加宝宝</p>
-            <Link
-              href="/settings"
-              className="mobile-touch-target mt-1.5 inline-flex items-center rounded-xl px-1 text-sm font-medium text-blue-600 transition hover:text-blue-700"
+      {/* 宝宝选择 + 一级分类 */}
+      <div className="rounded-2xl border border-gray-100 bg-white p-3.5 shadow-sm sm:p-4 space-y-3.5">
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-gray-700">
+            选择宝宝
+          </label>
+          {babies.length > 0 ? (
+            <select
+              value={babyId}
+              onChange={(e) => setBabyId(e.target.value)}
+              className="w-full rounded-xl border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 outline-none transition focus:border-transparent focus:ring-2 focus:ring-blue-500"
             >
-              前往设置
-            </Link>
-          </div>
-        )}
+              {babies.map(baby => (
+                <option key={baby.id} value={baby.id}>{baby.name}</option>
+              ))}
+            </select>
+          ) : (
+            <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-3.5 py-3 text-sm text-gray-500">
+              <p>请先在设置中添加宝宝</p>
+              <Link
+                href="/settings"
+                className="mobile-touch-target mt-1.5 inline-flex items-center rounded-xl px-1 text-sm font-medium text-blue-600 transition hover:text-blue-700"
+              >
+                前往设置
+              </Link>
+            </div>
+          )}
+        </div>
+
+        {/* 一级分类：喂养 / 健康 / 备忘 */}
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-gray-700">
+            记录类型
+          </label>
+          <RecordTabBar />
+        </div>
       </div>
 
+      {/* 二级分类：健康子类型 */}
       <div className="rounded-2xl border border-gray-100 bg-white p-3.5 shadow-sm sm:p-4">
         <div className="mb-2 flex items-center justify-between gap-3">
           <label className="block text-sm font-medium text-gray-700">
-            记录类型
+            健康类型
           </label>
           <div className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium sm:hidden ${selectedTypeClasses.bg} ${selectedTypeClasses.text}`}>
             <ActiveTypeIcon size={14} className={selectedTypeClasses.icon} />
             {selectedTypeMeta.label}
           </div>
         </div>
-        <div className="grid grid-cols-4 gap-1.5">
-          {feedingTypeLinks.map(item => {
-            const Icon = item.icon
+        <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
+          {typeOptions.map(option => {
+            const isSelected = type === option.value
+            const colorClasses = getColorClasses(option.color, isSelected)
+            const Icon = option.icon
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                prefetch={false}
-                className={`mobile-touch-target flex min-w-0 items-center justify-center gap-1 rounded-xl border py-2.5 transition ${item.cardClassName}`}
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setType(option.value)}
+                className={`mobile-touch-target flex min-h-[68px] flex-col items-center justify-center rounded-xl border-2 bg-white px-2 py-2 transition hover:border-gray-300 sm:bg-transparent ${
+                  isSelected ? `${colorClasses.border} ${colorClasses.bg}` : 'border-gray-200'
+                }`}
               >
-                <Icon size={16} className={`shrink-0 ${item.iconClassName}`} />
-                <span className="truncate text-sm font-medium">{item.label}</span>
-              </Link>
+                <Icon size={18} className={colorClasses.icon} />
+                <span className={`mt-1 text-[11px] font-medium leading-4 ${colorClasses.text}`}>
+                  {option.label}
+                </span>
+              </button>
             )
           })}
-        </div>
-        <div className="mt-3 rounded-2xl bg-gray-50/80 p-2.5 sm:p-3">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <span className="text-sm font-medium text-gray-700">健康</span>
-            <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-gray-500">
-              默认展开
-            </span>
-          </div>
-          <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
-            {typeOptions.map(option => {
-              const isSelected = type === option.value
-              const colorClasses = getColorClasses(option.color, isSelected)
-              const Icon = option.icon
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => setType(option.value)}
-                  className={`mobile-touch-target flex min-h-[68px] flex-col items-center justify-center rounded-xl border-2 bg-white px-2 py-2 transition hover:border-gray-300 sm:bg-transparent ${
-                    isSelected ? `${colorClasses.border} ${colorClasses.bg}` : 'border-gray-200'
-                  }`}
-                >
-                  <Icon size={18} className={colorClasses.icon} />
-                  <span className={`mt-1 text-[11px] font-medium leading-4 ${colorClasses.text}`}>
-                    {option.label}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
         </div>
       </div>
 

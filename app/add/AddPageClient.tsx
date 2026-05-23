@@ -53,11 +53,18 @@ function isEmptySharedDraft(draft: AddRecordSharedDraft) {
   return !draft.babyId && !draft.eventTime && !draft.notes
 }
 
+type ActiveTab = 'feeding' | 'health' | 'memo'
+
+function getActiveTab(type: string | null): ActiveTab {
+  if (type === 'memo') return 'memo'
+  if (!type || ['breast', 'breast_bottle', 'formula', 'solid_food'].includes(type)) return 'feeding'
+  return 'health'
+}
+
 export default function AddPageClient({ initialBabies }: Props) {
   const searchParams = useSearchParams()
   const type = searchParams.get('type')
-  const isHealthView = !type || ['health', 'weight', 'height', 'temperature', 'medication', 'vaccine', 'diaper', 'ad', 'sleep'].includes(type)
-  const isMemoView = type === 'memo'
+  const activeTab = getActiveTab(type)
   const [sharedDraft, setSharedDraft] = useState<AddRecordSharedDraft>(emptySharedDraft)
 
   useEffect(() => {
@@ -112,14 +119,14 @@ export default function AddPageClient({ initialBabies }: Props) {
 
   return (
     <div className="mx-auto max-w-4xl px-2.5 py-3 sm:px-4 sm:py-5">
-      {isMemoView ? (
+      {activeTab === 'memo' ? (
         <MemoForm
           initialBabies={initialBabies}
           initialSharedDraft={sharedDraft}
           onSharedDraftChange={handleSharedDraftChange}
           onRecordSaved={handleRecordSaved}
         />
-      ) : isHealthView ? (
+      ) : activeTab === 'health' ? (
         <HealthForm
           initialType={getHealthInitialType(type)}
           initialBabies={initialBabies}
