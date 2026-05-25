@@ -224,7 +224,7 @@ export async function GET(request: NextRequest) {
 
     const todayStats = statsMap.get(todayStr)
 
-    const [allWeightRecords, allHeightRecords, vaccineRecords, medicationRecords] = await Promise.all([
+    const [allWeightRecords, allHeightRecords, vaccineRecords, medicationRecords, memoRecords] = await Promise.all([
       prisma.healthRecord.findMany({
         where: {
           babyId,
@@ -281,7 +281,22 @@ export async function GET(request: NextRequest) {
           recordedAt: true,
           notes: true
         }
-      })
+      }),
+      prisma.memo.findMany({
+        where: {
+          babyId,
+          createdBy: session.user.id,
+        },
+        orderBy: { scheduledAt: 'desc' },
+        select: {
+          id: true,
+          title: true,
+          content: true,
+          scheduledAt: true,
+          completed: true,
+          completedAt: true,
+        }
+      }),
     ])
 
     const weightTrend = allWeightRecords.flatMap(r => {
@@ -360,6 +375,14 @@ export async function GET(request: NextRequest) {
         })
       })(),
       babyBirthDate: baby.birthDate ? getBeijingDateStr(new Date(baby.birthDate)) : null,
+      memoRecords: memoRecords.map(record => ({
+        id: record.id,
+        title: record.title,
+        content: record.content,
+        scheduledAt: record.scheduledAt.toISOString(),
+        completed: record.completed,
+        completedAt: record.completedAt?.toISOString() ?? null,
+      })),
     }, { headers: noStoreHeaders })
   } catch (error) {
     logError('获取统计数据失败', error)

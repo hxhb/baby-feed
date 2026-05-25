@@ -36,11 +36,21 @@ export interface PreloadedDashboardHealthRecord {
   recordType: 'health'
 }
 
+export interface PreloadedDashboardMemo {
+  id: string
+  title: string
+  content: string | null
+  scheduledAt: string
+  completed: boolean
+  completedAt: string | null
+}
+
 export interface PreloadedDashboardData {
   initialBabies: PreloadedBaby[]
   initialSelectedBabyId: string | null
   initialTodayRecords: PreloadedDashboardFeedingRecord[]
   initialTodayHealthRecords: PreloadedDashboardHealthRecord[]
+  initialRecentMemos: PreloadedDashboardMemo[]
 }
 
 export async function getPreloadedDashboardData(): Promise<PreloadedDashboardData> {
@@ -51,6 +61,7 @@ export async function getPreloadedDashboardData(): Promise<PreloadedDashboardDat
       initialSelectedBabyId: null,
       initialTodayRecords: [],
       initialTodayHealthRecords: [],
+      initialRecentMemos: [],
     }
   }
 
@@ -63,13 +74,19 @@ export async function getPreloadedDashboardData(): Promise<PreloadedDashboardDat
       initialSelectedBabyId: null,
       initialTodayRecords: [],
       initialTodayHealthRecords: [],
+      initialRecentMemos: [],
     }
   }
 
   const today = getBeijingToday()
   const { start, end } = getBeijingDayRange(today)
 
-  const [feedingRecords, healthRecords] = await Promise.all([
+  // 近3天窗口：统一使用同一个时间基准，避免多次 new Date() 导致边界遗漏
+  const now = new Date()
+  const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000)
+  const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000)
+
+  const [feedingRecords, healthRecords, recentMemos] = await Promise.all([
     prisma.feedingRecord.findMany({
       where: {
         babyId: initialSelectedBabyId,
@@ -114,6 +131,27 @@ export async function getPreloadedDashboardData(): Promise<PreloadedDashboardDat
         notes: true,
       },
     }),
+    // 获取近3天内的备忘（未完成的过期备忘 + 未来3天内到期的备忘）
+    prisma.memo.findMany({
+      where: {
+        babyId: initialSelectedBabyId,
+        createdBy: session.user.id,
+        completed: false,
+        scheduledAt: {
+          gte: threeDaysAgo,
+          lte: threeDaysFromNow,
+        },
+      },
+      orderBy: { scheduledAt: 'asc' },
+      select: {
+        id: true,
+        title: true,
+        content: true,
+        scheduledAt: true,
+        completed: true,
+        completedAt: true,
+      },
+    }),
   ])
 
   return {
@@ -148,6 +186,14 @@ export async function getPreloadedDashboardData(): Promise<PreloadedDashboardDat
       sleepQuality: record.sleepQuality,
       notes: record.notes,
       recordType: 'health',
+    })),
+    initialRecentMemos: recentMemos.map((memo) => ({
+      id: memo.id,
+      title: memo.title,
+      content: memo.content,
+      scheduledAt: memo.scheduledAt.toISOString(),
+      completed: memo.completed,
+      completedAt: memo.completedAt?.toISOString() ?? null,
     })),
   }
 }

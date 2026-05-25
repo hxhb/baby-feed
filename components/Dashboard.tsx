@@ -14,7 +14,8 @@ import {
   Thermometer,
   ChevronRight,
   Ruler,
-  CalendarCheck
+  CalendarCheck,
+  ClipboardList
 } from 'lucide-react'
 import { getRecordIcon, getRecordTitle } from '@/lib/record-display'
 import type { DisplayRecord } from '@/lib/record-display'
@@ -79,12 +80,22 @@ interface DailyStats {
   poopCount: number
 }
 
+interface DashboardMemo {
+  id: string
+  title: string
+  content: string | null
+  scheduledAt: string
+  completed: boolean
+  completedAt: string | null
+}
+
 interface Props {
   selectedBabyId?: string | null
   onSelectBaby?: (id: string | null) => void
   initialBabies?: Baby[]
   initialTodayRecords?: FeedingRecord[]
   initialTodayHealthRecords?: HealthRecord[]
+  initialRecentMemos?: DashboardMemo[]
 }
 
 
@@ -122,6 +133,7 @@ export default function Dashboard({
   initialBabies = [],
   initialTodayRecords = [],
   initialTodayHealthRecords = [],
+  initialRecentMemos = [],
 }: Props) {
   const [babies, setBabies] = useState<Baby[]>(initialBabies)
   const [internalSelectedBabyId, setInternalSelectedBabyId] = useState<string | null>(initialBabies[0]?.id ?? null)
@@ -133,21 +145,26 @@ export default function Dashboard({
       : null,
   )
   const [loading, setLoading] = useState(initialBabies.length === 0)
-  const [freshFetch, setFreshFetch] = useState(false)
+  const [freshFetch] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const savedTs = window.sessionStorage.getItem('record_saved_ts')
+      if (savedTs && Date.now() - Number(savedTs) < 10000) {
+        return true
+      }
+    }
+    return false
+  })
   const preloadedBabyIdRef = useRef<string | null>(selectedBabyId ?? initialBabies[0]?.id ?? null)
 
   const resolvedSelectedBabyId = selectedBabyId ?? internalSelectedBabyId
   const hasInitialTodayData = !freshFetch && (initialTodayRecords.length > 0 || initialTodayHealthRecords.length > 0)
 
-  // If a record was just saved, bypass SSR initial data and force a fresh fetch
+  // If a record was just saved, invalidate cache to ensure fresh API responses
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedTs = window.sessionStorage.getItem('record_saved_ts')
-      if (savedTs) {
-        setFreshFetch(true)
-        if (resolvedSelectedBabyId) {
-          invalidateRequestCache()
-        }
+      if (savedTs && Date.now() - Number(savedTs) < 10000) {
+        invalidateRequestCache()
       }
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -394,6 +411,53 @@ export default function Dashboard({
                 <span className="text-sm font-medium text-gray-900">{stats.height}cm</span>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* 近3天备忘提醒 - 紧凑控件 */}
+      {initialRecentMemos.length > 0 && (
+        <div className="bg-white rounded-card p-3 shadow-card border border-indigo-50">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1.5">
+              <ClipboardList size={14} className="text-indigo-500" />
+              <h3 className="text-xs font-medium text-gray-500">近期备忘</h3>
+            </div>
+            <Link href="/stats?tab=memos" className="text-[11px] text-indigo-500 hover:text-indigo-700 transition">
+              查看全部
+            </Link>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {initialRecentMemos.map(memo => {
+              const scheduledTime = new Date(memo.scheduledAt).getTime()
+              const now = Date.now()
+              const diffMs = scheduledTime - now
+              const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
+              const isOverdue = diffDays < 0
+              const isToday = diffDays === 0
+
+              let badgeText: string
+              let containerClass: string
+              if (isOverdue) {
+                badgeText = `逾期${Math.abs(diffDays)}天`
+                containerClass = 'bg-red-50 border-red-100'
+              } else if (isToday) {
+                badgeText = '今天'
+                containerClass = 'bg-amber-50 border-amber-100'
+              } else {
+                badgeText = `${diffDays}天后`
+                containerClass = 'bg-indigo-50 border-indigo-100'
+              }
+
+              return (
+                <div key={memo.id} className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border ${containerClass}`}>
+                  <span className="text-xs text-slate-700 truncate max-w-[8rem]">{memo.title}</span>
+                  <span className={`shrink-0 text-[10px] font-bold ${isOverdue ? 'text-red-600' : isToday ? 'text-amber-600' : 'text-indigo-600'}`}>
+                    {badgeText}
+                  </span>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}

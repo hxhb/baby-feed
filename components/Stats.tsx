@@ -35,6 +35,7 @@ interface Props {
   onSelectBaby: (id: string | null) => void
   initialBabies?: Baby[]
   initialStats?: PreloadedStatsData | null
+  defaultTab?: 'dashboard' | 'insights' | 'memos'
 }
 
 type MeasuredChartElement = ReactElement<{
@@ -197,6 +198,7 @@ export default function StatsComponent({
   onSelectBaby,
   initialBabies = [],
   initialStats = null,
+  defaultTab = 'dashboard',
 }: Props) {
   const formatTrendAxisDate = (value: number) => {
     const date = new Date(value)
@@ -282,16 +284,31 @@ export default function StatsComponent({
   const [stats, setStats] = useState<StatsData | null>(initialStats)
   const [loading, setLoading] = useState(initialBabies.length === 0)
   const [days, setDays] = useState(7)
-  const [activeSubpage, setActiveSubpage] = useState<'dashboard' | 'insights' | 'memos'>('dashboard')
-  const [freshFetch, setFreshFetch] = useState(false)
+  const [activeSubpage, setActiveSubpage] = useState<'dashboard' | 'insights' | 'memos'>(defaultTab)
+  const [freshFetch] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const savedTs = window.sessionStorage.getItem('record_saved_ts')
+      if (savedTs && Date.now() - Number(savedTs) < 10000) {
+        return true
+      }
+    }
+    return false
+  })
   const [showCompletedVaccines, setShowCompletedVaccines] = useState(false)
   const hasInitialStats = !freshFetch && !!initialStats && selectedBabyId === initialStats.baby.id && days === 7
 
-  // If a record was just saved, bypass SSR initial data and force a fresh fetch
+  // Sync activeSubpage when URL param (defaultTab) changes (e.g. browser back/forward)
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.sessionStorage.getItem('record_saved_ts')) {
-      invalidateRequestCache()
-      setFreshFetch(true)
+    setActiveSubpage(defaultTab)
+  }, [defaultTab])
+
+  // If a record was just saved, invalidate cache to ensure fresh API responses
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedTs = window.sessionStorage.getItem('record_saved_ts')
+      if (savedTs && Date.now() - Number(savedTs) < 10000) {
+        invalidateRequestCache()
+      }
     }
   }, [])
 
@@ -1489,7 +1506,7 @@ export default function StatsComponent({
             <>
               {selectedBabyId && (
                 <MemoSection
-                  memoRecords={stats.memoRecords}
+                  memoRecords={stats.memoRecords || []}
                   babyId={selectedBabyId}
                 />
               )}

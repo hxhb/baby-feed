@@ -323,19 +323,25 @@ export default function TimelineComponent({
   const latestRequestKeyRef = useRef<string | null>(null)
   const datePickerWrapperRef = useRef<HTMLDivElement | null>(null)
   const calendarInputRef = useRef<HTMLInputElement | null>(null)
-  const [freshFetch, setFreshFetch] = useState(false)
+  const [freshFetch] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const savedTs = window.sessionStorage.getItem('record_saved_ts')
+      if (savedTs && Date.now() - Number(savedTs) < 10000) {
+        return true
+      }
+    }
+    return false
+  })
   const currentDateStr = format(currentDate, 'yyyy-MM-dd')
   const hasInitialRecords = !freshFetch && !!initialDate && selectedBabyId === initialSelectedBabyId && currentDateStr === initialDate
   const hasInitialValidDates = !freshFetch && selectedBabyId === initialSelectedBabyId
 
-  // If a record was just saved, bypass SSR initial data and force a fresh fetch
+  // If a record was just saved, invalidate cache to ensure fresh API responses
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedTs = window.sessionStorage.getItem('record_saved_ts')
-      if (savedTs) {
-        window.sessionStorage.removeItem('record_saved_ts')
+      if (savedTs && Date.now() - Number(savedTs) < 10000) {
         invalidateRequestCache()
-        setFreshFetch(true)
       }
     }
   }, [])

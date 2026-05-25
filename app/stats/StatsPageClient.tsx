@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import type { PreloadedBaby } from '@/lib/server-babies'
 import type { PreloadedStatsData } from '@/lib/server-stats'
@@ -28,6 +29,10 @@ export default function StatsPageClient({
   initialSelectedBabyId,
   initialStats,
 }: Props) {
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const defaultTab = (tabParam === 'memos' || tabParam === 'insights') ? tabParam : 'dashboard'
+
   const [selectedBabyId, setSelectedBabyId] = useState<string | null>(initialSelectedBabyId)
 
   return (
@@ -36,6 +41,7 @@ export default function StatsPageClient({
       onSelectBaby={setSelectedBabyId}
       initialBabies={initialBabies}
       initialStats={initialStats}
+      defaultTab={defaultTab}
     />
   )
 }
