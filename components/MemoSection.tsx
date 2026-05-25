@@ -23,6 +23,43 @@ function isOverdue(scheduledAt: string): boolean {
   return new Date(scheduledAt).getTime() < Date.now()
 }
 
+/**
+ * 计算备忘的天数状态标签
+ * - 未完成 + 未过期：显示"剩余X天"
+ * - 未完成 + 已过期：显示"逾期X天"
+ * - 已完成：显示"已完成X天"
+ */
+function getMemoDayLabel(memo: MemoRecord): { text: string; color: string } | null {
+  const now = Date.now()
+
+  if (memo.completed && memo.completedAt) {
+    const completedTime = new Date(memo.completedAt).getTime()
+    const diffMs = now - completedTime
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+    if (diffDays === 0) {
+      return { text: '今日完成', color: 'text-emerald-600' }
+    }
+    return { text: `已完成${diffDays}天`, color: 'text-emerald-600' }
+  }
+
+  if (!memo.completed) {
+    const scheduledTime = new Date(memo.scheduledAt).getTime()
+    const diffMs = scheduledTime - now
+    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
+
+    if (diffDays < 0) {
+      const overdueDays = Math.abs(diffDays)
+      return { text: `逾期${overdueDays}天`, color: 'text-red-500' }
+    }
+    if (diffDays === 0) {
+      return { text: '今日到期', color: 'text-amber-600' }
+    }
+    return { text: `剩余${diffDays}天`, color: 'text-blue-600' }
+  }
+
+  return null
+}
+
 export default function MemoSection({ memoRecords: initialMemos, babyId }: Props) {
   const [memos, setMemos] = useState<MemoRecord[]>(initialMemos)
   const [showForm, setShowForm] = useState(false)
@@ -310,6 +347,7 @@ interface MemoItemProps {
 function MemoItem({ memo, onToggle, onEdit, onDelete, toggling, deleting, menuOpenId, onMenuToggle }: MemoItemProps) {
   const overdue = !memo.completed && isOverdue(memo.scheduledAt)
   const isMenuOpen = menuOpenId === memo.id
+  const dayLabel = getMemoDayLabel(memo)
 
   return (
     <div
@@ -343,8 +381,8 @@ function MemoItem({ memo, onToggle, onEdit, onDelete, toggling, deleting, menuOp
             {memo.title}
           </p>
           <div className="mt-0.5 flex items-center gap-1.5 text-[11px]">
-            {overdue && (
-              <span className="font-bold text-red-500">已过期</span>
+            {dayLabel && (
+              <span className={`font-bold ${dayLabel.color}`}>{dayLabel.text}</span>
             )}
             <span className={memo.completed ? 'text-slate-400' : overdue ? 'text-red-400' : 'text-slate-500'}>
               {formatMemoDate(memo.scheduledAt)}

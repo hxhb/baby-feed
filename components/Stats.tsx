@@ -282,7 +282,7 @@ export default function StatsComponent({
   const [stats, setStats] = useState<StatsData | null>(initialStats)
   const [loading, setLoading] = useState(initialBabies.length === 0)
   const [days, setDays] = useState(7)
-  const [activeSubpage, setActiveSubpage] = useState<'dashboard' | 'insights'>('dashboard')
+  const [activeSubpage, setActiveSubpage] = useState<'dashboard' | 'insights' | 'memos'>('dashboard')
   const [freshFetch, setFreshFetch] = useState(false)
   const [showCompletedVaccines, setShowCompletedVaccines] = useState(false)
   const hasInitialStats = !freshFetch && !!initialStats && selectedBabyId === initialStats.baby.id && days === 7
@@ -714,6 +714,11 @@ export default function StatsComponent({
       label: '数据洞察',
       description: '查看喂养、成长与健康洞察',
     },
+    {
+      key: 'memos',
+      label: '备忘列表',
+      description: '查看备忘录与待办事项',
+    },
   ]
   const vaccineProgressSummary = Object.values(
     (stats?.vaccineRecords || []).reduce<Record<string, {
@@ -850,7 +855,7 @@ export default function StatsComponent({
               <StatsSegmentedTabs
                 items={subpageTabs}
                 value={activeSubpage}
-                onChange={(value) => setActiveSubpage(value as 'dashboard' | 'insights')}
+                onChange={(value) => setActiveSubpage(value as 'dashboard' | 'insights' | 'memos')}
                 className="w-full sm:flex-1"
               />
               <div className="w-full sm:ml-auto sm:w-auto sm:shrink-0">
@@ -1477,7 +1482,11 @@ export default function StatsComponent({
                   />
                 )}
               </StatsPanel>
+            </>
+          )}
 
+          {activeSubpage === 'memos' && (
+            <>
               {selectedBabyId && (
                 <MemoSection
                   memoRecords={stats.memoRecords}
