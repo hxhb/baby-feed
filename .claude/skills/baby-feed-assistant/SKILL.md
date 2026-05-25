@@ -1,6 +1,6 @@
 ---
 name: baby-feed-assistant
-version: 2.1.1
+version: 2.2.0
 description: "Query and manage baby feeding/health data via the Baby Feed HTTP API. Use this skill whenever the user asks about their baby's feeding situation, daily summary, health stats, sleep, diapers, weight trends, memos, reminders, or wants to record a new feeding/health/memo event. Trigger on any mention of: feeding, nursing, formula, breast milk, diaper, sleep, weight, temperature, baby stats, today's summary, how much the baby ate, when was the last feed, record a feed, log a diaper change, memo, reminder, 备忘, 待办, vaccine schedule, upcoming checkup, etc. Even casual questions like '宝宝今天吃了多少' or '记录一下刚才喂奶' or '有什么备忘' or '下次疫苗什么时候' should trigger this skill."
 ---
 
@@ -45,6 +45,15 @@ date -u -d '+8 hours' '+%Y-%m-%dT%H:%M:%S+08:00'
 
 **Convert user-specified Beijing time to API format:**
 User says "下午3点" (today) → `"2026-05-15T15:00:00+08:00"` (MUST have `+08:00`)
+
+### ⚠️ Timestamp Freshness Rule — NEVER Reuse Cached Times
+
+**Always re-query current Beijing time for EACH time-sensitive operation:**
+```bash
+date -u -d '+8 hours' '+%Y-%m-%dT%H:%M:%S+08:00'
+```
+
+Never reuse a timestamp obtained from an earlier terminal call. User messages may arrive at different real times (e.g., voice messages processed asynchronously), so a time captured minutes ago is stale. System NTP is synced and correct — the risk is stale timestamp reuse, not clock drift. Run the `date` command fresh every time you need "now".
 
 ### Reading Timestamps from API Responses
 
@@ -422,6 +431,7 @@ Create a health record. Common required fields: `babyId`, `type`, `recordedAt` (
     "height": undefined,  // only if measured today
     "temperature": 36.8   // only if measured today
   },
+  // ⚠️ sleepDurationMinutes is a REAL-TIME CUMULATIVE TOTAL — see warning below
   "lastDays": [ /* array of per-day summaries like todayStats, limited by `days` param */ ],
   "totalStats": {
     "totalFeedings": 50, "totalFormulaAmount": 0,
@@ -447,6 +457,10 @@ Create a health record. Common required fields: `babyId`, `type`, `recordedAt` (
   "babyBirthDate": "2026-01-01"
 }
 ```
+
+**⚠️ CRITICAL: `sleepDurationMinutes` is a Real-Time Cumulative Total**
+
+The `sleepDurationMinutes` field in `todayStats` (and `lastDays[]`) already includes ALL sleep records for that day — even ones just created seconds ago. **NEVER manually add a new sleep record's duration on top of what stats returns.** If you just created a sleep record and then call `/api/stats`, the returned `sleepDurationMinutes` already includes it. For example: if stats says 565min, that IS the correct total including the latest nap. Never compute `stats_total + latest_nap` — that double-counts.
 
 ---
 
@@ -570,6 +584,8 @@ Summarize patterns in 2-3 sentences first, then show a compact table. Highlight 
 
 | Mistake | Correct approach |
 |---------|-----------------|
+| **Reusing a cached timestamp from an earlier call** | Re-run `date -u -d '+8 hours' '+%Y-%m-%dT%H:%M:%S+08:00'` fresh for each time-sensitive operation. Messages arrive asynchronously |
+| **Adding new sleep duration on top of stats total** | `sleepDurationMinutes` from `/api/stats` is already cumulative and real-time. Never do `stats_total + latest_nap` — that double-counts |
 | **Sending timestamps without `+08:00` offset** | All POST/PUT time fields MUST end with `+08:00`. Without it, times are off by 8 hours |
 | **Sending timestamps with `Z` (UTC) suffix** | Replace `Z` with `+08:00` and use Beijing local time values |
 | **Displaying response UTC times as-is** | Response times end in `Z` (UTC) — add 8 hours to convert to Beijing for display |
