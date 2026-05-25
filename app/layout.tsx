@@ -74,7 +74,7 @@ export default async function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         {/* Splash screen — hidden after React hydrates */}
-        <div id="splash" className="splash-screen">
+        <div id="splash" className="splash-screen" suppressHydrationWarning>
           <div className="splash-logo">
             <svg width="80" height="80" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ borderRadius: '20px', boxShadow: '0 8px 32px rgba(59,130,246,0.3)' }}>
               <defs>

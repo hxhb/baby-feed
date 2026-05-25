@@ -6,9 +6,14 @@
     </linearGradient>
   </defs>
   <rect width="32" height="32" rx="7" ry="7" fill="url(#bg)"/>
-  <rect x="10" y="11" width="12" height="16" rx="4" fill="white" opacity="0.95"/>
-  <rect x="12" y="6" width="7" height="6" rx="2.5" fill="white" opacity="0.95"/>
-  <path d="M13.5 6 Q15.5 3 17.5 6" fill="white" opacity="0.95" stroke="white" stroke-width="0.8"/>
-  <rect x="11" y="18" width="10" height="8" rx="3.5" fill="rgba(244,114,182,0.25)"/>
-  <path d="M16 20 C15 19 13.5 19.4 13.5 20.5 C13.5 21.6 16 23 16 23 C16 23 18.5 21.6 18.5 20.5 C18.5 19.4 17 19 16 20Z" fill="rgba(59,130,246,0.5)"/>
+  <!-- Bottle body (centered, proportional) -->
+  <rect x="11.5" y="13" width="9" height="13" rx="3.2" fill="white" opacity="0.95"/>
+  <!-- Bottle neck -->
+  <rect x="13.5" y="8.5" width="5" height="5" rx="1.8" fill="white" opacity="0.95"/>
+  <!-- Nipple -->
+  <path d="M14.8 8.5 Q16 6 17.2 8.5" fill="white" opacity="0.95" stroke="white" stroke-width="0.6"/>
+  <!-- Milk fill -->
+  <rect x="12.5" y="19" width="7" height="6" rx="2.5" fill="rgba(244,114,182,0.25)"/>
+  <!-- Heart -->
+  <path d="M16 20.5 C15.3 19.7 14.2 20 14.2 20.7 C14.2 21.4 16 22.6 16 22.6 C16 22.6 17.8 21.4 17.8 20.7 C17.8 20 16.7 19.7 16 20.5Z" fill="rgba(59,130,246,0.5)"/>
 </svg>

@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { ClipboardList, Plus, Check, Pencil, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
+import { ClipboardList, Plus, Check, Pencil, Trash2, ChevronDown, ChevronUp, MoreVertical } from 'lucide-react'
 import { toBeijingDatetimeLocal } from '@/lib/time'
 import { invalidateRequestCache } from '@/lib/client-request-cache'
 import { StatsPanel, StatsEmptyState } from '@/components/StatsUi'
 import MemoFormModal, { type MemoRecord } from '@/components/MemoFormModal'
+import ConfirmDialog from '@/components/ConfirmDialog'
 
 interface Props {
   memoRecords: MemoRecord[]
@@ -30,6 +31,8 @@ export default function MemoSection({ memoRecords: initialMemos, babyId }: Props
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [showCompleted, setShowCompleted] = useState(false)
+  const [confirmTarget, setConfirmTarget] = useState<{ type: 'complete' | 'delete'; memo: MemoRecord } | null>(null)
+  const [memoMenuOpenId, setMemoMenuOpenId] = useState<string | null>(null)
 
   const pendingMemos = memos.filter(m => !m.completed)
   const completedMemos = memos.filter(m => m.completed)
@@ -91,6 +94,12 @@ export default function MemoSection({ memoRecords: initialMemos, babyId }: Props
   }
 
   const handleToggleComplete = async (memo: MemoRecord) => {
+    // Confirm before marking as complete (not for un-completing)
+    if (!memo.completed) {
+      setConfirmTarget({ type: 'complete', memo })
+      return
+    }
+
     setTogglingId(memo.id)
     try {
       const res = await fetch(`/api/memo/${memo.id}`, {
@@ -107,8 +116,36 @@ export default function MemoSection({ memoRecords: initialMemos, babyId }: Props
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('确定要删除这条备忘吗？')) return
+  const handleConfirmComplete = async () => {
+    if (!confirmTarget || confirmTarget.type !== 'complete') return
+    const memo = confirmTarget.memo
+    setConfirmTarget(null)
+
+    setTogglingId(memo.id)
+    try {
+      const res = await fetch(`/api/memo/${memo.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ completed: true }),
+      })
+      if (res.ok) {
+        invalidateRequestCache()
+        await refreshMemos()
+      }
+    } finally {
+      setTogglingId(null)
+    }
+  }
+
+  const handleDelete = async (memo: MemoRecord) => {
+    setConfirmTarget({ type: 'delete', memo })
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!confirmTarget || confirmTarget.type !== 'delete') return
+    const id = confirmTarget.memo.id
+    setConfirmTarget(null)
+
     setDeletingId(id)
     try {
       const res = await fetch(`/api/memo/${id}`, {
@@ -159,9 +196,11 @@ export default function MemoSection({ memoRecords: initialMemos, babyId }: Props
                     memo={memo}
                     onToggle={() => handleToggleComplete(memo)}
                     onEdit={() => setEditingMemo(memo)}
-                    onDelete={() => handleDelete(memo.id)}
+                    onDelete={() => handleDelete(memo)}
                     toggling={togglingId === memo.id}
                     deleting={deletingId === memo.id}
+                    menuOpenId={memoMenuOpenId}
+                    onMenuToggle={setMemoMenuOpenId}
                   />
                 ))}
               </div>
@@ -186,9 +225,11 @@ export default function MemoSection({ memoRecords: initialMemos, babyId }: Props
                         memo={memo}
                         onToggle={() => handleToggleComplete(memo)}
                         onEdit={() => setEditingMemo(memo)}
-                        onDelete={() => handleDelete(memo.id)}
+                        onDelete={() => handleDelete(memo)}
                         toggling={togglingId === memo.id}
                         deleting={deletingId === memo.id}
+                        menuOpenId={memoMenuOpenId}
+                        onMenuToggle={setMemoMenuOpenId}
                       />
                     ))}
                   </div>
@@ -223,6 +264,34 @@ export default function MemoSection({ memoRecords: initialMemos, babyId }: Props
           saving={saving}
         />
       )}
+
+      {/* Menu backdrop */}
+      {memoMenuOpenId && (
+        <div className="fixed inset-0 z-10" onClick={() => setMemoMenuOpenId(null)} />
+      )}
+
+      {/* Confirm dialog */}
+      {confirmTarget && confirmTarget.type === 'complete' && (
+        <ConfirmDialog
+          title="确认完成"
+          message={`确定要将「${confirmTarget.memo.title}」标记为已完成吗？`}
+          confirmLabel="完成"
+          variant="primary"
+          onConfirm={handleConfirmComplete}
+          onCancel={() => setConfirmTarget(null)}
+        />
+      )}
+
+      {confirmTarget && confirmTarget.type === 'delete' && (
+        <ConfirmDialog
+          title="确认删除"
+          message={`确定要删除「${confirmTarget.memo.title}」吗？此操作不可恢复。`}
+          confirmLabel="删除"
+          variant="danger"
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setConfirmTarget(null)}
+        />
+      )}
     </>
   )
 }
@@ -234,10 +303,13 @@ interface MemoItemProps {
   onDelete: () => void
   toggling: boolean
   deleting: boolean
+  menuOpenId: string | null
+  onMenuToggle: (id: string | null) => void
 }
 
-function MemoItem({ memo, onToggle, onEdit, onDelete, toggling, deleting }: MemoItemProps) {
+function MemoItem({ memo, onToggle, onEdit, onDelete, toggling, deleting, menuOpenId, onMenuToggle }: MemoItemProps) {
   const overdue = !memo.completed && isOverdue(memo.scheduledAt)
+  const isMenuOpen = menuOpenId === memo.id
 
   return (
     <div
@@ -285,25 +357,36 @@ function MemoItem({ memo, onToggle, onEdit, onDelete, toggling, deleting }: Memo
           )}
         </div>
 
-        {/* Actions */}
-        <div className="flex shrink-0 items-center gap-0.5">
+        {/* Actions - dropdown menu */}
+        <div className="relative shrink-0">
           <button
             type="button"
-            onClick={onEdit}
+            onClick={() => onMenuToggle(isMenuOpen ? null : memo.id)}
             className="inline-flex h-7 w-7 items-center justify-center rounded-button text-slate-400 transition hover:bg-gray-100 hover:text-slate-600"
-            title="编辑"
           >
-            <Pencil size={13} />
+            <MoreVertical size={15} />
           </button>
-          <button
-            type="button"
-            onClick={onDelete}
-            disabled={deleting}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-button text-slate-400 transition hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
-            title="删除"
-          >
-            <Trash2 size={13} />
-          </button>
+          {isMenuOpen && (
+            <div className="absolute right-0 top-full mt-1 z-20 bg-white rounded-element shadow-elevated border border-slate-100 py-1 min-w-[100px]">
+              <button
+                type="button"
+                onClick={() => { onMenuToggle(null); onEdit() }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition"
+              >
+                <Pencil size={14} />
+                编辑
+              </button>
+              <button
+                type="button"
+                onClick={() => { onMenuToggle(null); onDelete() }}
+                disabled={deleting}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition disabled:opacity-50"
+              >
+                <Trash2 size={14} />
+                删除
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

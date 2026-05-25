@@ -6,9 +6,14 @@
     </linearGradient>
   </defs>
   <rect width="56" height="56" fill="url(#bg)"/>
-  <rect x="18" y="21" width="18" height="24" rx="6" fill="white" opacity="0.95"/>
-  <rect x="22" y="14" width="10" height="8" rx="3.5" fill="white" opacity="0.95"/>
-  <path d="M24.5 14 Q27 10 29.5 14" fill="white" opacity="0.95" stroke="white" stroke-width="1.2"/>
-  <rect x="19.5" y="32" width="15" height="12" rx="5" fill="rgba(244,114,182,0.25)"/>
-  <path d="M27 35 C25.5 33.5 23.5 34.1 23.5 35.5 C23.5 36.9 27 39 27 39 C27 39 30.5 36.9 30.5 35.5 C30.5 34.1 28.5 33.5 27 35Z" fill="rgba(59,130,246,0.5)"/>
+  <!-- Bottle body (centered, ~60% of icon) -->
+  <rect x="20" y="22" width="16" height="22" rx="5.5" fill="white" opacity="0.95"/>
+  <!-- Bottle neck -->
+  <rect x="23.5" y="15" width="9" height="8" rx="3.2" fill="white" opacity="0.95"/>
+  <!-- Nipple -->
+  <path d="M25.5 15 Q28 10.5 30.5 15" fill="white" opacity="0.95" stroke="white" stroke-width="1"/>
+  <!-- Milk fill -->
+  <rect x="21.5" y="32" width="13" height="11" rx="4.5" fill="rgba(244,114,182,0.25)"/>
+  <!-- Heart decoration -->
+  <path d="M28 35.5 C26.8 34.2 25 34.7 25 35.8 C25 36.9 28 38.8 28 38.8 C28 38.8 31 36.9 31 35.8 C31 34.7 29.2 34.2 28 35.5Z" fill="rgba(59,130,246,0.5)"/>
 </svg>
