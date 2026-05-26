@@ -1,21 +1,22 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { format } from 'date-fns'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { format, formatDistanceToNow } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
 import {
   Key,
   Plus,
   Trash2,
   Copy,
-  Check,
   AlertTriangle,
   X,
   Clock,
   ArrowLeft,
   Shield,
   FileText,
-  ExternalLink
+  ExternalLink,
+  ScrollText,
+  RefreshCw
 } from 'lucide-react'
 import { useCopyToast } from '@/components/CopyToast'
 
@@ -26,6 +27,20 @@ interface ApiKeyInfo {
   lastUsedAt: string | null
   expiresAt: string | null
   createdAt: string
+}
+
+interface ApiKeyLog {
+  id: string
+  timestamp: number
+  status: 'success' | 'failed' | 'pending'
+  summary: string
+  groupKey: string
+  groupLabel: string
+  meta: {
+    method: string
+    path: string
+    ip: string
+  }
 }
 
 interface Props {
@@ -44,6 +59,13 @@ export default function ApiKeyManager({ onBack }: Props) {
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
   const { copyToClipboard } = useCopyToast()
 
+  // Request logs state
+  const [logs, setLogs] = useState<ApiKeyLog[]>([])
+  const [logsTotal, setLogsTotal] = useState(0)
+  const [logsLoading, setLogsLoading] = useState(false)
+  const [clearingLogs, setClearingLogs] = useState(false)
+  const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
   const fetchKeys = useCallback(async () => {
     try {
       const response = await fetch('/api/user/api-keys')
@@ -58,9 +80,50 @@ export default function ApiKeyManager({ onBack }: Props) {
     }
   }, [])
 
+  const fetchLogs = useCallback(async () => {
+    try {
+      setLogsLoading(true)
+      const response = await fetch('/api/user/api-key-logs?limit=50')
+      if (response.ok) {
+        const data = await response.json()
+        setLogs(data.logs)
+        setLogsTotal(data.total)
+      }
+    } catch (error) {
+      console.error('获取请求日志失败:', error)
+    } finally {
+      setLogsLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     fetchKeys()
-  }, [fetchKeys])
+    fetchLogs()
+  }, [fetchKeys, fetchLogs])
+
+  // Auto-refresh logs every 30 seconds
+  useEffect(() => {
+    refreshTimerRef.current = setInterval(fetchLogs, 30000)
+    return () => {
+      if (refreshTimerRef.current) clearInterval(refreshTimerRef.current)
+    }
+  }, [fetchLogs])
+
+  const handleClearLogs = async () => {
+    if (!confirm('确定要清理所有 API 请求日志吗？')) return
+    setClearingLogs(true)
+    try {
+      const response = await fetch('/api/user/api-key-logs', { method: 'DELETE' })
+      if (response.ok) {
+        setLogs([])
+        setLogsTotal(0)
+      }
+    } catch {
+      alert('清理失败')
+    } finally {
+      setClearingLogs(false)
+    }
+  }
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -275,6 +338,83 @@ export default function ApiKeyManager({ onBack }: Props) {
                 </div>
               )
             })}
+          </div>
+        )}
+      </div>
+
+      {/* 请求日志 */}
+      <div className="bg-white rounded-2xl p-4 shadow-sm sm:p-5 lg:p-6">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-bold text-gray-900">请求日志</h2>
+            {logsTotal > 0 && (
+              <span className="text-xs font-medium text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                {logsTotal}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={fetchLogs}
+              disabled={logsLoading}
+              title="刷新"
+              className="mobile-touch-target rounded-xl p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50"
+            >
+              <RefreshCw size={16} className={logsLoading ? 'animate-spin' : ''} />
+            </button>
+            {logsTotal > 0 && (
+              <button
+                onClick={handleClearLogs}
+                disabled={clearingLogs}
+                className="mobile-touch-target inline-flex items-center rounded-xl px-2 py-2 text-red-500 transition hover:bg-red-50 disabled:opacity-50"
+              >
+                <Trash2 size={16} className="mr-1" />
+                <span className="text-sm">清理</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {logs.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            <ScrollText size={48} className="mx-auto mb-2 text-gray-300" />
+            <p>暂无请求记录</p>
+            <p className="text-sm mt-1 text-gray-400">通过 API Key 发起的请求将在此显示（仅保留 24 小时）</p>
+          </div>
+        ) : (
+          <div className="space-y-1.5 max-h-[400px] overflow-y-auto">
+            {logs.map(log => (
+              <div key={log.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 text-sm">
+                {/* Status dot */}
+                <span className="flex-shrink-0 w-2 h-2 rounded-full bg-green-400" />
+                {/* Method badge */}
+                <span className={`flex-shrink-0 text-xs font-mono font-bold px-1.5 py-0.5 rounded ${
+                  log.meta.method === 'GET' ? 'bg-blue-100 text-blue-700' :
+                  log.meta.method === 'POST' ? 'bg-green-100 text-green-700' :
+                  log.meta.method === 'PUT' ? 'bg-amber-100 text-amber-700' :
+                  log.meta.method === 'DELETE' ? 'bg-red-100 text-red-700' :
+                  'bg-gray-100 text-gray-700'
+                }`}>
+                  {log.meta.method}
+                </span>
+                {/* Path */}
+                <span className="flex-1 min-w-0 truncate text-gray-700 font-mono text-xs">
+                  {log.meta.path}
+                </span>
+                {/* Key name */}
+                <span className="hidden sm:inline flex-shrink-0 text-xs text-gray-400 max-w-[100px] truncate">
+                  {log.groupLabel}
+                </span>
+                {/* IP */}
+                <span className="hidden sm:inline flex-shrink-0 text-xs text-gray-400 font-mono">
+                  {log.meta.ip}
+                </span>
+                {/* Time */}
+                <span className="flex-shrink-0 text-xs text-gray-400 tabular-nums">
+                  {formatDistanceToNow(new Date(log.timestamp), { locale: zhCN, addSuffix: true })}
+                </span>
+              </div>
+            ))}
           </div>
         )}
       </div>

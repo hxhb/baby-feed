@@ -270,7 +270,7 @@ export default function FeedingForm({
       iconClassName: 'text-pink-500',
       active: type === 'BREAST_MILK' || type === 'BREAST_MILK_BOTTLE',
       activeClassName: 'border-pink-500 bg-pink-50/80 text-pink-700',
-      inactiveClassName: 'border-pink-100 bg-pink-50/80 text-pink-700 hover:border-pink-200 hover:bg-pink-100/70',
+      inactiveClassName: 'border-gray-200 bg-white text-gray-500 hover:border-gray-300',
       onClick: () => {
         setType(breastMode === 'bottle' ? 'BREAST_MILK_BOTTLE' : 'BREAST_MILK')
       }
@@ -282,7 +282,7 @@ export default function FeedingForm({
       iconClassName: 'text-blue-500',
       active: type === 'FORMULA',
       activeClassName: 'border-blue-500 bg-blue-50/80 text-blue-700',
-      inactiveClassName: 'border-blue-100 bg-blue-50/80 text-blue-700 hover:border-blue-200 hover:bg-blue-100/70',
+      inactiveClassName: 'border-gray-200 bg-white text-gray-500 hover:border-gray-300',
       onClick: () => setType('FORMULA')
     },
     {
@@ -292,7 +292,7 @@ export default function FeedingForm({
       iconClassName: 'text-orange-500',
       active: type === 'SOLID_FOOD',
       activeClassName: 'border-orange-500 bg-orange-50/80 text-orange-700',
-      inactiveClassName: 'border-orange-100 bg-orange-50/80 text-orange-700 hover:border-orange-200 hover:bg-orange-100/70',
+      inactiveClassName: 'border-gray-200 bg-white text-gray-500 hover:border-gray-300',
       onClick: () => setType('SOLID_FOOD')
     }
   ]
@@ -393,7 +393,7 @@ export default function FeedingForm({
                 onClick={card.onClick}
                 className={`mobile-touch-target flex min-w-0 items-center justify-center gap-1 rounded-xl border py-2.5 transition ${card.active ? card.activeClassName : card.inactiveClassName}`}
               >
-                <Icon size={16} className={`shrink-0 ${card.iconClassName}`} />
+                <Icon size={16} className={`shrink-0 ${card.active ? card.iconClassName : 'text-gray-400'}`} />
                 <span className="truncate text-sm font-medium">{card.title}</span>
               </button>
             )

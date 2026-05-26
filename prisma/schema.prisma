@@ -23,7 +23,8 @@ model User {
   apiKeys          ApiKey[]
   memos            Memo[]
   webhookEndpoints WebhookEndpoint[]
-  webhookEvents    WebhookEvent[]
+  reminderRules    ReminderRule[]
+  reminderSettings String?
 }
 
 model SiteSettings {
@@ -58,6 +59,7 @@ model Baby {
   feedingRecords FeedingRecord[]
   healthRecords HealthRecord[]
   memos          Memo[]
+  reminderRules  ReminderRule[]
 
   @@index([createdBy])
 }
@@ -160,67 +162,41 @@ model WebhookEndpoint {
   lastTriedAt DateTime?
   
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  deliveries  WebhookDelivery[]
-  
+
   @@index([userId])
   @@index([active])
 }
 
-model WebhookEvent {
-  id          String    @id @default(cuid())
-  userId      String
-  
-  // Event type: "feeding.created", "feeding.updated", "feeding.deleted", 
-  // "health.created", "health.updated", "health.deleted", "user.deleted", etc.
-  type        String
-  
-  // The complete event payload (JSON)
-  payload     String
-  
-  // Referenced record ID (for correlation)
-  recordId    String?
-  recordType  String?  // "FeedingRecord", "HealthRecord", "User"
-  
-  // Processing state
-  status      String   @default("pending") // pending, delivered, failed, archived
-  createdAt   DateTime @default(now())
-  
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  deliveries  WebhookDelivery[]
-  
-  @@index([userId, status])
-  @@index([userId, createdAt])
-  @@index([recordId])
-}
+model ReminderRule {
+  id              String    @id @default(cuid())
+  userId          String
+  babyId          String
 
-model WebhookDelivery {
-  id          String    @id @default(cuid())
-  
-  eventId     String
-  endpointId  String
-  
-  // Delivery attempt tracking
-  attemptNumber Int     @default(1)
-  status      String   @default("pending") // pending, success, failed, timeout
-  
-  // Response information
-  httpStatus  Int?
-  responseBody String?
-  errorMessage String?
-  
-  // Timing
-  sentAt      DateTime?
-  respondedAt DateTime?
-  nextRetryAt DateTime?
-  
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  
-  event       WebhookEvent      @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  endpoint    WebhookEndpoint   @relation(fields: [endpointId], references: [id], onDelete: Cascade)
-  
-  @@index([eventId, endpointId])
-  @@index([status, nextRetryAt])
-  @@index([endpointId, status])
-  @@index([createdAt])
+  name            String
+  enabled         Boolean   @default(true)
+
+  triggerType     String
+  triggerConfig   String
+  activeSchedule  String?
+
+  advanceMinutes  Int       @default(0)
+
+  notifyTitle     String
+  notifyBody      String?
+
+  startsAt        DateTime?
+  expiresAt       DateTime?
+
+  lastFiredAt     DateTime?
+  nextCheckAt     DateTime?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  baby            Baby      @relation(fields: [babyId], references: [id], onDelete: Cascade)
+
+  @@index([userId, enabled])
+  @@index([babyId])
+  @@index([enabled, nextCheckAt])
 }

@@ -35,6 +35,7 @@
 - **PWA 支持**：可安装到手机桌面，支持离线访问
 - **API Key 外部集成**：支持通过 HTTP API 对接外部程序（iOS 快捷指令、自动化脚本等）
 - **AI Agent 集成**：内置 Agent Skill，可接入 Claude Code 等 AI 平台，用自然语言查询和记录喂养数据
+- **智能提醒系统**：支持喂养间隔提醒、定时循环提醒（如每日AD）、事件窗口提醒（如疫苗后测体温），支持静默时段和 Webhook 通知
 - **管理员面板**：管理用户、控制注册开放
 - Docker 一键部署
 - 数据本地持久化（SQLite）
@@ -102,6 +103,7 @@ docker-compose up -d
 | `NEXTAUTH_URL` | 是 | 应用访问地址，如 `http://localhost:3000` 或 `https://baby.yourdomain.com` |
 | `CORS_ALLOWED_ORIGIN` | 否 | 自定义 CORS 来源，默认使用 `NEXTAUTH_URL` |
 | `TRUST_PROXY` | 否 | 设为 `true` 时信任反向代理传递的 `X-Forwarded-For` 头（用于正确识别客户端 IP 以实施速率限制）。使用 Nginx/Traefik 等反向代理时**必须设为 `true`**，默认 `true` |
+| `REMINDER_ENABLED` | 否 | 设为 `false` 禁用提醒调度器（默认启用） |
 
 > **注意**：如果使用 HTTPS 反向代理，`NEXTAUTH_URL` 必须以 `https://` 开头。
 
@@ -228,6 +230,10 @@ npm run dev
 | `/api/stats/day` | GET | 单日统计数据 |
 | `/api/timeline-dates` | GET | 时间轴有效日期 |
 | `/api/user/api-keys` | GET/POST/DELETE | API Key 管理 |
+| `/api/user/api-key-logs` | GET/DELETE | API Key 请求日志（内存存储，24h 自动清理） |
+| `/api/reminders` | GET/POST | 提醒规则列表 / 创建规则 |
+| `/api/reminders/[id]` | PUT/DELETE | 更新 / 删除提醒规则 |
+| `/api/reminders/logs` | GET/DELETE | 提醒执行日志 |
 | `/api/admin/*` | GET/PUT/DELETE | 管理员接口 |
 
 完整的请求示例和参数说明见 [HTTP API 文档](docs/HTTP_REQUESTS.md)。

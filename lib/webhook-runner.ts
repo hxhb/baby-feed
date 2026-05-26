@@ -1,23 +1,81 @@
 /**
- * Webhook Delivery Runner
- * 
- * Processes pending webhook deliveries from the database.
+ * Webhook Delivery Runner (In-Memory)
+ *
+ * Processes pending webhook deliveries from an in-memory queue.
  * This is meant to be run periodically (every minute or so) via cron or a background job.
- * 
- * Usage:
- *   - Deploy as a cron job: GET /api/cron/webhook-runner
- *   - Or call processWebhookDeliveries() from a background job queue
+ *
+ * Design: all delivery state lives in memory. Process restart clears the queue.
+ * This is acceptable for a self-hosted single-instance app where webhook retries
+ * are best-effort and not critical.
  */
 
-import { prisma } from './prisma'
+import { activityLogger } from './activity-logger'
 import { logError } from './logger'
 import crypto from 'crypto'
+
+// ─── Types ──────────────────────────────────────────────────────────────────
 
 interface DeliveryResult {
   success: boolean
   httpStatus?: number
   error?: string
 }
+
+export interface PendingWebhookDelivery {
+  id: string
+  eventPayload: string    // The JSON payload to deliver
+  eventType: string
+  endpointId: string
+  endpointUrl: string
+  endpointSecret: string
+  userId: string
+  attemptNumber: number
+  maxRetries: number
+  retryDelay: number      // base delay seconds
+  nextRetryAt: number     // Date.now() based
+  createdAt: number
+  // For activity-logger summary
+  summary: string
+}
+
+// ─── In-Memory Retry Queue ──────────────────────────────────────────────────
+
+const pendingDeliveries: PendingWebhookDelivery[] = []
+const MAX_PENDING = 500
+const PENDING_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours
+
+/**
+ * Add a delivery to the retry queue
+ */
+export function enqueueDelivery(delivery: PendingWebhookDelivery): void {
+  // Evict expired entries
+  const now = Date.now()
+  purgeExpiredPending(now)
+
+  // Cap the queue
+  if (pendingDeliveries.length >= MAX_PENDING) {
+    pendingDeliveries.shift() // Remove oldest
+  }
+
+  pendingDeliveries.push(delivery)
+}
+
+/**
+ * Get queue stats (for cron response)
+ */
+export function getQueueStats(): { pending: number } {
+  purgeExpiredPending(Date.now())
+  return { pending: pendingDeliveries.length }
+}
+
+function purgeExpiredPending(now: number): void {
+  const cutoff = now - PENDING_TTL_MS
+  while (pendingDeliveries.length > 0 && pendingDeliveries[0].createdAt < cutoff) {
+    pendingDeliveries.shift()
+  }
+}
+
+// ─── Delivery Logic ─────────────────────────────────────────────────────────
 
 /**
  * Sign the webhook payload with HMAC-SHA256
@@ -58,14 +116,14 @@ function sanitizeErrorMessage(error: string): string {
 /**
  * Send a single webhook delivery
  */
-async function sendWebhookDelivery(
-  delivery: { id: string },
-  event: { payload: string; type: string; id: string },
+export async function sendWebhookDelivery(
+  payload: string,
+  eventType: string,
+  eventId: string,
+  deliveryId: string,
   endpoint: { url: string; secret: string }
 ): Promise<DeliveryResult> {
   try {
-    const payload = event.payload
-
     // Enforce payload size limit
     if (payload.length > MAX_PAYLOAD_SIZE) {
       return {
@@ -84,9 +142,9 @@ async function sendWebhookDelivery(
       headers: {
         'Content-Type': 'application/json',
         'X-Webhook-Signature': signature,
-        'X-Webhook-Event-Type': event.type,
-        'X-Webhook-Event-ID': event.id,
-        'X-Webhook-Delivery-ID': delivery.id,
+        'X-Webhook-Event-Type': eventType,
+        'X-Webhook-Event-ID': eventId,
+        'X-Webhook-Delivery-ID': deliveryId,
         'X-Webhook-Timestamp': new Date().toISOString(),
       },
       body: payload,
@@ -117,73 +175,100 @@ async function sendWebhookDelivery(
 }
 
 /**
- * Attempt immediate delivery of a single webhook
- *
- * Called right after creating the delivery record for real-time notifications.
- * If delivery fails, the record stays in 'pending' for the cron runner to retry.
- */
-export async function sendWebhookDeliveryImmediate(deliveryId: string): Promise<void> {
-  const delivery = await prisma.webhookDelivery.findUnique({
-    where: { id: deliveryId },
-    include: { event: true, endpoint: true },
-  })
-  if (!delivery || delivery.status !== 'pending') return
-
-  const result = await sendWebhookDelivery(delivery, delivery.event, delivery.endpoint)
-
-  if (result.success) {
-    await prisma.webhookDelivery.update({
-      where: { id: deliveryId },
-      data: {
-        status: 'success',
-        sentAt: new Date(),
-        respondedAt: new Date(),
-        httpStatus: result.httpStatus,
-      },
-    })
-
-    // Check if all deliveries for this event succeeded
-    const remaining = await prisma.webhookDelivery.count({
-      where: { eventId: delivery.eventId, status: { in: ['failed', 'pending'] } },
-    })
-    if (remaining === 0) {
-      await prisma.webhookEvent.update({
-        where: { id: delivery.eventId },
-        data: { status: 'delivered' },
-      })
-    }
-  } else {
-    // Mark attempt sent, schedule retry for cron runner
-    await prisma.webhookDelivery.update({
-      where: { id: deliveryId },
-      data: {
-        sentAt: new Date(),
-        attemptNumber: delivery.attemptNumber + 1,
-        httpStatus: result.httpStatus,
-        errorMessage: result.error,
-        nextRetryAt: calculateNextRetry(delivery.attemptNumber, delivery.endpoint.retryDelay),
-      },
-    })
-  }
-}
-
-/**
  * Calculate next retry time with exponential backoff
  */
-function calculateNextRetry(attemptNumber: number, baseDelaySeconds: number): Date {
+function calculateNextRetry(attemptNumber: number, baseDelaySeconds: number): number {
   // Exponential backoff: base * 2^(attempt-1), capped at 24 hours
   const exponentialDelay = Math.min(
     baseDelaySeconds * Math.pow(2, attemptNumber - 1),
     24 * 60 * 60 // 24 hours max
   )
 
-  return new Date(Date.now() + exponentialDelay * 1000)
+  return Date.now() + exponentialDelay * 1000
 }
 
 /**
- * Process all pending webhook deliveries
- * 
- * This should be called periodically (e.g., every minute) to handle retries
+ * Attempt immediate delivery of a webhook and record the result.
+ *
+ * Called right after emitting the event. If delivery fails and retries are
+ * configured, the delivery is added to the in-memory retry queue.
+ */
+export async function sendWebhookImmediate(
+  payload: string,
+  eventType: string,
+  eventId: string,
+  endpoint: { id: string; url: string; secret: string; maxRetries: number; retryDelay: number },
+  userId: string,
+  summary: string
+): Promise<void> {
+  const deliveryId = crypto.randomBytes(4).toString('hex')
+
+  const result = await sendWebhookDelivery(payload, eventType, eventId, deliveryId, endpoint)
+
+  if (result.success) {
+    // Record success to activity logger
+    activityLogger.record({
+      source: 'webhook',
+      userId,
+      groupKey: endpoint.id,
+      groupLabel: endpoint.url,
+      status: 'success',
+      summary,
+      meta: {
+        eventType,
+        eventId,
+        attemptNumber: 1,
+        httpStatus: result.httpStatus ?? null,
+        errorMessage: null,
+        sentAt: new Date().toISOString(),
+        endpointUrl: endpoint.url,
+      },
+    })
+  } else {
+    // Record failure to activity logger
+    activityLogger.record({
+      source: 'webhook',
+      userId,
+      groupKey: endpoint.id,
+      groupLabel: endpoint.url,
+      status: endpoint.maxRetries > 1 ? 'pending' : 'failed',
+      summary,
+      meta: {
+        eventType,
+        eventId,
+        attemptNumber: 1,
+        httpStatus: result.httpStatus ?? null,
+        errorMessage: result.error ?? null,
+        sentAt: new Date().toISOString(),
+        endpointUrl: endpoint.url,
+      },
+    })
+
+    // Queue for retry if retries are configured
+    if (endpoint.maxRetries > 1) {
+      enqueueDelivery({
+        id: deliveryId,
+        eventPayload: payload,
+        eventType,
+        endpointId: endpoint.id,
+        endpointUrl: endpoint.url,
+        endpointSecret: endpoint.secret,
+        userId,
+        attemptNumber: 2,
+        maxRetries: endpoint.maxRetries,
+        retryDelay: endpoint.retryDelay,
+        nextRetryAt: calculateNextRetry(1, endpoint.retryDelay),
+        createdAt: Date.now(),
+        summary,
+      })
+    }
+  }
+}
+
+/**
+ * Process all pending webhook deliveries from the in-memory queue.
+ *
+ * This should be called periodically (e.g., every minute) to handle retries.
  */
 export async function processWebhookDeliveries(options?: { maxDeliveries?: number }): Promise<{
   processed: number
@@ -192,6 +277,7 @@ export async function processWebhookDeliveries(options?: { maxDeliveries?: numbe
   errors: string[]
 }> {
   const maxDeliveries = options?.maxDeliveries || 100
+  const now = Date.now()
 
   const stats = {
     processed: 0,
@@ -200,203 +286,103 @@ export async function processWebhookDeliveries(options?: { maxDeliveries?: numbe
     errors: [] as string[],
   }
 
-  try {
-    // Find pending deliveries that are ready to send
-    // This includes:
-    // 1. New deliveries (status: 'pending', sentAt: null)
-    // 2. Retry attempts (status: 'pending', nextRetryAt <= now)
-    const now = new Date()
-    const pendingDeliveries = await prisma.webhookDelivery.findMany({
-      where: {
-        status: 'pending',
-        endpoint: { active: true }, // Only deliver to active endpoints
-        OR: [
-          { sentAt: null }, // Never sent
-          { nextRetryAt: { lte: now } }, // Ready for retry
-        ],
-      },
-      take: maxDeliveries,
-      include: {
-        event: true,
-        endpoint: true,
-      },
-    })
+  // Purge expired first
+  purgeExpiredPending(now)
 
-    for (const delivery of pendingDeliveries) {
-      try {
-        const result = await sendWebhookDelivery(
-          delivery,
-          delivery.event,
-          delivery.endpoint
-        )
+  // Find deliveries that are ready to send
+  const ready = pendingDeliveries.filter(d => d.nextRetryAt <= now)
+  const toProcess = ready.slice(0, maxDeliveries)
 
-        if (result.success) {
-          // Mark as delivered
-          await prisma.webhookDelivery.update({
-            where: { id: delivery.id },
-            data: {
-              status: 'success',
-              sentAt: new Date(),
-              respondedAt: new Date(),
-              httpStatus: result.httpStatus,
-            },
+  for (const delivery of toProcess) {
+    try {
+      const result = await sendWebhookDelivery(
+        delivery.eventPayload,
+        delivery.eventType,
+        delivery.id,
+        delivery.id,
+        { url: delivery.endpointUrl, secret: delivery.endpointSecret }
+      )
+
+      // Remove from queue regardless of result (we'll re-enqueue if needed)
+      const idx = pendingDeliveries.indexOf(delivery)
+      if (idx !== -1) pendingDeliveries.splice(idx, 1)
+
+      if (result.success) {
+        activityLogger.record({
+          source: 'webhook',
+          userId: delivery.userId,
+          groupKey: delivery.endpointId,
+          groupLabel: delivery.endpointUrl,
+          status: 'success',
+          summary: delivery.summary,
+          meta: {
+            eventType: delivery.eventType,
+            eventId: delivery.id,
+            attemptNumber: delivery.attemptNumber,
+            httpStatus: result.httpStatus ?? null,
+            errorMessage: null,
+            sentAt: new Date().toISOString(),
+            endpointUrl: delivery.endpointUrl,
+          },
+        })
+        stats.succeeded++
+      } else {
+        // Check if we should retry
+        if (delivery.attemptNumber < delivery.maxRetries) {
+          // Re-enqueue with incremented attempt
+          enqueueDelivery({
+            ...delivery,
+            attemptNumber: delivery.attemptNumber + 1,
+            nextRetryAt: calculateNextRetry(delivery.attemptNumber, delivery.retryDelay),
           })
 
-          // Mark event as delivered if all endpoints succeeded
-          const failedDeliveries = await prisma.webhookDelivery.count({
-            where: {
-              eventId: delivery.eventId,
-              status: { in: ['failed', 'pending'] },
+          activityLogger.record({
+            source: 'webhook',
+            userId: delivery.userId,
+            groupKey: delivery.endpointId,
+            groupLabel: delivery.endpointUrl,
+            status: 'pending',
+            summary: delivery.summary,
+            meta: {
+              eventType: delivery.eventType,
+              eventId: delivery.id,
+              attemptNumber: delivery.attemptNumber,
+              httpStatus: result.httpStatus ?? null,
+              errorMessage: result.error ?? null,
+              sentAt: new Date().toISOString(),
+              endpointUrl: delivery.endpointUrl,
             },
           })
-
-          if (failedDeliveries === 0) {
-            await prisma.webhookEvent.update({
-              where: { id: delivery.eventId },
-              data: { status: 'delivered' },
-            })
-          }
-
-          stats.succeeded++
         } else {
-          // Check if we should retry
-          if (delivery.attemptNumber < delivery.endpoint.maxRetries) {
-            const nextRetryAt = calculateNextRetry(
-              delivery.attemptNumber,
-              delivery.endpoint.retryDelay
-            )
-
-            await prisma.webhookDelivery.update({
-              where: { id: delivery.id },
-              data: {
-                status: 'pending',
-                attemptNumber: delivery.attemptNumber + 1,
-                sentAt: new Date(),
-                respondedAt: null,
-                httpStatus: result.httpStatus,
-                errorMessage: result.error,
-                nextRetryAt,
-              },
-            })
-          } else {
-            // Max retries exceeded
-            await prisma.webhookDelivery.update({
-              where: { id: delivery.id },
-              data: {
-                status: 'failed',
-                sentAt: new Date(),
-                respondedAt: new Date(),
-                httpStatus: result.httpStatus,
-                errorMessage: result.error,
-              },
-            })
-
-            // Mark event as failed
-            await prisma.webhookEvent.update({
-              where: { id: delivery.eventId },
-              data: { status: 'failed' },
-            })
-          }
-
-          stats.failed++
+          // Max retries exhausted
+          activityLogger.record({
+            source: 'webhook',
+            userId: delivery.userId,
+            groupKey: delivery.endpointId,
+            groupLabel: delivery.endpointUrl,
+            status: 'failed',
+            summary: delivery.summary,
+            meta: {
+              eventType: delivery.eventType,
+              eventId: delivery.id,
+              attemptNumber: delivery.attemptNumber,
+              httpStatus: result.httpStatus ?? null,
+              errorMessage: result.error ?? null,
+              sentAt: new Date().toISOString(),
+              endpointUrl: delivery.endpointUrl,
+            },
+          })
         }
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error)
-        stats.errors.push(`Delivery ${delivery.id}: ${errorMessage}`)
-        logError(`Failed to process webhook delivery ${delivery.id}`, error)
+        stats.failed++
       }
-
-      stats.processed++
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      stats.errors.push(`Delivery ${delivery.id}: ${errorMessage}`)
+      logError(`Failed to process webhook delivery ${delivery.id}`, error)
     }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    stats.errors.push(`Error fetching deliveries: ${errorMessage}`)
-    logError('Error processing webhook deliveries', error)
+
+    stats.processed++
   }
 
   return stats
-}
-
-/**
- * Clean up old webhook deliveries (1-day retention)
- *
- * Removes delivery records older than `daysToKeep` (default 1 day)
- * and orphaned events that have no remaining deliveries.
- * This is cheap to run on every cron tick due to indexed createdAt column.
- */
-export async function cleanupOldDeliveries(daysToKeep: number = 1): Promise<{
-  deletedDeliveries: number
-  deletedEvents: number
-}> {
-  const cutoffDate = new Date()
-  cutoffDate.setDate(cutoffDate.getDate() - daysToKeep)
-
-  try {
-    // Delete old deliveries
-    const deliveriesResult = await prisma.webhookDelivery.deleteMany({
-      where: {
-        createdAt: { lt: cutoffDate },
-      },
-    })
-
-    // Delete orphaned events (events with no remaining deliveries that are already processed)
-    let deletedEvents = 0
-    if (deliveriesResult.count > 0) {
-      const eventsResult = await prisma.webhookEvent.deleteMany({
-        where: {
-          createdAt: { lt: cutoffDate },
-          status: { in: ['delivered', 'failed', 'archived'] },
-          deliveries: { none: {} },
-        },
-      })
-      deletedEvents = eventsResult.count
-    }
-
-    return {
-      deletedDeliveries: deliveriesResult.count,
-      deletedEvents,
-    }
-  } catch (error) {
-    logError('Error cleaning up old deliveries', error)
-    return { deletedDeliveries: 0, deletedEvents: 0 }
-  }
-}
-
-/**
- * Clean up old webhook events and deliveries
- *
- * Removes events and deliveries older than `daysToKeep` (default 30 days)
- * Call this periodically to maintain database performance
- */
-export async function cleanupOldWebhookRecords(daysToKeep: number = 30): Promise<{
-  deletedEvents: number
-  deletedDeliveries: number
-}> {
-  const cutoffDate = new Date()
-  cutoffDate.setDate(cutoffDate.getDate() - daysToKeep)
-
-  try {
-    // Delete old deliveries first (they reference events)
-    const deliveriesResult = await prisma.webhookDelivery.deleteMany({
-      where: {
-        createdAt: { lt: cutoffDate },
-      },
-    })
-
-    // Delete old events
-    const eventsResult = await prisma.webhookEvent.deleteMany({
-      where: {
-        createdAt: { lt: cutoffDate },
-        status: { in: ['delivered', 'failed', 'archived'] },
-      },
-    })
-
-    return {
-      deletedEvents: eventsResult.count,
-      deletedDeliveries: deliveriesResult.count,
-    }
-  } catch (error) {
-    logError('Error cleaning up webhook records', error)
-    return { deletedEvents: 0, deletedDeliveries: 0 }
-  }
 }

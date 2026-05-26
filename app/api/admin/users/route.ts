@@ -112,12 +112,6 @@ export async function DELETE(request: NextRequest) {
       await tx.healthRecord.deleteMany({ where: { createdBy: userId } })
       await tx.baby.deleteMany({ where: { createdBy: userId } })
       await tx.apiKey.deleteMany({ where: { userId } })
-      await tx.webhookDelivery.deleteMany({
-        where: {
-          endpoint: { userId }
-        }
-      })
-      await tx.webhookEvent.deleteMany({ where: { userId } })
       await tx.webhookEndpoint.deleteMany({ where: { userId } })
       await tx.user.delete({ where: { id: userId } })
     })

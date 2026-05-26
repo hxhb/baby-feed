@@ -958,7 +958,7 @@ export default function TimelineComponent({
         </div>
       </div>
 
-      <div className="bg-white rounded-card shadow-card border border-blue-50 overflow-hidden">
+      <div className="bg-white rounded-card shadow-card border border-blue-50">
         <div className="flex items-center justify-between px-3 pt-3 pb-1 min-h-8">
           <div className="text-xs text-gray-400">共 {records.length} 条记录</div>
           {isFetchingRecords && (

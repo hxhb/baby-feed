@@ -71,6 +71,14 @@ const rateLimitConfig: Record<string, RateLimitRule> = {
   'webhook-update':         { limit: 20,  windowMs: 10 * 60 * 1000 },
   'webhook-delete':         { limit: 10,  windowMs: 10 * 60 * 1000 },
   'webhook-deliveries-list': { limit: 60, windowMs: 60 * 1000 },
+
+  // ============ 提醒规则 ============
+  'reminder-list':          { limit: 60,  windowMs: 60 * 1000 },
+  'reminder-create':        { limit: 20,  windowMs: 10 * 60 * 1000 },
+  'reminder-update':        { limit: 30,  windowMs: 10 * 60 * 1000 },
+  'reminder-delete':        { limit: 20,  windowMs: 15 * 60 * 1000 },
+  'reminder-logs-list':     { limit: 60,  windowMs: 60 * 1000 },
+  'reminder-logs-delete':   { limit: 10,  windowMs: 10 * 60 * 1000 },
 }
 
 // 默认规则：未配置的 action 使用此兜底值

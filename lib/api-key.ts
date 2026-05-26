@@ -16,6 +16,7 @@ import { Session } from 'next-auth'
 import { NextRequest } from 'next/server'
 import { getClientIp as getClientIpFromRequest } from './rate-limit'
 import { logError } from '@/lib/logger'
+import { activityLogger } from '@/lib/activity-logger'
 
 const API_KEY_PREFIX = 'bfk_'
 
@@ -129,6 +130,24 @@ export async function authByApiKey(request: NextRequest): Promise<Session | null
       data: { lastUsedAt: new Date() }
     }).catch(() => {
       // 静默失败，更新最后使用时间不是关键操作
+    })
+
+    // Record API Key request to activity logger
+    const method = request.method || 'GET'
+    const url = new URL(request.url)
+    const path = url.pathname
+    activityLogger.record({
+      source: 'api-key',
+      userId: apiKey.user.id,
+      groupKey: apiKey.id,
+      groupLabel: apiKey.name,
+      status: 'success',
+      summary: `${method} ${path}`,
+      meta: {
+        method,
+        path,
+        ip,
+      },
     })
 
     // 返回与 cookie 认证一致的 Session 结构

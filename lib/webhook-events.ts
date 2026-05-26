@@ -27,6 +27,9 @@ export const WEBHOOK_EVENTS = {
 
   // User Events
   USER_DELETED: 'user.deleted',
+
+  // Reminder Events
+  REMINDER_FIRED: 'reminder.fired',
 } as const
 
 export type WebhookEventType = typeof WEBHOOK_EVENTS[keyof typeof WEBHOOK_EVENTS]
@@ -271,6 +274,23 @@ export interface MemoDeletedEventPayload extends WebhookEventPayload {
 }
 
 /**
+ * Reminder Fired Event
+ */
+export interface ReminderFiredEventPayload extends WebhookEventPayload {
+  type: typeof WEBHOOK_EVENTS.REMINDER_FIRED
+  data: {
+    ruleId: string
+    ruleName: string
+    triggerType: string
+    babyId: string
+    babyName: string
+    title: string
+    body: string | null
+    context: Record<string, unknown>
+  }
+}
+
+/**
  * Union of all webhook payloads
  */
 export type AnyWebhookPayload =
@@ -284,6 +304,7 @@ export type AnyWebhookPayload =
   | MemoUpdatedEventPayload
   | MemoDeletedEventPayload
   | UserDeletedEventPayload
+  | ReminderFiredEventPayload
 
 /**
  * Helper to validate event payload structure

@@ -1,14 +1,18 @@
 /**
- * Webhook Service
+ * Webhook Service (In-Memory)
  *
- * Handles emission of webhook events. Events are stored in the database
- * and immediate delivery is attempted. Failed deliveries are retried by cron.
+ * Handles emission of webhook events. Events are delivered immediately
+ * and logged to the in-memory activity logger. Failed deliveries are
+ * queued for retry in the in-memory retry queue.
  */
 
 import { prisma } from './prisma'
 import { type AnyWebhookPayload, type WebhookEventType } from './webhook-events'
-import { sendWebhookDeliveryImmediate } from './webhook-runner'
+import { sendWebhookImmediate } from './webhook-runner'
 import { logError } from './logger'
+import { resetIntervalRules } from '@/lib/reminder-scheduler'
+import { autoCreateVaccineReminder } from '@/lib/reminder-auto-vaccine'
+import crypto from 'crypto'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // Record types from Prisma are complex nested objects — using `any` for the
@@ -51,6 +55,36 @@ const HEALTH_FIELDS = [
   'recordedAt',
   'notes',
 ] as const
+
+// ─── Record type labels for summary ────────────────────────────────────────
+
+const RECORD_TYPE_LABELS: Record<string, string> = {
+  BREAST_MILK: '母乳亲喂',
+  BREAST_MILK_BOTTLE: '母乳瓶喂',
+  FORMULA: '奶粉',
+  SOLID_FOOD: '辅食',
+  WEIGHT: '体重',
+  HEIGHT: '身高',
+  TEMPERATURE: '体温',
+  MEDICATION: '服药',
+  VACCINE: '疫苗',
+  DIAPER: '大小便',
+  AD_VITAMIN: 'AD滴剂',
+  SLEEP: '睡眠',
+}
+
+const EVENT_LABELS: Record<string, string> = {
+  'feeding.created': '新增喂养',
+  'feeding.updated': '更新喂养',
+  'feeding.deleted': '删除喂养',
+  'health.created': '新增健康',
+  'health.updated': '更新健康',
+  'health.deleted': '删除健康',
+  'memo.created': '新增备忘',
+  'memo.updated': '更新备忘',
+  'memo.deleted': '删除备忘',
+  'user.deleted': '删除用户',
+}
 
 // ─── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -99,46 +133,65 @@ function buildBabyPayloadBrief(baby: any): { id: string; name: string } {
   return { id: baby.id, name: baby.name }
 }
 
+/**
+ * Generate a human-readable summary from event data
+ */
+function buildSummary(eventType: WebhookEventType, data: any): string {
+  const parts: string[] = []
+
+  // Event type label
+  const eventLabel = EVENT_LABELS[eventType]
+  if (eventLabel) parts.push(eventLabel)
+
+  // Baby name
+  const babyName = data?.baby?.name
+  if (babyName) parts.push(babyName)
+
+  // Content detail
+  if (data?.title) {
+    parts.push(data.title)
+  } else if (data?.type && RECORD_TYPE_LABELS[data.type]) {
+    parts.push(RECORD_TYPE_LABELS[data.type])
+    if (data.formulaAmount) parts.push(`${data.formulaAmount}ml`)
+    else if (data.breastMilkAmount) parts.push(`${data.breastMilkAmount}ml`)
+    else if (data.weight) parts.push(`${data.weight}kg`)
+    else if (data.height) parts.push(`${data.height}cm`)
+    else if (data.temperature) parts.push(`${data.temperature}°C`)
+  } else if (data?.email) {
+    parts.push(data.email)
+  }
+
+  return parts.join(' · ')
+}
+
 // ─── Core emit function ──────────────────────────────────────────────────────
 
 /**
  * Emit a webhook event
  *
- * Creates a WebhookEvent record in the database and WebhookDelivery records
- * for each endpoint subscribed to this event type.
+ * Finds all active endpoints subscribed to this event type,
+ * delivers the payload immediately, and logs the result.
+ * Failed deliveries are queued for retry.
  */
 export async function emitWebhookEvent(
   userId: string,
   eventType: WebhookEventType,
   payload: Omit<AnyWebhookPayload, 'id' | 'timestamp' | 'userId' | 'type'> & { recordId?: string; recordType?: string },
-  recordId?: string,
-  recordType?: string
 ): Promise<void> {
   try {
-    // Create the event record
-    const event = await prisma.webhookEvent.create({
-      data: {
-        userId,
-        type: eventType,
-        payload: JSON.stringify({
-          id: '', // Will be set by the event ID
-          type: eventType,
-          timestamp: new Date().toISOString(),
-          userId,
-          ...payload,
-        }),
-        recordId: recordId || payload.recordId,
-        recordType: recordType || payload.recordType,
-      },
+    const eventId = crypto.randomBytes(8).toString('hex')
+
+    // Build the full payload
+    const fullPayload = JSON.stringify({
+      id: eventId,
+      type: eventType,
+      timestamp: new Date().toISOString(),
+      userId,
+      ...payload,
     })
 
-    // Update the payload with the actual event ID
-    const eventData = JSON.parse(event.payload)
-    eventData.id = event.id
-    await prisma.webhookEvent.update({
-      where: { id: event.id },
-      data: { payload: JSON.stringify(eventData) },
-    })
+    // Generate summary for activity logger
+    const summary = buildSummary(eventType, payload.data)
 
     // Find all active endpoints subscribed to this event type
     const endpoints = await prisma.webhookEndpoint.findMany({
@@ -148,29 +201,29 @@ export async function emitWebhookEvent(
       },
     })
 
-    // For each endpoint, check if it subscribes to this event
-    const createdDeliveryIds: string[] = []
-
+    // For each endpoint, check if it subscribes to this event and deliver
     for (const endpoint of endpoints) {
       const subscribedEvents = JSON.parse(endpoint.events || '[]') as string[]
 
       if (subscribedEvents.includes(eventType) || subscribedEvents.includes('*')) {
-        const delivery = await prisma.webhookDelivery.create({
-          data: {
-            eventId: event.id,
-            endpointId: endpoint.id,
-            status: 'pending',
+        // Fire-and-forget immediate delivery (non-blocking)
+        sendWebhookImmediate(
+          fullPayload,
+          eventType,
+          eventId,
+          {
+            id: endpoint.id,
+            url: endpoint.url,
+            secret: endpoint.secret,
+            maxRetries: endpoint.maxRetries,
+            retryDelay: endpoint.retryDelay,
           },
+          userId,
+          summary
+        ).catch(err => {
+          logError(`Immediate webhook delivery failed for endpoint ${endpoint.id}`, err)
         })
-        createdDeliveryIds.push(delivery.id)
       }
-    }
-
-    // Attempt immediate delivery (non-blocking, fire-and-forget)
-    for (const deliveryId of createdDeliveryIds) {
-      sendWebhookDeliveryImmediate(deliveryId).catch(err => {
-        logError(`Immediate webhook delivery failed for ${deliveryId}`, err)
-      })
     }
   } catch (error) {
     logError(`Failed to emit webhook event: ${eventType}`, error)
@@ -209,9 +262,9 @@ export async function emitFeedingCreated(
         baby: buildBabyPayload(baby),
       },
     },
-    record.id,
-    'FeedingRecord'
   )
+  // Reset interval reminder timers for feeding
+  resetIntervalRules(userId, record.babyId, 'feeding').catch(() => {})
 }
 
 export async function emitFeedingUpdated(
@@ -247,8 +300,6 @@ export async function emitFeedingUpdated(
         baby: buildBabyPayloadBrief(baby),
       },
     },
-    newRecord.id,
-    'FeedingRecord'
   )
 }
 
@@ -271,8 +322,6 @@ export async function emitFeedingDeleted(
         deletedAt: new Date().toISOString(),
       },
     },
-    record.id,
-    'FeedingRecord'
   )
 }
 
@@ -314,9 +363,14 @@ export async function emitHealthCreated(
         baby: buildBabyPayload(baby),
       },
     },
-    record.id,
-    'HealthRecord'
   )
+  // Reset interval reminder timers for health
+  resetIntervalRules(userId, record.babyId, 'health').catch(() => {})
+
+  // Auto-create vaccine monitoring reminder if configured
+  if (record.type === 'VACCINE') {
+    autoCreateVaccineReminder(userId, record, baby.name).catch(() => {})
+  }
 }
 
 export async function emitHealthUpdated(
@@ -359,8 +413,6 @@ export async function emitHealthUpdated(
         baby: buildBabyPayloadBrief(baby),
       },
     },
-    newRecord.id,
-    'HealthRecord'
   )
 }
 
@@ -382,8 +434,6 @@ export async function emitHealthDeleted(
         deletedAt: new Date().toISOString(),
       },
     },
-    record.id,
-    'HealthRecord'
   )
 }
 
@@ -419,8 +469,6 @@ export async function emitMemoCreated(
         baby: buildBabyPayloadBrief(baby),
       },
     },
-    record.id,
-    'Memo'
   )
 }
 
@@ -451,8 +499,6 @@ export async function emitMemoUpdated(
         baby: buildBabyPayloadBrief(baby),
       },
     },
-    newRecord.id,
-    'Memo'
   )
 }
 
@@ -473,8 +519,6 @@ export async function emitMemoDeleted(
         deletedAt: new Date().toISOString(),
       },
     },
-    record.id,
-    'Memo'
   )
 }
 
@@ -501,7 +545,5 @@ export async function emitUserDeleted(
         deletedAt: new Date().toISOString(),
       },
     },
-    deletedUser.id,
-    'User'
   )
 }

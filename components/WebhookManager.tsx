@@ -19,6 +19,7 @@ import {
   RefreshCw,
   ChevronDown,
   ChevronUp,
+  Edit2,
 } from 'lucide-react'
 import { useCopyToast } from '@/components/CopyToast'
 
@@ -38,22 +39,19 @@ interface WebhookEndpointInfo {
 
 interface DeliveryLog {
   id: string
-  attemptNumber: number
+  timestamp: number
   status: string
-  httpStatus: number | null
-  errorMessage: string | null
-  sentAt: string | null
-  createdAt: string
   summary?: string
-  event: {
-    id: string
-    type: string
-    recordId: string | null
-    recordType: string | null
-  }
-  endpoint: {
-    id: string
-    url: string
+  groupKey: string
+  groupLabel: string
+  meta: {
+    eventType: string
+    eventId: string
+    attemptNumber: number
+    httpStatus: number | null
+    errorMessage: string | null
+    sentAt: string | null
+    endpointUrl: string
   }
 }
 
@@ -67,6 +65,7 @@ const EVENT_LABELS: Record<string, string> = {
   'memo.created': '新增备忘',
   'memo.updated': '更新备忘',
   'memo.deleted': '删除备忘',
+  'reminder.fired': '提醒触发',
   'user.deleted': '删除用户',
   '*': '全部事件',
 }
@@ -83,6 +82,10 @@ const EVENT_GROUPS = [
   {
     label: '备忘录',
     events: ['memo.created', 'memo.updated', 'memo.deleted'],
+  },
+  {
+    label: '提醒',
+    events: ['reminder.fired'],
   },
 ]
 
@@ -108,6 +111,11 @@ export default function WebhookManager({ onBack }: Props) {
   const [menuOpen, setMenuOpen] = useState<string | null>(null)
   const [visibleUrls, setVisibleUrls] = useState<Set<string>>(new Set())
   const [clearingDeliveries, setClearingDeliveries] = useState<string | null>(null)
+
+  // Edit modal state
+  const [editingEndpoint, setEditingEndpoint] = useState<WebhookEndpointInfo | null>(null)
+  const [editEvents, setEditEvents] = useState<string[]>([])
+  const [editLoading, setEditLoading] = useState(false)
   const { copyToClipboard } = useCopyToast()
 
   const fetchEndpoints = useCallback(async () => {
@@ -252,6 +260,37 @@ export default function WebhookManager({ onBack }: Props) {
       alert('清理失败')
     } finally {
       setClearingDeliveries(null)
+    }
+  }
+
+  const handleEditEvents = (endpoint: WebhookEndpointInfo) => {
+    setEditingEndpoint(endpoint)
+    setEditEvents(endpoint.events.includes('*') ? ['*'] : [...endpoint.events])
+    setMenuOpen(null)
+  }
+
+  const handleSaveEvents = async () => {
+    if (!editingEndpoint) return
+    setEditLoading(true)
+    try {
+      const response = await fetch(`/api/webhooks/${editingEndpoint.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ events: editEvents }),
+      })
+      if (response.ok) {
+        setEndpoints(prev => prev.map(ep =>
+          ep.id === editingEndpoint.id ? { ...ep, events: editEvents } : ep
+        ))
+        setEditingEndpoint(null)
+      } else {
+        const data = await response.json()
+        alert(data.error || '保存失败')
+      }
+    } catch {
+      alert('保存失败')
+    } finally {
+      setEditLoading(false)
     }
   }
 
@@ -444,6 +483,13 @@ export default function WebhookManager({ onBack }: Props) {
                       {menuOpen === endpoint.id && (
                         <div className="absolute right-0 top-full mt-1 z-20 bg-white rounded-element shadow-elevated border border-slate-100 py-1 min-w-[140px]">
                           <button
+                            onClick={() => handleEditEvents(endpoint)}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition"
+                          >
+                            <Edit2 size={14} />
+                            编辑事件
+                          </button>
+                          <button
                             onClick={() => handleToggleActive(endpoint.id, endpoint.active)}
                             disabled={toggleLoading === endpoint.id}
                             className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition"
@@ -506,23 +552,23 @@ export default function WebhookManager({ onBack }: Props) {
                               <div className="flex items-center gap-2">
                                 {getStatusDot(log.status)}
                                 <span className="text-slate-700 font-medium">
-                                  {EVENT_LABELS[log.event.type] || log.event.type}
+                                  {EVENT_LABELS[log.meta.eventType] || log.meta.eventType}
                                 </span>
-                                {log.attemptNumber > 1 && (
-                                  <span className="text-slate-400">#{log.attemptNumber}</span>
+                                {log.meta.attemptNumber > 1 && (
+                                  <span className="text-slate-400">#{log.meta.attemptNumber}</span>
                                 )}
                               </div>
                               <span className="text-slate-400 tabular-nums">
-                                {log.sentAt
-                                  ? format(new Date(log.sentAt), 'MM-dd HH:mm:ss', { locale: zhCN })
+                                {log.meta.sentAt
+                                  ? format(new Date(log.meta.sentAt), 'MM-dd HH:mm:ss', { locale: zhCN })
                                   : '—'}
                               </span>
                             </div>
                             {log.summary && (
                               <p className="mt-0.5 ml-4 text-slate-500 truncate">{log.summary}</p>
                             )}
-                            {log.errorMessage && (
-                              <p className="mt-1 text-red-500 break-all ml-4">{log.errorMessage}</p>
+                            {log.meta.errorMessage && (
+                              <p className="mt-1 text-red-500 break-all ml-4">{log.meta.errorMessage}</p>
                             )}
                           </div>
                         ))}
@@ -625,7 +671,7 @@ function verifyWebhook(body, signature, secret) {
                       <span className="text-sm text-slate-700 font-medium">{group.label}</span>
                       <div className="flex items-center gap-3">
                         {group.events.map(event => {
-                          const shortLabel = event.endsWith('.created') ? '增' : event.endsWith('.updated') ? '改' : '删'
+                          const shortLabel = event.endsWith('.created') ? '增' : event.endsWith('.updated') ? '改' : event.endsWith('.deleted') ? '删' : event.endsWith('.fired') ? '通知' : '其他'
                           return (
                             <label key={event} className="flex items-center gap-1 cursor-pointer">
                               <input
@@ -709,6 +755,73 @@ function verifyWebhook(body, signature, secret) {
       {/* Click outside to close menu */}
       {menuOpen && (
         <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(null)} />
+      )}
+
+      {/* ========== Edit Events Modal ========== */}
+      {editingEndpoint && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-card p-5 sm:p-6 w-full max-w-md max-h-[85vh] overflow-y-auto shadow-elevated">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-slate-900">编辑订阅事件</h3>
+              <button onClick={() => setEditingEndpoint(null)} className="p-2 hover:bg-slate-100 rounded-element transition">
+                <X size={20} />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 mb-4 truncate">{editingEndpoint.url}</p>
+
+            {/* All events toggle — same style as create modal */}
+            <label className="flex items-center gap-2 mb-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={editEvents.includes('*')}
+                onChange={e => setEditEvents(e.target.checked ? ['*'] : [])}
+                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm font-medium text-blue-700">全部事件</span>
+            </label>
+
+            {/* Grouped events — compact row per category (unified with create modal) */}
+            <div className="rounded-element border border-slate-200 divide-y divide-slate-100 overflow-hidden">
+              {EVENT_GROUPS.map(group => (
+                <div key={group.label} className="flex items-center justify-between px-3 py-2.5">
+                  <span className="text-sm text-slate-700 font-medium">{group.label}</span>
+                  <div className="flex items-center gap-3">
+                    {group.events.map(event => {
+                      const shortLabel = event.endsWith('.created') ? '增' : event.endsWith('.updated') ? '改' : event.endsWith('.deleted') ? '删' : event.endsWith('.fired') ? '通知' : '其他'
+                      return (
+                        <label key={event} className="flex items-center gap-1 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={editEvents.includes(event) || editEvents.includes('*')}
+                            onChange={() => {
+                              setEditEvents(prev =>
+                                prev.includes(event)
+                                  ? prev.filter(e => e !== event)
+                                  : [...prev.filter(e => e !== '*'), event]
+                              )
+                            }}
+                            disabled={editEvents.includes('*')}
+                            className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 disabled:opacity-40"
+                          />
+                          <span className="text-xs text-slate-500">{shortLabel}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={handleSaveEvents}
+              disabled={editLoading || (editEvents.length === 0)}
+              className="w-full mt-5 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium rounded-button transition"
+            >
+              {editLoading ? '保存中...' : '保存'}
+            </button>
+          </div>
+        </div>
       )}
     </div>
   )

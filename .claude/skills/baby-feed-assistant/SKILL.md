@@ -1,6 +1,6 @@
 ---
 name: baby-feed-assistant
-version: 2.2.0
+version: 2.4.0
 description: "Query and manage baby feeding/health data via the Baby Feed HTTP API. Use this skill whenever the user asks about their baby's feeding situation, daily summary, health stats, sleep, diapers, weight trends, memos, reminders, or wants to record a new feeding/health/memo event. Trigger on any mention of: feeding, nursing, formula, breast milk, diaper, sleep, weight, temperature, baby stats, today's summary, how much the baby ate, when was the last feed, record a feed, log a diaper change, memo, reminder, 备忘, 待办, vaccine schedule, upcoming checkup, etc. Even casual questions like '宝宝今天吃了多少' or '记录一下刚才喂奶' or '有什么备忘' or '下次疫苗什么时候' should trigger this skill."
 ---
 
@@ -622,6 +622,227 @@ Summarize patterns in 2-3 sentences first, then show a compact table. Highlight 
 | "吃了AD" | `POST /api/health` (type=AD_VITAMIN, adGiven=true) |
 | "记录下周要打疫苗" | `POST /api/memo` |
 | "备忘完成了" | `PUT /api/memo/:id` (completed=true) |
+
+---
+
+## Webhook Event: reminder.fired (提醒触发通知)
+
+When a reminder rule fires, the system sends a `reminder.fired` webhook event. This section explains how to parse and respond to these events.
+
+### Payload Structure
+
+```json
+{
+  "id": "a1b2c3d4e5f6g7h8",
+  "type": "reminder.fired",
+  "timestamp": "2026-05-27T06:30:00.000Z",
+  "userId": "cm3abc123def456gh",
+  "data": {
+    "ruleId": "cm3rule001feeding",
+    "ruleName": "喂养超时提醒",
+    "triggerType": "interval",
+    "babyId": "cm3baby001xiaobao",
+    "babyName": "小宝",
+    "title": "该给小宝喂奶了",
+    "body": "距离上次喂养已经3小时0分钟",
+    "context": { ... }
+  }
+}
+```
+
+### Field Reference
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | 16-char hex 事件唯一ID |
+| `type` | string | 固定为 `"reminder.fired"` |
+| `timestamp` | ISO 8601 (UTC) | 事件发出时间，显示时 +8 转北京 |
+| `userId` | string | 触发该提醒的用户ID |
+| `data.ruleId` | string | 提醒规则ID |
+| `data.ruleName` | string | 规则名称（固定值或用户输入，见下方各类型说明） |
+| `data.triggerType` | string | `"interval"` / `"cron"` / `"event_window"` |
+| `data.babyId` | string | 关联宝宝ID |
+| `data.babyName` | string | 宝宝名称（已从数据库解析） |
+| `data.title` | string | 渲染后的通知标题（`{{babyName}}` 等模板变量已替换为实际值） |
+| `data.body` | string or null | 渲染后的通知正文（可能为 null） |
+| `data.context` | object | 评估器上下文，结构因 triggerType 而异（见下方） |
+
+### Template Variables (已在 title/body 中替换)
+
+| Variable | Replaced With |
+|----------|---------------|
+| `{{babyName}}` | 宝宝名称 |
+| `{{ruleName}}` | 规则名称 |
+| `{{now}}` | 当前北京时间 `MM-DD HH:mm` |
+| `{{elapsed}}` | context.elapsedMinutes 格式化为 "X小时Y分钟" |
+
+### Context by Trigger Type
+
+系统有 4 种提醒场景，但 `triggerType` 只有 3 个值（健康定期和喂养超时共用 `"interval"`）。
+
+---
+
+#### 1. 喂养超时提醒 — `triggerType: "interval"`
+
+**识别方式：** `triggerType === "interval"` 且 `ruleName === "喂养超时提醒"`
+
+**规则含义：** 距上次喂养记录超过设定时间时触发。可配置监控的喂养类型（母乳亲喂/母乳瓶喂/配方奶/辅食）。
+
+**title/body 生成规则：**
+- `title`: `"该给{babyName}喂奶了"` — 固定模板
+- `body`: `"距离上次喂养已经{elapsed}"` — 固定模板 + elapsed 变量
+
+```json
+{
+  "data": {
+    "triggerType": "interval",
+    "ruleName": "喂养超时提醒",
+    "title": "该给小宝喂奶了",
+    "body": "距离上次喂养已经3小时0分钟",
+    "context": {
+      "elapsedMinutes": 180,
+      "lastRecordTime": "2026-05-27T03:30:00.000Z"
+    }
+  }
+}
+```
+
+| context field | Type | Description |
+|---------------|------|-------------|
+| `elapsedMinutes` | number or null | 距上次喂养记录的分钟数。`null` = 无历史记录 |
+| `lastRecordTime` | ISO 8601 or null | 上次喂养记录时间 (UTC)。`null` = 无历史记录 |
+
+**响应建议：** 提醒该喂奶了。可调用 `GET /api/feeding?babyId={babyId}&date=today` 获取今日喂养记录，补充上次喂养类型和奶量。
+
+---
+
+#### 2. 健康定期提醒 — `triggerType: "interval"`
+
+**识别方式：** `triggerType === "interval"` 且 `ruleName === "健康定期提醒"`
+
+**规则含义：** 距上次健康测量超过设定时间（通常以天为单位）时触发。可配置监控的健康项目（体重/身高/体温/换尿布/睡眠）。
+
+**title/body 生成规则：**
+- `title`: `"该给{babyName}测量{具体项目}了"` — 项目名来自创建时选择的检测项
+- `body`: `"定期检测提醒：{具体项目}"` — 同上
+
+例如用户选了体重+身高：
+- title = `"该给小宝测量体重、身高了"`
+- body = `"定期检测提醒：体重、身高"`
+
+```json
+{
+  "data": {
+    "triggerType": "interval",
+    "ruleName": "健康定期提醒",
+    "title": "该给小宝测量体重、身高了",
+    "body": "定期检测提醒：体重、身高",
+    "context": {
+      "elapsedMinutes": 20160,
+      "lastRecordTime": "2026-05-13T01:00:00.000Z"
+    }
+  }
+}
+```
+
+context 字段同喂养超时，但 `elapsedMinutes` 通常远大于 1440（≥ 1天）。
+
+**区分两种 interval 的可靠方法：** 看 `data.ruleName`：
+- `"喂养超时提醒"` → 喂养类
+- `"健康定期提醒"` → 健康类
+
+**响应建议：** 提醒测量。从 `title` 中解析具体项目（体重/身高/体温等），调用对应 API 获取上次数据：
+- 包含"体重" → `GET /api/health?babyId=X&type=WEIGHT` → 取 `[0]`
+- 包含"身高" → `GET /api/health?babyId=X&type=HEIGHT` → 取 `[0]`
+- 包含"体温" → `GET /api/health?babyId=X&type=TEMPERATURE` → 取 `[0]`
+
+---
+
+#### 3. 每日定时提醒 — `triggerType: "cron"`
+
+**识别方式：** `triggerType === "cron"`
+
+**规则含义：** 在指定的每日时间点触发（如每天11:00提醒吃AD）。
+
+**title/body 生成规则：**
+- `title`: 用户输入的"提醒内容"（如 `"该给宝宝吃AD啦"`），若用户未输入则为 `"每日定时提醒"`
+- `body`: `null`（无正文）
+
+**注意：** cron 类型的 title 是用户原文输入，**不含模板变量**，不会进行 `{{babyName}}` 替换。
+
+```json
+{
+  "data": {
+    "triggerType": "cron",
+    "ruleName": "该给宝宝吃AD啦",
+    "title": "该给宝宝吃AD啦",
+    "body": null,
+    "context": {
+      "cronExpr": "0 11 * * *"
+    }
+  }
+}
+```
+
+| context field | Type | Description |
+|---------------|------|-------------|
+| `cronExpr` | string | 匹配到的 5 段 cron 表达式（北京时间语义） |
+
+**特征：** `ruleName` 和 `title` 内容相同，都是用户输入的提醒文案。
+
+**响应建议：** 直接转发 `title` 内容即可。可根据 title 关键词推断场景（含"AD"/"维生素"→营养补充，含"药"→服药提醒）。无需额外 API 调用。
+
+---
+
+#### 4. 疫苗后体温监测 — `triggerType: "event_window"`
+
+**识别方式：** `triggerType === "event_window"`
+
+**规则含义：** 从疫苗接种时间起 N 小时窗口内，每隔 M 小时提醒一次测体温。窗口过期后自动禁用。
+
+**title/body 生成规则：**
+- `title`: `"该给{babyName}测体温了"` — 固定模板
+- `body`: `"疫苗接种后体温监测 · {疫苗信息}"` 或 `"疫苗接种后体温监测提醒"`（取决于用户是否填写了疫苗信息）
+- `ruleName`: `"疫苗后测体温 · {疫苗信息}"` 或 `"疫苗后测体温"`
+
+```json
+{
+  "data": {
+    "triggerType": "event_window",
+    "ruleName": "疫苗后测体温 · 五联疫苗第2针",
+    "title": "该给小宝测体温了",
+    "body": "疫苗接种后体温监测 · 五联疫苗第2针",
+    "context": {
+      "slot": 3,
+      "windowEnd": "2026-05-28T15:00:00.000Z"
+    }
+  }
+}
+```
+
+| context field | Type | Description |
+|---------------|------|-------------|
+| `slot` | number | 当前是第几次触发（从1开始递增） |
+| `windowEnd` | ISO 8601 (UTC) | 监测窗口结束时间，+8转北京时间显示 |
+
+**响应建议：** 提醒测体温。可调用 `GET /api/health?babyId=X&type=TEMPERATURE` 获取近期体温记录，判断发热趋势（≥37.5°C 低热，≥38.5°C 发热）。从 `body` 或 `ruleName` 中提取疫苗名称。告知剩余监测时间（将 `windowEnd` +8h 转北京时间）。
+
+---
+
+### How to Handle reminder.fired Events (Summary)
+
+```
+收到 reminder.fired →
+  1. 看 data.title — 这是面向用户的核心通知文案，可直接转发
+  2. 看 data.body — 补充上下文（可能为 null）
+  3. 看 data.triggerType + data.ruleName — 判断场景类型：
+     ├─ interval + "喂养超时提醒" → 喂养场景
+     ├─ interval + "健康定期提醒" → 健康场景（title 里有具体项目名）
+     ├─ cron → 定时提醒（title = 用户自定义文案）
+     └─ event_window → 疫苗监测（body/ruleName 里有疫苗信息）
+  4. 按场景决定是否调用 API 补充数据（见各类型的"响应建议"）
+  5. 时间字段 (timestamp/lastRecordTime/windowEnd) 都是 UTC → +8h 转北京时间
+```
 
 ---
 

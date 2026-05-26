@@ -7,6 +7,7 @@ import { getRateLimit } from '@/lib/rate-limit-config'
 import { noStoreHeaders } from '@/lib/api-helpers'
 import { logError } from '@/lib/logger'
 import { getAllEventTypes } from '@/lib/webhook-events'
+import { activityLogger } from '@/lib/activity-logger'
 import crypto from 'crypto'
 
 /**
@@ -49,17 +50,17 @@ export async function GET(request: NextRequest) {
         retryDelay: true,
         createdAt: true,
         lastTriedAt: true,
-        _count: {
-          select: { deliveries: true }
-        }
       },
       orderBy: { createdAt: 'desc' }
     })
 
+    // Get delivery counts from in-memory activity logger
+    const logStats = activityLogger.stats('webhook', session.user.id)
+
     const enriched = endpoints.map(ep => ({
       ...ep,
       events: JSON.parse(ep.events || '[]'),
-      deliveriesCount: ep._count.deliveries,
+      deliveriesCount: logStats.byGroup[ep.id] || 0,
     }))
 
     return NextResponse.json(enriched, { headers: noStoreHeaders })

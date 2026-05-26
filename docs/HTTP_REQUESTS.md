@@ -19,6 +19,8 @@
   - [3.1 获取 API Key 列表](#31-获取-api-key-列表)
   - [3.2 创建 API Key](#32-创建-api-key)
   - [3.3 删除 API Key](#33-删除-api-key)
+  - [3.4 获取 API Key 请求日志](#34-获取-api-key-请求日志)
+  - [3.5 清理 API Key 请求日志](#35-清理-api-key-请求日志)
 - [4. 婴儿管理](#4-婴儿管理)
   - [4.1 获取婴儿列表](#41-获取婴儿列表)
   - [4.2 创建婴儿](#42-创建婴儿)
@@ -55,6 +57,13 @@
   - [11.4 获取用户列表](#114-获取用户列表)
   - [11.5 删除用户](#115-删除用户)
   - [11.6 修改用户角色](#116-修改用户角色)
+- [12. 提醒系统](#12-提醒系统)
+  - [12.1 获取提醒规则列表](#121-获取提醒规则列表)
+  - [12.2 创建提醒规则](#122-创建提醒规则)
+  - [12.3 更新提醒规则](#123-更新提醒规则)
+  - [12.4 删除提醒规则](#124-删除提醒规则)
+  - [12.5 获取执行日志](#125-获取执行日志)
+  - [12.6 清理执行日志](#126-清理执行日志)
 - [枚举值参考](#枚举值参考)
 
 ---
@@ -349,6 +358,77 @@
 ```json
 {
   "message": "API Key 已删除"
+}
+```
+
+---
+
+### 3.4 获取 API Key 请求日志
+
+获取通过 API Key 发起的请求日志（仅保留最近 24 小时，存储在内存中，进程重启后清空）。
+
+- **URL**: `GET /api/user/api-key-logs`
+- **认证**: 需要
+- **限流**: 60 次/60秒
+
+**查询参数**:
+
+| 参数 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `keyId` | string | 否 | 筛选指定 API Key 的日志 |
+| `limit` | number | 否 | 返回条数，默认 50，最大 100 |
+| `offset` | number | 否 | 分页偏移量，默认 0 |
+
+**成功响应** (`200`):
+
+```json
+{
+  "logs": [
+    {
+      "id": "a1b2c3d4",
+      "timestamp": 1716700000000,
+      "source": "api-key",
+      "userId": "cxxxxxxxxxxxxxxxxxxxxxxxx",
+      "groupKey": "cxxxxxxxxxxxxxxxxxxxxxxxx",
+      "groupLabel": "iOS快捷指令",
+      "status": "success",
+      "summary": "GET /api/feeding",
+      "meta": {
+        "method": "GET",
+        "path": "/api/feeding",
+        "ip": "192.168.1.1"
+      }
+    }
+  ],
+  "total": 42,
+  "offset": 0,
+  "limit": 50
+}
+```
+
+---
+
+### 3.5 清理 API Key 请求日志
+
+手动清理 API Key 请求日志。
+
+- **URL**: `DELETE /api/user/api-key-logs`
+- **认证**: 需要
+- **限流**: 10 次/10分钟
+- **CSRF**: 需要 Origin 校验
+
+**查询参数**:
+
+| 参数 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `keyId` | string | 否 | 仅清理指定 Key 的日志，不传则清理全部 |
+
+**成功响应** (`200`):
+
+```json
+{
+  "success": true,
+  "deleted": 42
 }
 ```
 
@@ -1369,6 +1449,245 @@ GET /api/memo?babyId=cxxx&date=2024-02-01&rangeDays=14
   "id": "cxxxxxxxxxxxxxxxxxxxxxxxx",
   "role": "ADMIN"
 }
+```
+
+---
+
+## 12. 提醒系统
+
+### 12.1 获取提醒规则列表
+
+获取当前用户的所有提醒规则。
+
+- **URL**: `GET /api/reminders`
+- **认证**: 需要
+- **限流**: 60 次/60秒
+
+**查询参数**:
+
+| 参数 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `babyId` | string | 否 | 筛选指定婴儿的规则 |
+| `enabled` | string | 否 | `true` 仅启用的，`false` 仅禁用的 |
+
+**成功响应** (`200`):
+
+```json
+[
+  {
+    "id": "cxxxxxxxxxxxxxxxxxxxxxxxx",
+    "name": "喂养间隔提醒",
+    "babyId": "cxxxxxxxxxxxxxxxxxxxxxxxx",
+    "babyName": "宝宝",
+    "enabled": true,
+    "triggerType": "interval",
+    "triggerConfig": {
+      "sourceType": "feeding",
+      "intervalMinutes": 180,
+      "filterCondition": { "type": ["FORMULA", "BREAST_MILK"] }
+    },
+    "activeSchedule": {
+      "windows": [{ "start": "06:00", "end": "23:00" }]
+    },
+    "advanceMinutes": 10,
+    "notifyTitle": "该喂{{babyName}}了",
+    "notifyBody": "距离上次喂养已经超过3小时",
+    "lastFiredAt": "2026-05-26T10:00:00.000Z",
+    "createdAt": "2026-05-25T12:00:00.000Z"
+  }
+]
+```
+
+---
+
+### 12.2 创建提醒规则
+
+创建新的提醒规则。每个用户最多 50 条规则。
+
+- **URL**: `POST /api/reminders`
+- **认证**: 需要
+- **限流**: 20 次/10分钟
+- **CSRF**: 需要 Origin 校验
+
+**请求体 (JSON)**:
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `name` | string | 是 | 规则名称，最长 100 字符 |
+| `babyId` | string | 是 | 婴儿 ID（CUID 格式） |
+| `triggerType` | string | 是 | 触发器类型：`interval`, `cron`, `event_window` |
+| `triggerConfig` | object | 是 | 触发器配置（按类型不同，见下方） |
+| `activeSchedule` | object \| null | 否 | 活跃时段配置，null=全天候 |
+| `advanceMinutes` | number | 否 | 提前触发分钟数，0-60，默认 0 |
+| `notifyTitle` | string | 是 | 通知标题（支持 `{{babyName}}` `{{elapsed}}` `{{ruleName}}` `{{now}}` 变量） |
+| `notifyBody` | string | 否 | 通知正文（支持同上变量） |
+| `startsAt` | string | 否 | 生效时间，ISO 8601 格式 |
+| `expiresAt` | string | 否 | 失效时间，ISO 8601 格式 |
+
+**triggerConfig 按类型**:
+
+**interval（间隔监控）**:
+```json
+{
+  "sourceType": "feeding",
+  "intervalMinutes": 180,
+  "filterCondition": { "type": ["FORMULA", "BREAST_MILK", "BREAST_MILK_BOTTLE"] }
+}
+```
+
+**cron（定时循环）**:
+```json
+{
+  "cronExpr": "0 11 * * *"
+}
+```
+
+**event_window（事件窗口）**:
+```json
+{
+  "anchorTime": "2026-05-26T10:00:00+08:00",
+  "windowHours": 48,
+  "repeatIntervalMinutes": 480
+}
+```
+
+**activeSchedule 格式**:
+```json
+{
+  "windows": [{ "start": "06:00", "end": "23:00" }],
+  "weekdays": [1, 2, 3, 4, 5, 6, 7]
+}
+```
+
+**成功响应** (`201`): 返回创建的完整规则对象。
+
+---
+
+### 12.3 更新提醒规则
+
+更新提醒规则（支持部分更新）。
+
+- **URL**: `PUT /api/reminders/:id`
+- **认证**: 需要
+- **限流**: 30 次/10分钟
+- **CSRF**: 需要 Origin 校验
+
+**路径参数**:
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| `id` | string | 规则 ID（CUID 格式） |
+
+**请求体 (JSON)**（所有字段可选）:
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `name` | string | 规则名称 |
+| `enabled` | boolean | 启用/禁用 |
+| `triggerConfig` | object | 触发器配置 |
+| `activeSchedule` | object \| null | 活跃时段 |
+| `advanceMinutes` | number | 提前触发分钟数 |
+| `notifyTitle` | string | 通知标题 |
+| `notifyBody` | string \| null | 通知正文 |
+| `startsAt` | string \| null | 生效时间 |
+| `expiresAt` | string \| null | 失效时间 |
+
+**成功响应** (`200`): 返回更新后的规则对象。
+
+---
+
+### 12.4 删除提醒规则
+
+删除一条提醒规则。
+
+- **URL**: `DELETE /api/reminders/:id`
+- **认证**: 需要
+- **限流**: 20 次/15分钟
+- **CSRF**: 需要 Origin 校验
+
+**路径参数**:
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| `id` | string | 规则 ID（CUID 格式） |
+
+**成功响应** (`200`):
+
+```json
+{ "success": true }
+```
+
+---
+
+### 12.5 获取执行日志
+
+获取提醒系统的执行日志（仅保留 72 小时，存储在内存中）。
+
+- **URL**: `GET /api/reminders/logs`
+- **认证**: 需要
+- **限流**: 60 次/60秒
+
+**查询参数**:
+
+| 参数 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `ruleId` | string | 否 | 筛选指定规则的日志 |
+| `limit` | number | 否 | 返回条数，默认 50，最大 100 |
+| `offset` | number | 否 | 分页偏移量，默认 0 |
+
+**成功响应** (`200`):
+
+```json
+{
+  "logs": [
+    {
+      "id": "a1b2c3d4",
+      "timestamp": 1716700000000,
+      "source": "reminder",
+      "userId": "cxxxxxxxxxxxxxxxxxxxxxxxx",
+      "groupKey": "cxxxxxxxxxxxxxxxxxxxxxxxx",
+      "groupLabel": "喂养间隔提醒",
+      "status": "success",
+      "summary": "喂养间隔提醒 · 该喂宝宝了",
+      "meta": {
+        "ruleId": "cxxxxxxxxxxxxxxxxxxxxxxxx",
+        "triggerType": "interval",
+        "babyId": "cxxxxxxxxxxxxxxxxxxxxxxxx",
+        "babyName": "宝宝",
+        "title": "该喂宝宝了",
+        "body": "距离上次喂养已经3小时12分钟",
+        "webhookDelivered": true,
+        "context": { "elapsedMinutes": 192 }
+      }
+    }
+  ],
+  "total": 5,
+  "offset": 0,
+  "limit": 50
+}
+```
+
+---
+
+### 12.6 清理执行日志
+
+手动清理提醒执行日志。
+
+- **URL**: `DELETE /api/reminders/logs`
+- **认证**: 需要
+- **限流**: 10 次/10分钟
+- **CSRF**: 需要 Origin 校验
+
+**查询参数**:
+
+| 参数 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `ruleId` | string | 否 | 仅清理指定规则的日志，不传则清理全部 |
+
+**成功响应** (`200`):
+
+```json
+{ "success": true, "deleted": 5 }
 ```
 
 ---

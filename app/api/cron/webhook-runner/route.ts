@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { processWebhookDeliveries, cleanupOldDeliveries, cleanupOldWebhookRecords } from '@/lib/webhook-runner'
+import { processWebhookDeliveries, getQueueStats } from '@/lib/webhook-runner'
 import { logError } from '@/lib/logger'
 import crypto from 'crypto'
 import { buildIpActionKey, enforceRateLimit } from '@/lib/rate-limit'
 
 /**
- * Cron endpoint for processing webhook deliveries
+ * Cron endpoint for processing webhook deliveries from in-memory queue.
  *
  * This should be called periodically (every 1-5 minutes) by an external cron service.
  * Secured by CRON_SECRET environment variable (required).
@@ -63,25 +63,16 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Process webhook deliveries
+    // Process webhook deliveries from in-memory queue
     const deliveryStats = await processWebhookDeliveries({ maxDeliveries: 100 })
 
-    // Always clean up deliveries older than 1 day (cheap indexed query)
-    const deliveryCleanup = await cleanupOldDeliveries(1)
-
-    // Probabilistically clean up old event records (~10% of runs)
-    let eventCleanup: { deletedEvents: number; deletedDeliveries: number } | undefined
-    if (Math.random() < 0.10) {
-      eventCleanup = await cleanupOldWebhookRecords(7)
-    }
+    // Get current queue stats
+    const queueStats = getQueueStats()
 
     return NextResponse.json({
       success: true,
       deliveries: deliveryStats,
-      cleanup: {
-        deliveries: deliveryCleanup,
-        ...(eventCleanup ? { events: eventCleanup } : {}),
-      },
+      queue: queueStats,
     })
   } catch (error) {
     logError('Webhook runner cron failed', error)

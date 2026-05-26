@@ -24,7 +24,8 @@ import {
   LogOut,
   UserCog,
   MoreVertical,
-  Webhook
+  Webhook,
+  Bell
 } from 'lucide-react'
 
 interface BabyInfo {
@@ -499,6 +500,17 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
             <div className="flex items-center space-x-3">
               <Webhook size={18} className="text-slate-400 group-hover:text-blue-500 transition" />
               <span className="text-slate-700">Webhook 管理</span>
+            </div>
+            <span className="text-slate-400 text-sm">›</span>
+          </button>
+
+          <button
+            onClick={() => router.push('/settings/reminders')}
+            className="mobile-touch-target w-full flex items-center justify-between rounded-xl px-2 py-3 text-left transition group hover:bg-gray-50"
+          >
+            <div className="flex items-center space-x-3">
+              <Bell size={18} className="text-slate-400 group-hover:text-violet-500 transition" />
+              <span className="text-slate-700">提醒管理</span>
             </div>
             <span className="text-slate-400 text-sm">›</span>
           </button>

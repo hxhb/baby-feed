@@ -1,0 +1,287 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { auth } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
+import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
+import { getRateLimit } from '@/lib/rate-limit-config'
+import { validateId, safeParseBody, validateSameOrigin, validateString } from '@/lib/validation'
+import { validateTriggerConfig } from '@/lib/reminder-validation'
+import { noStoreHeaders } from '@/lib/api-helpers'
+import { logError } from '@/lib/logger'
+
+const VALID_TRIGGER_TYPES = ['interval', 'cron', 'event_window'] as const
+
+/**
+ * PUT /api/reminders/[id]
+ * Partially update a reminder rule.
+ * If `enabled` or `triggerConfig` is updated, nextCheckAt is reset to null.
+ */
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const session = await auth(request)
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: '未授权' }, { status: 401, headers: noStoreHeaders })
+    }
+
+    const originCheck = validateSameOrigin(request)
+    if (!originCheck.valid) {
+      return NextResponse.json({ error: originCheck.error }, { status: 403, headers: noStoreHeaders })
+    }
+
+    const updateRateLimit = enforceRateLimit({
+      key: buildUserActionKey('reminder-update', session.user.id, request),
+      ...getRateLimit('reminder-update'),
+    })
+    if (!updateRateLimit.allowed) {
+      return NextResponse.json(
+        { error: '操作过于频繁，请稍后再试' },
+        {
+          status: 429,
+          headers: {
+            ...noStoreHeaders,
+            'Retry-After': String(updateRateLimit.retryAfterSeconds),
+          },
+        }
+      )
+    }
+
+    const idCheck = validateId(id, '提醒规则 ID')
+    if (!idCheck.valid) {
+      return NextResponse.json({ error: idCheck.error }, { status: 400, headers: noStoreHeaders })
+    }
+
+    const { data: body, error: parseError } = await safeParseBody(request)
+    if (parseError || !body) {
+      return NextResponse.json({ error: parseError || '请求体格式不正确' }, { status: 400, headers: noStoreHeaders })
+    }
+
+    // Verify ownership
+    const existing = await prisma.reminderRule.findFirst({
+      where: { id, userId: session.user.id },
+    })
+    if (!existing) {
+      return NextResponse.json({ error: '提醒规则不存在' }, { status: 404, headers: noStoreHeaders })
+    }
+
+    const {
+      name,
+      enabled,
+      triggerType,
+      triggerConfig,
+      activeSchedule,
+      advanceMinutes,
+      notifyTitle,
+      notifyBody,
+      startsAt,
+      expiresAt,
+    } = body
+
+    const updateData: Record<string, unknown> = {}
+    let shouldResetNextCheckAt = false
+
+    // name
+    if (name !== undefined) {
+      const nameCheck = validateString(name, '规则名称', 100)
+      if (!nameCheck.valid) {
+        return NextResponse.json({ error: nameCheck.error }, { status: 400, headers: noStoreHeaders })
+      }
+      updateData.name = (name as string).trim()
+    }
+
+    // enabled
+    if (enabled !== undefined) {
+      if (typeof enabled !== 'boolean') {
+        return NextResponse.json({ error: 'enabled 必须是布尔值' }, { status: 400, headers: noStoreHeaders })
+      }
+      updateData.enabled = enabled
+      if (enabled !== existing.enabled) {
+        shouldResetNextCheckAt = true
+      }
+    }
+
+    // triggerType
+    if (triggerType !== undefined) {
+      if (!(VALID_TRIGGER_TYPES as readonly string[]).includes(triggerType as string)) {
+        return NextResponse.json({ error: '无效的 triggerType' }, { status: 400, headers: noStoreHeaders })
+      }
+      updateData.triggerType = triggerType as string
+    }
+
+    // triggerConfig
+    if (triggerConfig !== undefined) {
+      if (!triggerConfig || typeof triggerConfig !== 'object' || Array.isArray(triggerConfig)) {
+        return NextResponse.json({ error: 'triggerConfig 必须是对象' }, { status: 400, headers: noStoreHeaders })
+      }
+      // Validate triggerConfig fields against the effective triggerType
+      if (body.triggerConfig !== undefined) {
+        const effectiveType = (body.triggerType as string | undefined) || existing.triggerType
+        const configCheck = validateTriggerConfig(effectiveType, body.triggerConfig as Record<string, unknown>)
+        if (!configCheck.valid) {
+          return NextResponse.json({ error: configCheck.error }, { status: 400, headers: noStoreHeaders })
+        }
+      }
+      updateData.triggerConfig = JSON.stringify(triggerConfig)
+      shouldResetNextCheckAt = true
+    }
+
+    // activeSchedule
+    if (activeSchedule !== undefined) {
+      if (activeSchedule === null) {
+        updateData.activeSchedule = null
+      } else {
+        if (typeof activeSchedule !== 'object' || Array.isArray(activeSchedule)) {
+          return NextResponse.json({ error: 'activeSchedule 必须是对象或 null' }, { status: 400, headers: noStoreHeaders })
+        }
+        const schedule = activeSchedule as Record<string, unknown>
+        if (schedule.windows && Array.isArray(schedule.windows) && schedule.windows.length > 10) {
+          return NextResponse.json({ error: 'activeSchedule.windows 最多10个时间窗口' }, { status: 400, headers: noStoreHeaders })
+        }
+        updateData.activeSchedule = JSON.stringify(activeSchedule)
+      }
+    }
+
+    // advanceMinutes
+    if (advanceMinutes !== undefined) {
+      if (typeof advanceMinutes !== 'number' || !Number.isInteger(advanceMinutes) || advanceMinutes < 0 || advanceMinutes > 1440) {
+        return NextResponse.json({ error: 'advanceMinutes 必须是 0-1440 的整数' }, { status: 400, headers: noStoreHeaders })
+      }
+      updateData.advanceMinutes = advanceMinutes
+    }
+
+    // notifyTitle
+    if (notifyTitle !== undefined) {
+      const titleCheck = validateString(notifyTitle, '通知标题', 200)
+      if (!titleCheck.valid) {
+        return NextResponse.json({ error: titleCheck.error }, { status: 400, headers: noStoreHeaders })
+      }
+      updateData.notifyTitle = (notifyTitle as string).trim()
+    }
+
+    // notifyBody
+    if (notifyBody !== undefined) {
+      if (notifyBody === null) {
+        updateData.notifyBody = null
+      } else {
+        const bodyCheck = validateString(notifyBody, '通知内容', 500)
+        if (!bodyCheck.valid) {
+          return NextResponse.json({ error: bodyCheck.error }, { status: 400, headers: noStoreHeaders })
+        }
+        updateData.notifyBody = String(notifyBody).trim()
+      }
+    }
+
+    // startsAt
+    if (startsAt !== undefined) {
+      if (startsAt === null) {
+        updateData.startsAt = null
+      } else {
+        const d = new Date(startsAt as string)
+        if (isNaN(d.getTime())) {
+          return NextResponse.json({ error: 'startsAt 日期格式不正确' }, { status: 400, headers: noStoreHeaders })
+        }
+        updateData.startsAt = d
+      }
+    }
+
+    // expiresAt
+    if (expiresAt !== undefined) {
+      if (expiresAt === null) {
+        updateData.expiresAt = null
+      } else {
+        const d = new Date(expiresAt as string)
+        if (isNaN(d.getTime())) {
+          return NextResponse.json({ error: 'expiresAt 日期格式不正确' }, { status: 400, headers: noStoreHeaders })
+        }
+        updateData.expiresAt = d
+      }
+    }
+
+    // Reset nextCheckAt if enabled or triggerConfig changed
+    if (shouldResetNextCheckAt) {
+      updateData.nextCheckAt = null
+    }
+
+    const updated = await prisma.reminderRule.update({
+      where: { id },
+      data: updateData,
+      include: {
+        baby: { select: { name: true } },
+      },
+    })
+
+    const response = {
+      ...updated,
+      babyName: updated.baby.name,
+      triggerConfig: JSON.parse(updated.triggerConfig),
+      activeSchedule: updated.activeSchedule ? JSON.parse(updated.activeSchedule) : null,
+      baby: undefined,
+    }
+
+    return NextResponse.json(response, { headers: noStoreHeaders })
+  } catch (error) {
+    logError('更新提醒规则失败', error)
+    return NextResponse.json({ error: '更新失败' }, { status: 500, headers: noStoreHeaders })
+  }
+}
+
+/**
+ * DELETE /api/reminders/[id]
+ * Delete a reminder rule. Verifies ownership before deleting.
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const session = await auth(request)
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: '未授权' }, { status: 401, headers: noStoreHeaders })
+    }
+
+    const originCheck = validateSameOrigin(request)
+    if (!originCheck.valid) {
+      return NextResponse.json({ error: originCheck.error }, { status: 403, headers: noStoreHeaders })
+    }
+
+    const deleteRateLimit = enforceRateLimit({
+      key: buildUserActionKey('reminder-delete', session.user.id, request),
+      ...getRateLimit('reminder-delete'),
+    })
+    if (!deleteRateLimit.allowed) {
+      return NextResponse.json(
+        { error: '操作过于频繁，请稍后再试' },
+        {
+          status: 429,
+          headers: {
+            ...noStoreHeaders,
+            'Retry-After': String(deleteRateLimit.retryAfterSeconds),
+          },
+        }
+      )
+    }
+
+    const idCheck = validateId(id, '提醒规则 ID')
+    if (!idCheck.valid) {
+      return NextResponse.json({ error: idCheck.error }, { status: 400, headers: noStoreHeaders })
+    }
+
+    // Verify ownership
+    const existing = await prisma.reminderRule.findFirst({
+      where: { id, userId: session.user.id },
+    })
+    if (!existing) {
+      return NextResponse.json({ error: '提醒规则不存在' }, { status: 404, headers: noStoreHeaders })
+    }
+
+    await prisma.reminderRule.delete({ where: { id } })
+
+    return NextResponse.json({ success: true }, { headers: noStoreHeaders })
+  } catch (error) {
+    logError('删除提醒规则失败', error)
+    return NextResponse.json({ error: '删除失败' }, { status: 500, headers: noStoreHeaders })
+  }
+}
