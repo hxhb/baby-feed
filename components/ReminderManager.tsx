@@ -13,6 +13,8 @@ import {
   X,
   ChevronDown,
   ChevronUp,
+  MoreVertical,
+  Edit2,
 } from 'lucide-react'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -147,6 +149,14 @@ function getRuleSummary(rule: ReminderRule): string {
   return parts.join(' · ')
 }
 
+function isExpiredEventWindow(rule: ReminderRule): boolean {
+  if (rule.triggerType !== 'event_window') return false
+  const config = rule.triggerConfig as { anchorTime?: string; windowHours?: number }
+  if (!config.anchorTime || !config.windowHours) return false
+  const windowEnd = new Date(config.anchorTime).getTime() + config.windowHours * 3600000
+  return Date.now() > windowEnd
+}
+
 // ─── Component ──────────────────────────────────────────────────────────────
 
 export default function ReminderManager({ onBack }: Props) {
@@ -162,6 +172,13 @@ export default function ReminderManager({ onBack }: Props) {
   const [showModal, setShowModal] = useState(false)
   const [modalStep, setModalStep] = useState<'type' | 'form'>('type')
   const [saving, setSaving] = useState(false)
+  const [editingRule, setEditingRule] = useState<ReminderRule | null>(null)
+
+  // Kebab menu
+  const [menuOpen, setMenuOpen] = useState<string | null>(null)
+
+  // Expired section
+  const [expiredExpanded, setExpiredExpanded] = useState(false)
 
   // Form state
   const [formType, setFormType] = useState<TriggerType>('interval')
@@ -319,6 +336,7 @@ export default function ReminderManager({ onBack }: Props) {
   }
 
   const openCreateModal = () => {
+    setEditingRule(null)
     setModalStep('type')
     setShowModal(true)
     // Set defaults
@@ -409,21 +427,33 @@ export default function ReminderManager({ onBack }: Props) {
         }
       }
 
-      const res = await fetch('/api/reminders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
+      let res: Response
+      if (editingRule) {
+        // Edit mode: PUT
+        res = await fetch(`/api/reminders/${editingRule.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+      } else {
+        // Create mode: POST
+        res = await fetch('/api/reminders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+      }
 
       if (res.ok) {
         setShowModal(false)
+        setEditingRule(null)
         fetchRules()
       } else {
         const data = await res.json()
-        alert(data.error || '创建失败')
+        alert(data.error || (editingRule ? '更新失败' : '创建失败'))
       }
     } catch {
-      alert('创建失败，请重试')
+      alert(editingRule ? '更新失败，请重试' : '创建失败，请重试')
     } finally {
       setSaving(false)
     }
@@ -452,6 +482,69 @@ export default function ReminderManager({ onBack }: Props) {
       const res = await fetch(`/api/reminders/${ruleId}`, { method: 'DELETE' })
       if (res.ok) setRules(prev => prev.filter(r => r.id !== ruleId))
     } catch { alert('删除失败') }
+  }
+
+  const handleEdit = (rule: ReminderRule) => {
+    setMenuOpen(null)
+    setEditingRule(rule)
+
+    // Determine effective form type
+    const config = rule.triggerConfig as Record<string, unknown>
+    if (rule.triggerType === 'interval' && config.sourceType === 'health') {
+      setFormType('health_interval')
+    } else {
+      setFormType(rule.triggerType)
+    }
+
+    setFormBabyId(rule.babyId)
+
+    // Pre-fill based on type
+    if (rule.triggerType === 'interval') {
+      const mins = (config.intervalMinutes as number) || 0
+      if (config.sourceType === 'health') {
+        setHealthDays(Math.floor(mins / (24 * 60)))
+        setHealthHours(Math.round((mins % (24 * 60)) / 60))
+        const filter = config.filterCondition as { type?: string[] } | undefined
+        setHealthTypes(filter?.type || ['WEIGHT', 'HEIGHT'])
+      } else {
+        setIntervalHours(Math.floor(mins / 60))
+        setIntervalMinutes(mins % 60)
+        const filter = config.filterCondition as { type?: string[] } | undefined
+        setFeedingTypes(filter?.type || ['BREAST_MILK', 'BREAST_MILK_BOTTLE', 'FORMULA'])
+        // Pre-fill active schedule
+        if (rule.activeSchedule?.windows?.[0]) {
+          setScheduleStart(rule.activeSchedule.windows[0].start)
+          setScheduleEnd(rule.activeSchedule.windows[0].end)
+        }
+      }
+    } else if (rule.triggerType === 'cron') {
+      const cronExpr = (config.cronExpr as string) || '0 11 * * *'
+      const [min, hour] = cronExpr.split(' ')
+      setCronHour(parseInt(hour) || 11)
+      setCronMinute(parseInt(min) || 0)
+      setCronContent(rule.name === '每日定时提醒' ? '' : rule.name)
+    } else if (rule.triggerType === 'event_window') {
+      const anchorISO = (config.anchorTime as string) || ''
+      if (anchorISO) {
+        const d = new Date(anchorISO)
+        const beijing = new Date(d.getTime() + 8 * 60 * 60 * 1000)
+        setAnchorDate(beijing.toISOString().slice(0, 10))
+        setAnchorTime(beijing.toISOString().slice(11, 16))
+      }
+      setWindowDays(Math.round(((config.windowHours as number) || 72) / 24))
+      setRepeatHours(Math.round(((config.repeatIntervalMinutes as number) || 300) / 60))
+      // Extract vaccine note from rule name
+      const noteMatch = rule.name.match(/疫苗后测体温 · (.+)/)
+      setVaccineNote(noteMatch ? noteMatch[1] : '')
+      // Active schedule
+      if (rule.activeSchedule?.windows?.[0]) {
+        setEwScheduleStart(rule.activeSchedule.windows[0].start)
+        setEwScheduleEnd(rule.activeSchedule.windows[0].end)
+      }
+    }
+
+    setModalStep('form')
+    setShowModal(true)
   }
 
   const handleClearLogs = async () => {
@@ -594,47 +687,126 @@ export default function ReminderManager({ onBack }: Props) {
             <p className="text-sm mt-1 text-gray-400">创建一个来自动监测宝宝状态</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {rules.map(rule => (
-              <div
-                key={rule.id}
-                className={`rounded-xl border p-4 transition ${rule.enabled ? 'border-gray-100 bg-gray-50' : 'border-gray-100 bg-gray-50/50 opacity-60'}`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">{getTypeIcon(rule.triggerType, rule.triggerConfig)}</span>
-                      <p className="font-medium text-gray-900 truncate">
-                        {rule.name || getTypeLabel(rule.triggerType)}
-                      </p>
+          <>
+            {/* Active rules */}
+            <div className="space-y-3">
+              {rules.filter(r => !isExpiredEventWindow(r)).map(rule => (
+                <div
+                  key={rule.id}
+                  className={`rounded-xl border p-4 transition ${rule.enabled ? 'border-gray-100 bg-gray-50' : 'border-gray-100 bg-gray-50/50 opacity-60'}`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">{getTypeIcon(rule.triggerType, rule.triggerConfig)}</span>
+                        <p className="font-medium text-gray-900 truncate">
+                          {rule.name || getTypeLabel(rule.triggerType)}
+                        </p>
+                      </div>
+                      <p className="text-sm text-gray-500 mt-1">{getRuleSummary(rule)}</p>
+                      {rule.lastFiredAt && (
+                        <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                          上次触发: {formatDistanceToNow(new Date(rule.lastFiredAt), { locale: zhCN, addSuffix: true })}
+                        </p>
+                      )}
                     </div>
-                    <p className="text-sm text-gray-500 mt-1">{getRuleSummary(rule)}</p>
-                    {rule.lastFiredAt && (
-                      <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-                        上次触发: {formatDistanceToNow(new Date(rule.lastFiredAt), { locale: zhCN, addSuffix: true })}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {/* Toggle switch */}
-                    <button
-                      onClick={() => handleToggle(rule.id, !rule.enabled)}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${rule.enabled ? 'bg-violet-500' : 'bg-gray-300'}`}
-                    >
-                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${rule.enabled ? 'translate-x-6' : 'translate-x-1'}`} />
-                    </button>
-                    {/* Delete */}
-                    <button
-                      onClick={() => handleDelete(rule.id)}
-                      className="mobile-touch-target rounded-xl p-2 text-gray-400 transition hover:bg-red-50 hover:text-red-500"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {/* Toggle switch */}
+                      <button
+                        onClick={() => handleToggle(rule.id, !rule.enabled)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${rule.enabled ? 'bg-violet-500' : 'bg-gray-300'}`}
+                      >
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${rule.enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                      </button>
+                      {/* Kebab menu */}
+                      <div className="relative">
+                        <button
+                          onClick={() => setMenuOpen(menuOpen === rule.id ? null : rule.id)}
+                          className="mobile-touch-target rounded-xl p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                        >
+                          <MoreVertical size={16} />
+                        </button>
+                        {menuOpen === rule.id && (
+                          <div className="absolute right-0 top-full mt-1 z-20 bg-white rounded-xl shadow-lg border border-gray-100 py-1 min-w-[100px]">
+                            <button
+                              onClick={() => handleEdit(rule)}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition"
+                            >
+                              <Edit2 size={14} />
+                              编辑
+                            </button>
+                            <button
+                              onClick={() => { setMenuOpen(null); handleDelete(rule.id) }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition"
+                            >
+                              <Trash2 size={14} />
+                              删除
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
+              ))}
+            </div>
+
+            {/* Expired rules section */}
+            {rules.filter(r => isExpiredEventWindow(r)).length > 0 && (
+              <div className="mt-4 pt-3 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setExpiredExpanded(!expiredExpanded)}
+                  className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-600 transition"
+                >
+                  {expiredExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  已过期 ({rules.filter(r => isExpiredEventWindow(r)).length})
+                </button>
+                {expiredExpanded && (
+                  <div className="mt-2 space-y-2">
+                    {rules.filter(r => isExpiredEventWindow(r)).map(rule => (
+                      <div
+                        key={rule.id}
+                        className="rounded-xl border border-gray-100 bg-gray-50/50 p-4 opacity-60"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">{getTypeIcon(rule.triggerType, rule.triggerConfig)}</span>
+                              <p className="font-medium text-gray-900 truncate">
+                                {rule.name || getTypeLabel(rule.triggerType)}
+                              </p>
+                              <span className="text-xs bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded-full flex-shrink-0">已过期</span>
+                            </div>
+                            <p className="text-sm text-gray-500 mt-1">{getRuleSummary(rule)}</p>
+                          </div>
+                          <div className="relative flex-shrink-0">
+                            <button
+                              onClick={() => setMenuOpen(menuOpen === rule.id ? null : rule.id)}
+                              className="mobile-touch-target rounded-xl p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                            >
+                              <MoreVertical size={16} />
+                            </button>
+                            {menuOpen === rule.id && (
+                              <div className="absolute right-0 top-full mt-1 z-20 bg-white rounded-xl shadow-lg border border-gray-100 py-1 min-w-[100px]">
+                                <button
+                                  onClick={() => { setMenuOpen(null); handleDelete(rule.id) }}
+                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition"
+                                >
+                                  <Trash2 size={14} />
+                                  删除
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
 
@@ -681,23 +853,30 @@ export default function ReminderManager({ onBack }: Props) {
         )}
       </div>
 
-      {/* ═══ Create Modal ═══ */}
+      {/* Click outside to close kebab menu */}
+      {menuOpen && (
+        <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(null)} />
+      )}
+
+      {/* ═══ Create/Edit Modal ═══ */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] overflow-y-auto shadow-xl">
             {/* Modal header */}
             <div className="flex items-center justify-between p-5 pb-3 sticky top-0 bg-white rounded-t-2xl border-b border-gray-100">
               <h3 className="text-lg font-bold text-gray-900">
-                {modalStep === 'type' ? '创建提醒' : getTypeIcon(formType) + ' ' + getTypeLabel(formType)}
+                {editingRule
+                  ? getTypeIcon(formType) + ' 编辑提醒'
+                  : modalStep === 'type' ? '创建提醒' : getTypeIcon(formType) + ' ' + getTypeLabel(formType)}
               </h3>
-              <button onClick={() => setShowModal(false)} className="p-2 hover:bg-gray-100 rounded-lg transition">
+              <button onClick={() => { setShowModal(false); setEditingRule(null) }} className="p-2 hover:bg-gray-100 rounded-lg transition">
                 <X size={20} />
               </button>
             </div>
 
             <div className="p-5">
-              {/* Step 1: Type selection */}
-              {modalStep === 'type' && (
+              {/* Step 1: Type selection (only in create mode) */}
+              {modalStep === 'type' && !editingRule && (
                 <div className="space-y-3">
                   <button
                     onClick={() => handleTypeSelect('interval')}
@@ -756,13 +935,15 @@ export default function ReminderManager({ onBack }: Props) {
               {/* Step 2: Form per type */}
               {modalStep === 'form' && (
                 <div className="space-y-5">
-                  {/* Back to type selection */}
-                  <button
-                    onClick={() => setModalStep('type')}
-                    className="text-sm text-violet-600 hover:text-violet-700 flex items-center gap-1"
-                  >
-                    <ArrowLeft size={14} /> 重新选择类型
-                  </button>
+                  {/* Back to type selection (only in create mode) */}
+                  {!editingRule && (
+                    <button
+                      onClick={() => setModalStep('type')}
+                      className="text-sm text-violet-600 hover:text-violet-700 flex items-center gap-1"
+                    >
+                      <ArrowLeft size={14} /> 重新选择类型
+                    </button>
+                  )}
 
                   {/* Baby selector (common) */}
                   <div>
@@ -1044,7 +1225,7 @@ export default function ReminderManager({ onBack }: Props) {
                     disabled={saving || !formBabyId || (formType === 'interval' && intervalHours === 0 && intervalMinutes === 0) || (formType === 'health_interval' && healthDays === 0 && healthHours === 0)}
                     className="w-full py-3 px-4 bg-violet-600 hover:bg-violet-700 disabled:bg-violet-400 text-white font-medium rounded-lg transition"
                   >
-                    {saving ? '创建中...' : '创建提醒'}
+                    {saving ? (editingRule ? '保存中...' : '创建中...') : (editingRule ? '保存修改' : '创建提醒')}
                   </button>
                 </div>
               )}

@@ -1,6 +1,6 @@
 ---
 name: baby-feed-assistant
-version: 2.5.2
+version: 2.5.3
 description: "Query and manage baby feeding/health data via the Baby Feed HTTP API. Use this skill whenever the user asks about their baby's feeding situation, daily summary, health stats, sleep, diapers, weight trends, memos, reminders, or wants to record a new feeding/health/memo event. Trigger on any mention of: feeding, nursing, formula, breast milk, diaper, sleep, weight, temperature, baby stats, today's summary, how much the baby ate, when was the last feed, record a feed, log a diaper change, memo, reminder, 备忘, 待办, vaccine schedule, upcoming checkup, etc. Even casual questions like '宝宝今天吃了多少' or '记录一下刚才喂奶' or '有什么备忘' or '下次疫苗什么时候' should trigger this skill."
 ---
 
@@ -574,7 +574,7 @@ Summarize patterns in 2-3 sentences first, then show a compact table. Highlight 
 - No poop in 2+ days → mention
 
 **Style rules:**
-- Do NOT use emoji in responses. Use plain text markers (-, ·, *) for structure.
+- Use plain text markers (-, ·, *) for structure.
 - Round numbers where appropriate (e.g., "约120ml" not "119.5ml")
 - Use simple units: ml, 分钟, kg, cm, °C
 
