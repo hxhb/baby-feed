@@ -70,12 +70,15 @@ const HEALTH_TYPES = [
 
 // ─── Helper Functions ───────────────────────────────────────────────────────
 
-function getTypeIcon(type: TriggerType): string {
+function getTypeIcon(type: TriggerType, triggerConfig?: Record<string, unknown>): string {
   switch (type) {
-    case 'interval': return '🍼'
+    case 'interval':
+      // Distinguish feeding interval (🍼) from health interval (🩺)
+      if (triggerConfig?.sourceType === 'health') return '🩺'
+      return '🍼'
     case 'cron': return '⏰'
     case 'event_window': return '💉'
-    case 'health_interval': return '📏'
+    case 'health_interval': return '🩺'
   }
 }
 
@@ -600,7 +603,7 @@ export default function ReminderManager({ onBack }: Props) {
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-lg">{getTypeIcon(rule.triggerType)}</span>
+                      <span className="text-lg">{getTypeIcon(rule.triggerType, rule.triggerConfig)}</span>
                       <p className="font-medium text-gray-900 truncate">
                         {rule.name || getTypeLabel(rule.triggerType)}
                       </p>
@@ -740,7 +743,7 @@ export default function ReminderManager({ onBack }: Props) {
                     className="w-full text-left rounded-xl border-2 border-gray-100 p-4 transition hover:border-violet-300 hover:bg-violet-50/50"
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-2xl">📏</span>
+                      <span className="text-2xl">🩺</span>
                       <div>
                         <p className="font-medium text-gray-900">健康定期提醒</p>
                         <p className="text-sm text-gray-500">每隔一段时间提醒检测身高体重等</p>

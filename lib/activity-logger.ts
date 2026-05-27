@@ -251,23 +251,33 @@ class ActivityLogger {
 
 // ─── Singleton Instance ─────────────────────────────────────────────────────
 
-export const activityLogger = new ActivityLogger()
+// Use globalThis to ensure a single instance across all Next.js compilation
+// contexts (instrumentation, route handlers, RSC). Without this, each webpack
+// entry point creates its own ActivityLogger — writes go to one instance while
+// reads come from another (always empty).
+const globalForLogger = globalThis as unknown as { __activityLogger?: ActivityLogger }
 
-// Register default sources
-activityLogger.registerSource('api-key', {
-  maxEntries: 500,
-  maxPerGroup: 100,
-  ttlMs: 24 * 60 * 60 * 1000,
-})
+export const activityLogger = globalForLogger.__activityLogger ??= (() => {
+  const logger = new ActivityLogger()
 
-activityLogger.registerSource('webhook', {
-  maxEntries: 1000,
-  maxPerGroup: 200,
-  ttlMs: 24 * 60 * 60 * 1000,
-})
+  // Register default sources
+  logger.registerSource('api-key', {
+    maxEntries: 500,
+    maxPerGroup: 100,
+    ttlMs: 24 * 60 * 60 * 1000,
+  })
 
-activityLogger.registerSource('reminder', {
-  maxEntries: 1000,
-  maxPerGroup: 200,
-  ttlMs: 72 * 60 * 60 * 1000, // 72 hours
-})
+  logger.registerSource('webhook', {
+    maxEntries: 1000,
+    maxPerGroup: 200,
+    ttlMs: 24 * 60 * 60 * 1000,
+  })
+
+  logger.registerSource('reminder', {
+    maxEntries: 1000,
+    maxPerGroup: 200,
+    ttlMs: 72 * 60 * 60 * 1000, // 72 hours
+  })
+
+  return logger
+})()

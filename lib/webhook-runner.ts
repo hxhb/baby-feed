@@ -40,7 +40,10 @@ export interface PendingWebhookDelivery {
 
 // ─── In-Memory Retry Queue ──────────────────────────────────────────────────
 
-const pendingDeliveries: PendingWebhookDelivery[] = []
+// Use globalThis to ensure a single retry queue across all Next.js compilation
+// contexts (same reason as activity-logger.ts — prevents queue duplication).
+const globalForQueue = globalThis as unknown as { __webhookPendingDeliveries?: PendingWebhookDelivery[] }
+const pendingDeliveries: PendingWebhookDelivery[] = globalForQueue.__webhookPendingDeliveries ??= []
 const MAX_PENDING = 500
 const PENDING_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours
 
