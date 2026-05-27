@@ -215,6 +215,16 @@ const TimelineRecordItem = memo(function TimelineRecordItem({
     ? record.startTime
     : getSleepRecordDisplayTime(record as HealthRecord, viewingDateStr)
   const isMenuOpen = menuOpenId === record.id
+  const menuBtnRef = useRef<HTMLButtonElement>(null)
+  const [openUpward, setOpenUpward] = useState(false)
+
+  useEffect(() => {
+    if (isMenuOpen && menuBtnRef.current) {
+      const rect = menuBtnRef.current.getBoundingClientRect()
+      // If less than 120px from viewport bottom (menu ~80px + navbar ~72px), open upward
+      setOpenUpward(window.innerHeight - rect.bottom < 120)
+    }
+  }, [isMenuOpen])
 
   return (
     <div className="flex items-center justify-between p-3 sm:p-4 bg-white rounded-element border border-slate-100/60 transition">
@@ -232,6 +242,7 @@ const TimelineRecordItem = memo(function TimelineRecordItem({
       </div>
       <div className="relative flex-shrink-0 ml-2">
         <button
+          ref={menuBtnRef}
           type="button"
           onClick={() => onMenuToggle(isMenuOpen ? null : record.id)}
           className="mobile-touch-target p-2 text-gray-400 hover:text-slate-600 hover:bg-slate-100 rounded-element transition"
@@ -239,7 +250,7 @@ const TimelineRecordItem = memo(function TimelineRecordItem({
           <MoreVertical size={16} />
         </button>
         {isMenuOpen && (
-          <div className="absolute right-0 top-full mt-1 z-20 bg-white rounded-element shadow-elevated border border-slate-100 py-1 min-w-[100px]">
+          <div className={`absolute right-0 z-[60] bg-white rounded-element shadow-elevated border border-slate-100 py-1 min-w-[100px] ${openUpward ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
             <button
               type="button"
               onClick={() => { onMenuToggle(null); onEdit(record) }}
