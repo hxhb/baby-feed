@@ -1,6 +1,6 @@
 ---
 name: baby-feed-assistant
-version: 2.5.1
+version: 2.5.2
 description: "Query and manage baby feeding/health data via the Baby Feed HTTP API. Use this skill whenever the user asks about their baby's feeding situation, daily summary, health stats, sleep, diapers, weight trends, memos, reminders, or wants to record a new feeding/health/memo event. Trigger on any mention of: feeding, nursing, formula, breast milk, diaper, sleep, weight, temperature, baby stats, today's summary, how much the baby ate, when was the last feed, record a feed, log a diaper change, memo, reminder, 备忘, 待办, vaccine schedule, upcoming checkup, etc. Even casual questions like '宝宝今天吃了多少' or '记录一下刚才喂奶' or '有什么备忘' or '下次疫苗什么时候' should trigger this skill."
 ---
 
@@ -547,7 +547,7 @@ For broad questions like "今天宝宝怎么样", call multiple APIs in parallel
 
 ### Step 4: Present results
 
-**Language:** Chinese by default. **Simple and clean — no emoji.** Parents are busy, keep it concise.
+**Language:** Chinese by default. **Simple and clean** Parents are busy, keep it concise.
 
 **Daily summary format (only show categories with data):**
 ```
