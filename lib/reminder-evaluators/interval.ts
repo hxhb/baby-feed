@@ -40,7 +40,6 @@ export const intervalEvaluator: RuleEvaluator = {
       })
       lastRecordTime = record?.recordedAt ?? null
     } else {
-      // Unknown sourceType — should not fire
       return { shouldFire: false }
     }
 
@@ -56,9 +55,21 @@ export const intervalEvaluator: RuleEvaluator = {
     if (shouldFire && rule.lastFiredAt) {
       const timeSinceLastFire = now.getTime() - rule.lastFiredAt.getTime()
       if (timeSinceLastFire < config.intervalMinutes * 60 * 1000) {
+        console.log(
+          `[IntervalEvaluator] rule=${rule.id} suppressed — ` +
+          `fired ${Math.floor(timeSinceLastFire / 60000)}min ago, ` +
+          `interval=${config.intervalMinutes}min`
+        )
         return { shouldFire: false }
       }
     }
+
+    console.log(
+      `[IntervalEvaluator] rule=${rule.id} sourceType=${config.sourceType} ` +
+      `lastRecord=${lastRecordTime.toISOString()} ` +
+      `elapsed=${elapsedMinutes}min interval=${config.intervalMinutes}min ` +
+      `shouldFire=${shouldFire}`
+    )
 
     return {
       shouldFire,

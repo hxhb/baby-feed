@@ -193,6 +193,8 @@ class ReminderScheduler {
         },
       })
 
+      console.log(`[Reminder] Tick — ${rules.length} rules loaded`)
+
       for (const rule of rules) {
         try {
           await this.evaluateRule(rule as ReminderRuleRow, now)
@@ -248,14 +250,20 @@ class ReminderScheduler {
           `Scheduler: invalid activeSchedule JSON for rule ${rule.id}`,
           new Error('JSON parse error'),
         )
+        // Update nextCheckAt to avoid re-evaluating this broken rule every tick
+        await prisma.reminderRule.update({
+          where: { id: rule.id },
+          data: { nextCheckAt: new Date(now.getTime() + 60_000) },
+        })
         return
       }
 
       if (!isInActiveWindow(schedule, now)) {
         // Outside every window — defer to when the next window opens.
-        // This enables "quiet-hours catch-up": when the window opens again the
-        // evaluator will naturally decide if the rule has fired enough or should fire.
         const nextOpen = nextWindowOpen(schedule, now)
+        console.log(
+          `[Reminder] Rule ${rule.id} outside active window — deferred to ${nextOpen?.toISOString() ?? 'next minute'}`
+        )
         await prisma.reminderRule.update({
           where: { id: rule.id },
           data: { nextCheckAt: nextOpen ?? new Date(now.getTime() + 60_000) },
@@ -280,11 +288,17 @@ class ReminderScheduler {
       result = await evaluator.evaluate(rule, now)
     } catch (err) {
       logError(`Scheduler: evaluator threw for rule ${rule.id}`, err)
+      // Update nextCheckAt so a broken rule doesn't retry every tick forever
+      await prisma.reminderRule.update({
+        where: { id: rule.id },
+        data: { nextCheckAt: new Date(now.getTime() + 60_000) },
+      })
       return
     }
 
     if (result.shouldFire) {
       // 6. Fire
+      console.log(`[Reminder] Firing rule=${rule.id} name="${rule.name}" type=${rule.triggerType}`)
       await fireReminder({ rule, context: result.context ?? {}, now })
 
       // 7a. Update lastFiredAt + nextCheckAt (post-fire cooldown)
@@ -297,6 +311,9 @@ class ReminderScheduler {
       })
     } else {
       // 7b. Update nextCheckAt only (no fire this tick)
+      if (rule.triggerType === 'interval') {
+        console.log(`[Reminder] Skip rule=${rule.id} name="${rule.name}" — not firing`)
+      }
       await prisma.reminderRule.update({
         where: { id: rule.id },
         data: { nextCheckAt: this.computeNextCheck(rule, now, false) },
@@ -360,7 +377,7 @@ export const reminderScheduler = globalForScheduler.__reminderScheduler ??= new 
  * Sets `lastFiredAt = null` (clear previous fire marker) and
  * `nextCheckAt = now + intervalMinutes` (defer the next evaluation).
  *
- * This is a non-critical best-effort call — all errors are silently swallowed.
+ * Errors are logged but not re-thrown (non-critical best-effort call).
  */
 export async function resetIntervalRules(
   userId: string,
@@ -393,11 +410,15 @@ export async function resetIntervalRules(
           where: { id: rule.id },
           data: { lastFiredAt: null, nextCheckAt },
         })
-      } catch {
-        // Non-critical: silently ignore per-rule errors
+        console.log(
+          `[Reminder] resetIntervalRules rule=${rule.id} sourceType=${sourceType} ` +
+          `nextCheckAt=${nextCheckAt.toISOString()}`
+        )
+      } catch (err) {
+        logError(`resetIntervalRules: failed to reset rule ${rule.id}`, err)
       }
     }
-  } catch {
-    // Non-critical: silently swallow all errors
+  } catch (err) {
+    logError('resetIntervalRules: failed to query rules', err)
   }
 }

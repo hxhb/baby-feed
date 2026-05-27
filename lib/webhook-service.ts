@@ -238,6 +238,11 @@ export async function emitFeedingCreated(
   record: any,
   baby: any
 ): Promise<void> {
+  // Reset interval reminder timers BEFORE emitting webhook so that
+  // slow webhook delivery doesn't widen the race window between
+  // resetIntervalRules and the next scheduler tick.
+  resetIntervalRules(userId, record.babyId, 'feeding').catch(() => {})
+
   await emitWebhookEvent(
     userId,
     'feeding.created',
@@ -263,8 +268,6 @@ export async function emitFeedingCreated(
       },
     },
   )
-  // Reset interval reminder timers for feeding
-  resetIntervalRules(userId, record.babyId, 'feeding').catch(() => {})
 }
 
 export async function emitFeedingUpdated(
@@ -332,6 +335,10 @@ export async function emitHealthCreated(
   record: any,
   baby: any
 ): Promise<void> {
+  // Reset interval reminder timers BEFORE emitting webhook (same reason as
+  // emitFeedingCreated — avoid widening the race window).
+  resetIntervalRules(userId, record.babyId, 'health').catch(() => {})
+
   await emitWebhookEvent(
     userId,
     'health.created',
@@ -364,8 +371,6 @@ export async function emitHealthCreated(
       },
     },
   )
-  // Reset interval reminder timers for health
-  resetIntervalRules(userId, record.babyId, 'health').catch(() => {})
 
   // Auto-create vaccine monitoring reminder if configured
   if (record.type === 'VACCINE') {
