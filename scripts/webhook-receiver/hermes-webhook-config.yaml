@@ -1,0 +1,95 @@
+# =============================================================================
+# Hermes Agent - Baby Feed Webhook 配置（统一路由版）
+# =============================================================================
+# 用途：接收 baby-feed 应用的所有数据变更通知，通过单一路由统一处理
+#
+# 使用方式：
+#   将此文件内容合并到 ~/.hermes/config.yaml 的 platforms 部分
+#   或直接替换 platforms.webhook 段
+#
+# 前置条件：
+#   1. hermes gateway setup 已完成
+#   2. baby-feed-assistant skill 已安装
+#   3. 消息投递目标已配置 (qqbot)
+#
+# baby-feed 端只需注册一个 Webhook，订阅所有事件：
+#   POST /api/webhooks
+#   {
+#     "url": "https://hermes-webhook.yourdomain.com/webhooks/baby-feed",
+#     "events": ["*"],
+#     "maxRetries": 3,
+#     "retryDelay": 60
+#   }
+# =============================================================================
+
+platforms:
+  webhook:
+    enabled: true
+    extra:
+      port: 8644
+      secret: "CHANGE_ME_global_fallback_secret"
+      rate_limit: 60
+      max_body_bytes: 1048576
+
+      routes:
+        baby-feed:
+          events: ["*"]
+          secret: "CHANGE_ME_webhook_secret"
+          skills: ["baby-feed-assistant"]
+          prompt: |
+            ## Baby Feed 数据变更通知
+
+            收到一条来自 baby-feed 应用的数据变更事件，请根据事件类型进行分析。
+
+            **事件信息：**
+            - 事件类型：{type}
+            - 事件ID：{id}
+            - 触发时间：{timestamp}
+
+            **完整数据：**
+            {__raw__}
+
+            ---
+
+            请根据事件类型（{type}）执行对应的分析：
+
+            **如果是喂养记录 (feeding.*)：**
+            - 分析本次喂养的时长/奶量是否合理
+            - 调用工具获取近3天喂养记录，分析间隔和频率趋势
+            - 如有异常给出温和建议
+            - 开头用 🍼 表情
+
+            **如果是健康记录 (health.*)：**
+            - 结合宝宝月龄判断健康指标是否正常
+            - 调用工具获取近期健康记录，分析生长趋势
+            - 如有需要关注的指标给出建议
+            - 开头用 💊 表情
+
+            **如果是备忘记录 (memo.*)：**
+            - 确认备忘内容，如涉及疫苗/体检给出注意事项
+            - 如果是标记完成(completed=true)，给一句鼓励
+            - 开头用 📌 表情
+
+            **如果是提醒触发 (reminder.fired)：**
+            - 直接转发提醒内容，用通知标题作为消息主体
+            - 根据提醒类型补充上下文建议：
+              - 喂养超时(interval+feeding)：提醒该喂奶了，可调用工具查看上次喂养距今多久
+              - 每日定时(cron)：如AD/钙/DHA等，简要提醒服用
+              - 疫苗监测(event_window)：提醒测体温并记录，关注是否有发热趋势
+              - 健康定期(interval+health)：提醒测量身高体重，可调用工具查看上次数据
+            - 语气温和有爱，像一个贴心的育儿助手
+            - 开头用 ⏰ 表情
+
+            **如果是删除事件 (*.deleted)：**
+            - 简要确认删除内容即可，无需深度分析
+            - 开头用 🗑️ 表情
+
+            **如果是更新事件 (*.updated)：**
+            - 重点说明变更了什么字段
+            - 判断修改后的数据是否合理
+            - 开头用 📝 表情
+
+            用中文回答，简洁友好，控制在 200 字以内。
+          deliver: "qqbot"
+          deliver_extra:
+            chat_id: "1904015014"

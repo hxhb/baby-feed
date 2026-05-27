@@ -1,0 +1,106 @@
+{
+  "_description": "baby-feed 提醒系统 webhook 模拟数据 (reminder.fired)",
+  "_note": "以下是 UI 支持的 4 种提醒类型触发时通过 webhook 发送的完整 payload",
+
+  "1_喂养超时提醒_interval_feeding": {
+    "_场景": "设置了每3小时提醒喂奶（监控母乳亲喂+母乳瓶喂+配方奶），距上次喂养已过3小时，触发通知",
+    "_title生成规则": "固定模板: '该给{{babyName}}喂奶了'",
+    "_body生成规则": "固定模板: '距离上次喂养已经{{elapsed}}'",
+    "id": "a1b2c3d4e5f6g7h8",
+    "type": "reminder.fired",
+    "timestamp": "2026-05-27T06:30:00.000Z",
+    "userId": "cm3abc123def456gh",
+    "data": {
+      "ruleId": "cm3rule001feeding",
+      "ruleName": "喂养超时提醒",
+      "triggerType": "interval",
+      "babyId": "cm3baby001xiaobao",
+      "babyName": "小宝",
+      "title": "该给小宝喂奶了",
+      "body": "距离上次喂养已经3小时0分钟",
+      "context": {
+        "elapsedMinutes": 180,
+        "lastRecordTime": "2026-05-27T03:30:00.000Z"
+      }
+    }
+  },
+
+  "2_每日定时提醒_cron": {
+    "_场景": "设置了每天上午11点提醒吃AD滴剂，到达指定时间触发通知",
+    "_title生成规则": "用户输入的'提醒内容'原文（不含模板变量，不进行替换）",
+    "_body生成规则": "null（无正文）",
+    "_name与title关系": "ruleName === title === 用户输入的提醒内容",
+    "id": "b2c3d4e5f6g7h8i9",
+    "type": "reminder.fired",
+    "timestamp": "2026-05-27T03:00:00.000Z",
+    "userId": "cm3abc123def456gh",
+    "data": {
+      "ruleId": "cm3rule002cron",
+      "ruleName": "该给宝宝吃AD啦",
+      "triggerType": "cron",
+      "babyId": "cm3baby001xiaobao",
+      "babyName": "小宝",
+      "title": "该给宝宝吃AD啦",
+      "body": null,
+      "context": {
+        "cronExpr": "0 11 * * *"
+      }
+    }
+  },
+
+  "3_疫苗后体温监测_event_window": {
+    "_场景": "打了疫苗后创建了72小时监测窗口，每5小时提醒测体温，当前是第3次提醒",
+    "_title生成规则": "固定模板: '该给{{babyName}}测体温了'",
+    "_body生成规则": "'疫苗接种后体温监测 · {用户输入的疫苗信息}' 或 '疫苗接种后体温监测提醒'",
+    "_name生成规则": "'疫苗后测体温 · {疫苗信息}' 或 '疫苗后测体温'",
+    "id": "c3d4e5f6g7h8i9j0",
+    "type": "reminder.fired",
+    "timestamp": "2026-05-27T07:00:00.000Z",
+    "userId": "cm3abc123def456gh",
+    "data": {
+      "ruleId": "cm3rule003vaccine",
+      "ruleName": "疫苗后测体温 · 五联疫苗第2针",
+      "triggerType": "event_window",
+      "babyId": "cm3baby001xiaobao",
+      "babyName": "小宝",
+      "title": "该给小宝测体温了",
+      "body": "疫苗接种后体温监测 · 五联疫苗第2针",
+      "context": {
+        "slot": 3,
+        "windowEnd": "2026-05-28T15:00:00.000Z"
+      }
+    }
+  },
+
+  "4_健康定期提醒_interval_health": {
+    "_场景": "设置了每14天提醒测量体重和身高，距上次记录已满14天，触发通知",
+    "_title生成规则": "'该给{{babyName}}测量{选中的健康项目}了'（项目名用顿号连接）",
+    "_body生成规则": "'定期检测提醒：{选中的健康项目}'",
+    "_项目名映射": "WEIGHT=体重, HEIGHT=身高, TEMPERATURE=体温, DIAPER=换尿布, SLEEP=睡眠",
+    "id": "d4e5f6g7h8i9j0k1",
+    "type": "reminder.fired",
+    "timestamp": "2026-05-27T01:00:00.000Z",
+    "userId": "cm3abc123def456gh",
+    "data": {
+      "ruleId": "cm3rule004health",
+      "ruleName": "健康定期提醒",
+      "triggerType": "interval",
+      "babyId": "cm3baby001xiaobao",
+      "babyName": "小宝",
+      "title": "该给小宝测量体重、身高了",
+      "body": "定期检测提醒：体重、身高",
+      "context": {
+        "elapsedMinutes": 20160,
+        "lastRecordTime": "2026-05-13T01:00:00.000Z"
+      }
+    }
+  },
+
+  "_识别场景的方法": {
+    "说明": "triggerType 只有 3 个值，但有 4 种场景。两种 interval 通过 ruleName 区分：",
+    "interval + ruleName='喂养超时提醒'": "→ 喂养场景",
+    "interval + ruleName='健康定期提醒'": "→ 健康场景（title 中含具体项目名）",
+    "cron": "→ 定时提醒（title = 用户自定义文案，不含模板变量）",
+    "event_window": "→ 疫苗监测（body/ruleName 中含疫苗信息）"
+  }
+}
