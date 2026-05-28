@@ -37,8 +37,10 @@ export default function CategorySelector<TKey extends string = string>({
             key={option.key}
             type="button"
             onClick={() => onChange(option.key)}
-            className={`mobile-touch-target flex min-h-[68px] flex-col items-center justify-center rounded-xl border-2 px-2 py-2.5 transition hover:border-gray-300 ${
-              isSelected ? `${colors.border} ${colors.bg}` : 'border-gray-200 bg-white'
+            className={`mobile-touch-target flex min-h-[68px] flex-col items-center justify-center rounded-xl border-2 px-2 py-2.5 transition ${
+              isSelected
+                ? `${colors.border} ${colors.bg}`
+                : 'border-gray-200 bg-white hover:border-gray-300'
             }`}
           >
             <Icon size={18} className={`sm:size-5 ${colors.icon}`} />
