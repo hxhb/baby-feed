@@ -241,7 +241,7 @@ export async function emitFeedingCreated(
   // Reset interval reminder timers BEFORE emitting webhook so that
   // slow webhook delivery doesn't widen the race window between
   // resetIntervalRules and the next scheduler tick.
-  resetIntervalRules(userId, record.babyId, 'feeding').catch(() => {})
+  resetIntervalRules(userId, record.babyId, 'feeding', record.startTime).catch(() => {})
 
   await emitWebhookEvent(
     userId,
@@ -337,7 +337,7 @@ export async function emitHealthCreated(
 ): Promise<void> {
   // Reset interval reminder timers BEFORE emitting webhook (same reason as
   // emitFeedingCreated — avoid widening the race window).
-  resetIntervalRules(userId, record.babyId, 'health').catch(() => {})
+  resetIntervalRules(userId, record.babyId, 'health', record.recordedAt).catch(() => {})
 
   await emitWebhookEvent(
     userId,

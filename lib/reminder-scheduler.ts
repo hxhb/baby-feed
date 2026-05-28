@@ -383,9 +383,9 @@ export async function resetIntervalRules(
   userId: string,
   babyId: string,
   sourceType: 'feeding' | 'health',
+  recordTime: Date,
 ): Promise<void> {
   try {
-    const now = new Date()
 
     const rules = await prisma.reminderRule.findMany({
       where: { userId, babyId, enabled: true, triggerType: 'interval' },
@@ -403,7 +403,7 @@ export async function resetIntervalRules(
         if (config.sourceType !== sourceType) continue
 
         const nextCheckAt = new Date(
-          now.getTime() + Math.max(config.intervalMinutes, 1) * 60 * 1000,
+          recordTime.getTime() + Math.max(config.intervalMinutes, 1) * 60 * 1000,
         )
 
         await prisma.reminderRule.update({
