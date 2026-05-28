@@ -1,6 +1,6 @@
 ---
 name: baby-feed-assistant
-version: 2.6.0
+version: 2.7.0
 description: "Query and manage baby feeding/health data via the Baby Feed HTTP API. Use this skill whenever the user asks about their baby's feeding situation, daily summary, health stats, sleep, diapers, weight trends, memos, reminders, or wants to record a new feeding/health/memo event. Trigger on any mention of: feeding, nursing, formula, breast milk, diaper, sleep, weight, temperature, baby stats, today's summary, how much the baby ate, when was the last feed, record a feed, log a diaper change, memo, reminder, 备忘, 待办, vaccine schedule, upcoming checkup, etc. Even casual questions like '宝宝今天吃了多少' or '记录一下刚才喂奶' or '有什么备忘' or '下次疫苗什么时候' should trigger this skill."
 ---
 
@@ -587,17 +587,42 @@ For broad questions like "今天宝宝怎么样", call multiple APIs in parallel
 
 **Language:** Chinese by default. **Simple and clean** Parents are busy, keep it concise.
 
+### Emoji 规范 — 严格对照表
+
+**只使用下表中指定的 emoji，不要自行替换或添加其他 emoji。**
+
+| 类别 | Emoji | 用于 |
+|------|-------|------|
+| 母乳亲喂 | 🤱 | BREAST_MILK（直接哺乳） |
+| 瓶喂母乳 | 🍼 | BREAST_MILK_BOTTLE（挤出母乳瓶喂） |
+| 配方奶 | 🧴 | FORMULA（奶粉冲泡） |
+| 辅食 | 🥣 | SOLID_FOOD |
+| 小便 | 💧 | DIAPER — diaperType = PEE |
+| 大便 | 💩 | DIAPER — diaperType = POOP |
+| 大小便 | 💩💧 | DIAPER — diaperType = BOTH |
+| 睡眠 | 😴 | SLEEP |
+| 体温 | 🌡️ | TEMPERATURE |
+| 体重 | ⚖️ | WEIGHT |
+| 身高 | 📏 | HEIGHT |
+| 维生素AD | ☀️ | AD_VITAMIN |
+| 疫苗 | 💉 | VACCINE |
+| 用药 | 💊 | MEDICATION |
+| 备忘/提醒 | 📋 | MEMO |
+
 **Daily summary format (only show categories with data):**
 ```
 今天 (MM月DD日) {宝宝名字}的情况：
 
-🍼 亲喂母乳：X次，共Y分钟（左Z/右W分钟）
-🍶 瓶喂母乳：X次，共Y ml
-🧷 换尿布：尿X次，便X次
+🤱 亲喂母乳：X次，共Y分钟（左Z/右W分钟）
+🍼 瓶喂母乳：X次，共Y ml
+🧴 配方奶：X次，共Y ml
+🥣 辅食：食物名 × 量
+💩 大便：X次    💧 小便：X次
 😴 睡眠：共X小时Y分钟（N段）
   · 昨晚22:00-今早06:00（今天部分6小时）
   · 今天13:00-14:30（1.5小时）
-💧 维生素AD：已补充 / 今天还未补充
+🌡️ 体温：36.8°C
+☀️ 维生素AD：已补充 / 今天还未补充
 💉 疫苗：（如有当天记录）
 💊 用药：药名 x N次（如有当天记录）
 ```
@@ -606,13 +631,14 @@ For broad questions like "今天宝宝怎么样", call multiple APIs in parallel
 Summarize patterns in 2-3 sentences first, then show a compact table. Highlight if growth rate is slowing or accelerating.
 
 **Alert on unusual findings:**
-- Temperature ≥ 37.5°C → mention low fever
-- Temperature ≥ 38.5°C → highlight fever
+- 🌡️ Temperature ≥ 37.5°C → mention low fever
+- 🌡️ Temperature ≥ 38.5°C → highlight fever
 - Much less feeding than yesterday → note the change
-- No poop in 2+ days → mention
+- 💩 No poop in 2+ days → mention
 
 **Style rules:**
-- Use plain text markers (-, ·, *) for structure.
+- Only use emojis from the table above — do NOT improvise or add decorative emojis
+- Use plain text markers (-, ·, *) for structure
 - Round numbers where appropriate (e.g., "约120ml" not "119.5ml")
 - Use simple units: ml, 分钟, kg, cm, °C
 
