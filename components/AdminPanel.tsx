@@ -16,7 +16,14 @@ import {
   Link2,
   Copy,
   Check,
-  UserPlus
+  UserPlus,
+  MoreVertical,
+  UserPen,
+  KeyRound,
+  Eye,
+  EyeOff,
+  AlertTriangle,
+  X
 } from 'lucide-react'
 import { useCopyToast } from '@/components/CopyToast'
 
@@ -47,6 +54,32 @@ export default function AdminPanel({ currentUserId, onBack }: Props) {
   const [inviteCodes, setInviteCodes] = useState<Array<{ code: string; createdBy: string; createdAt: string; usedBy: string | null; usedAt: string | null }>>([])
   const [inviteLoading, setInviteLoading] = useState(false)
   const { copyToClipboard } = useCopyToast()
+
+  // 用户操作菜单和弹窗状态
+  const [menuOpen, setMenuOpen] = useState<string | null>(null)
+  const [userModal, setUserModal] = useState<'editInfo' | 'changePassword' | 'deleteUser' | null>(null)
+  const [selectedUser, setSelectedUser] = useState<UserInfo | null>(null)
+
+  // 修改用户信息表单
+  const [editName, setEditName] = useState('')
+  const [editEmail, setEditEmail] = useState('')
+  const [editInfoLoading, setEditInfoLoading] = useState(false)
+  const [editInfoError, setEditInfoError] = useState('')
+  const [editInfoSuccess, setEditInfoSuccess] = useState(false)
+
+  // 修改用户密码表单
+  const [newUserPassword, setNewUserPassword] = useState('')
+  const [confirmNewUserPassword, setConfirmNewUserPassword] = useState('')
+  const [showNewUserPassword, setShowNewUserPassword] = useState(false)
+  const [changePwLoading, setChangePwLoading] = useState(false)
+  const [changePwError, setChangePwError] = useState('')
+  const [changePwSuccess, setChangePwSuccess] = useState(false)
+
+  // 删除用户
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deleteStep, setDeleteStep] = useState(1)
+  const [deleteLoading2, setDeleteLoading2] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -115,6 +148,7 @@ export default function AdminPanel({ currentUserId, onBack }: Props) {
 
   const handleToggleRole = async (userId: string, currentRole: string) => {
     const newRole = currentRole === 'ADMIN' ? 'USER' : 'ADMIN'
+    setMenuOpen(null)
     setActionLoading(userId)
     try {
       const response = await fetch('/api/admin/users', {
@@ -130,29 +164,6 @@ export default function AdminPanel({ currentUserId, onBack }: Props) {
       }
     } catch {
       alert('操作失败')
-    } finally {
-      setActionLoading(null)
-    }
-  }
-
-  const handleDeleteUser = async (userId: string, userName: string) => {
-    if (!confirm(`确定要删除用户 "${userName}" 吗？该用户的所有数据将被永久删除。`)) return
-    
-    setActionLoading(userId)
-    try {
-      const response = await fetch('/api/admin/users', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId })
-      })
-      if (response.ok) {
-        setUsers(prev => prev.filter(u => u.id !== userId))
-      } else {
-        const data = await response.json()
-        alert(data.error || '删除失败')
-      }
-    } catch {
-      alert('删除失败')
     } finally {
       setActionLoading(null)
     }
@@ -195,6 +206,145 @@ export default function AdminPanel({ currentUserId, onBack }: Props) {
   const handleCopyInviteUrl = async (code: string) => {
     const baseUrl = window.location.origin
     await copyToClipboard(`${baseUrl}/register?code=${code}`, '邀请链接已复制')
+  }
+
+  // ========== 用户操作处理 ==========
+
+  const openUserModal = (user: UserInfo, type: 'editInfo' | 'changePassword' | 'deleteUser') => {
+    setSelectedUser(user)
+    setUserModal(type)
+    setMenuOpen(null)
+    if (type === 'editInfo') {
+      setEditName(user.name)
+      setEditEmail(user.email)
+      setEditInfoError('')
+      setEditInfoSuccess(false)
+      setEditInfoLoading(false)
+    } else if (type === 'changePassword') {
+      setNewUserPassword('')
+      setConfirmNewUserPassword('')
+      setShowNewUserPassword(false)
+      setChangePwError('')
+      setChangePwSuccess(false)
+      setChangePwLoading(false)
+    } else if (type === 'deleteUser') {
+      setDeleteConfirmText('')
+      setDeleteStep(1)
+      setDeleteError('')
+      setDeleteLoading2(false)
+    }
+  }
+
+  const closeUserModal = () => {
+    setUserModal(null)
+    setSelectedUser(null)
+    setEditInfoLoading(false)
+    setChangePwLoading(false)
+    setDeleteLoading2(false)
+  }
+
+  const handleUpdateUserInfo = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedUser) return
+
+    setEditInfoLoading(true)
+    setEditInfoError('')
+
+    try {
+      const response = await fetch('/api/admin/users', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: selectedUser.id,
+          action: 'updateInfo',
+          name: editName.trim(),
+          email: editEmail.trim(),
+        }),
+      })
+
+      if (response.ok) {
+        setEditInfoSuccess(true)
+        setUsers(prev => prev.map(u =>
+          u.id === selectedUser.id
+            ? { ...u, name: editName.trim(), email: editEmail.trim().toLowerCase() }
+            : u
+        ))
+        setTimeout(closeUserModal, 1500)
+      } else {
+        const data = await response.json()
+        setEditInfoError(data.error || '操作失败')
+      }
+    } catch {
+      setEditInfoError('网络错误，请重试')
+    } finally {
+      setEditInfoLoading(false)
+    }
+  }
+
+  const handleUpdateUserPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedUser) return
+
+    if (newUserPassword !== confirmNewUserPassword) {
+      setChangePwError('两次输入的密码不一致')
+      return
+    }
+
+    setChangePwLoading(true)
+    setChangePwError('')
+
+    try {
+      const response = await fetch('/api/admin/users', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: selectedUser.id,
+          action: 'updatePassword',
+          newPassword: newUserPassword,
+        }),
+      })
+
+      if (response.ok) {
+        setChangePwSuccess(true)
+        setTimeout(closeUserModal, 1500)
+      } else {
+        const data = await response.json()
+        setChangePwError(data.error || '操作失败')
+      }
+    } catch {
+      setChangePwError('网络错误，请重试')
+    } finally {
+      setChangePwLoading(false)
+    }
+  }
+
+  const handleDeleteUserExec = async () => {
+    if (!selectedUser) return
+
+    setDeleteLoading2(true)
+    setDeleteError('')
+
+    try {
+      const response = await fetch('/api/admin/users', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: selectedUser.id }),
+      })
+
+      if (response.ok) {
+        setUsers(prev => prev.filter(u => u.id !== selectedUser.id))
+        closeUserModal()
+      } else {
+        const data = await response.json()
+        setDeleteError(data.error || '删除失败')
+        setDeleteStep(1)
+      }
+    } catch {
+      setDeleteError('网络错误，请重试')
+      setDeleteStep(1)
+    } finally {
+      setDeleteLoading2(false)
+    }
   }
 
   if (loading || settingsLoading) {
@@ -364,27 +514,50 @@ export default function AdminPanel({ currentUserId, onBack }: Props) {
                   </div>
 
                   {!isCurrentUser && (
-                    <div className="flex items-center space-x-1 ml-3 flex-shrink-0">
+                    <div className="relative flex-shrink-0">
                       <button
-                        onClick={() => handleToggleRole(user.id, user.role)}
-                        disabled={isLoading}
-                        title={isAdmin ? '取消管理员' : '设为管理员'}
-                        className={`p-2 rounded-lg transition disabled:opacity-50 ${
-                          isAdmin 
-                            ? 'text-blue-600 hover:bg-blue-100' 
-                            : 'text-gray-400 hover:bg-gray-200'
-                        }`}
+                        onClick={() => setMenuOpen(menuOpen === user.id ? null : user.id)}
+                        className="mobile-touch-target rounded-element p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
                       >
-                        {isAdmin ? <ShieldOff size={16} /> : <Shield size={16} />}
+                        <MoreVertical size={16} />
                       </button>
-                      <button
-                        onClick={() => handleDeleteUser(user.id, user.name)}
-                        disabled={isLoading}
-                        title="删除用户"
-                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition disabled:opacity-50"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+
+                      {menuOpen === user.id && (
+                        <>
+                          <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(null)} />
+                          <div className="absolute right-0 top-full mt-1 z-20 bg-white rounded-element shadow-elevated border border-slate-100 py-1 min-w-[140px]">
+                            <button
+                              onClick={() => openUserModal(user, 'editInfo')}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition"
+                            >
+                              <UserPen size={14} />
+                              修改信息
+                            </button>
+                            <button
+                              onClick={() => openUserModal(user, 'changePassword')}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition"
+                            >
+                              <KeyRound size={14} />
+                              修改密码
+                            </button>
+                            <button
+                              onClick={() => handleToggleRole(user.id, user.role)}
+                              disabled={isLoading}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition disabled:opacity-50"
+                            >
+                              {isAdmin ? <ShieldOff size={14} /> : <Shield size={14} />}
+                              {isAdmin ? '取消管理员' : '设为管理员'}
+                            </button>
+                            <button
+                              onClick={() => openUserModal(user, 'deleteUser')}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition"
+                            >
+                              <Trash2 size={14} />
+                              删除用户
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
@@ -394,5 +567,265 @@ export default function AdminPanel({ currentUserId, onBack }: Props) {
         </div>
       </div>
     </div>
+
+    {/* ========== 修改用户信息弹窗 ========== */}
+    {userModal === 'editInfo' && selectedUser && (
+      <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={closeUserModal}>
+        <div
+          className="w-full max-w-md rounded-t-3xl bg-white p-5 pb-safe shadow-2xl sm:rounded-2xl sm:p-6"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-gray-200 sm:hidden" />
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-bold text-slate-900">修改用户信息</h3>
+            <button onClick={closeUserModal} className="mobile-touch-target inline-flex items-center justify-center rounded-full p-2 text-slate-400 transition hover:bg-gray-100 hover:text-slate-600">
+              <X size={20} />
+            </button>
+          </div>
+
+          {editInfoSuccess ? (
+            <div className="flex flex-col items-center py-8">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                <Check size={32} className="text-green-600" />
+              </div>
+              <p className="text-lg font-medium text-slate-900">用户信息修改成功</p>
+            </div>
+          ) : (
+            <form onSubmit={handleUpdateUserInfo} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  用户名
+                </label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  required
+                  maxLength={50}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  placeholder="请输入用户名"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  邮箱
+                </label>
+                <input
+                  type="email"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  required
+                  maxLength={255}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  placeholder="请输入邮箱"
+                />
+              </div>
+
+              {editInfoError && (
+                <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{editInfoError}</p>
+              )}
+
+              <button
+                type="submit"
+                disabled={editInfoLoading}
+                className="mobile-touch-target w-full py-3 px-4 gradient-primary shadow-elevated disabled:opacity-50 text-white font-medium rounded-xl transition"
+              >
+                {editInfoLoading ? '保存中...' : '保存'}
+              </button>
+            </form>
+          )}
+        </div>
+      </div>
+    )}
+
+    {/* ========== 修改用户密码弹窗 ========== */}
+    {userModal === 'changePassword' && selectedUser && (
+      <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={closeUserModal}>
+        <div
+          className="w-full max-w-md rounded-t-3xl bg-white p-5 pb-safe shadow-2xl sm:rounded-2xl sm:p-6"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-gray-200 sm:hidden" />
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-bold text-slate-900">修改用户密码</h3>
+            <button onClick={closeUserModal} className="mobile-touch-target inline-flex items-center justify-center rounded-full p-2 text-slate-400 transition hover:bg-gray-100 hover:text-slate-600">
+              <X size={20} />
+            </button>
+          </div>
+
+          {changePwSuccess ? (
+            <div className="flex flex-col items-center py-8">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                <Check size={32} className="text-green-600" />
+              </div>
+              <p className="text-lg font-medium text-slate-900">密码修改成功</p>
+              <p className="text-sm text-slate-500 mt-1">用户下次登录时需使用新密码</p>
+            </div>
+          ) : (
+            <form onSubmit={handleUpdateUserPassword} className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4">
+                <p className="text-sm text-blue-700">
+                  正在为用户 <span className="font-semibold">{selectedUser.name}</span> 重置密码
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  新密码
+                </label>
+                <div className="relative">
+                  <input
+                    type={showNewUserPassword ? 'text' : 'password'}
+                    value={newUserPassword}
+                    onChange={(e) => setNewUserPassword(e.target.value)}
+                    required
+                    minLength={8}
+                    className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    placeholder="至少8位，包含字母和数字"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewUserPassword(!showNewUserPassword)}
+                    className="mobile-touch-target absolute right-2 top-1/2 inline-flex -translate-y-1/2 items-center justify-center rounded-full p-2 text-slate-400 transition hover:bg-gray-100 hover:text-slate-600"
+                  >
+                    {showNewUserPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+                <p className="text-xs text-slate-400 mt-1">至少 8 位，包含字母和数字</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  确认新密码
+                </label>
+                <input
+                  type="password"
+                  value={confirmNewUserPassword}
+                  onChange={(e) => setConfirmNewUserPassword(e.target.value)}
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  placeholder="再次输入新密码"
+                />
+              </div>
+
+              {changePwError && (
+                <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{changePwError}</p>
+              )}
+
+              <button
+                type="submit"
+                disabled={changePwLoading}
+                className="mobile-touch-target w-full py-3 px-4 gradient-primary shadow-elevated disabled:opacity-50 text-white font-medium rounded-xl transition"
+              >
+                {changePwLoading ? '修改中...' : '修改密码'}
+              </button>
+            </form>
+          )}
+        </div>
+      </div>
+    )}
+
+    {/* ========== 删除用户弹窗（三级确认） ========== */}
+    {userModal === 'deleteUser' && selectedUser && (
+      <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={closeUserModal}>
+        <div
+          className="w-full max-w-md rounded-t-3xl bg-white p-5 pb-safe shadow-2xl sm:rounded-2xl sm:p-6"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-gray-200 sm:hidden" />
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-bold text-red-600">删除用户</h3>
+            <button onClick={closeUserModal} className="mobile-touch-target inline-flex items-center justify-center rounded-full p-2 text-slate-400 transition hover:bg-gray-100 hover:text-slate-600">
+              <X size={20} />
+            </button>
+          </div>
+
+          {deleteStep === 1 && (
+            <>
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+                <div className="flex items-start space-x-3">
+                  <AlertTriangle size={20} className="text-red-500 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm text-red-700">
+                    <p className="font-medium mb-1">此操作不可撤销！</p>
+                    <p>删除用户 <span className="font-semibold">{selectedUser.name}</span> 将永久删除以下所有数据：</p>
+                    <ul className="list-disc list-inside mt-1 space-y-0.5">
+                      <li>该用户的账户信息</li>
+                      <li>所有宝宝信息（{selectedUser._count.babies} 个）</li>
+                      <li>所有喂养记录（{selectedUser._count.feedingRecords} 条）</li>
+                      <li>所有健康记录（{selectedUser._count.healthRecords} 条）</li>
+                      <li>API Key 和 Webhook 配置</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    请输入 <span className="font-bold text-red-600">确认删除</span> 以继续
+                  </label>
+                  <input
+                    type="text"
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+                    placeholder="确认删除"
+                  />
+                </div>
+
+                {deleteError && (
+                  <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{deleteError}</p>
+                )}
+
+                <button
+                  onClick={() => { setDeleteStep(2); setDeleteError('') }}
+                  disabled={deleteConfirmText !== '确认删除'}
+                  className="mobile-touch-target w-full py-3 px-4 bg-red-600 text-white font-medium rounded-xl transition hover:bg-red-700 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  确定
+                </button>
+              </div>
+            </>
+          )}
+
+          {deleteStep === 2 && (
+            <>
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+                <div className="flex items-start space-x-3">
+                  <AlertTriangle size={20} className="text-red-500 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm text-red-700">
+                    <p className="font-medium mb-1">最终确认</p>
+                    <p>确定要永久删除用户 <span className="font-semibold">{selectedUser.name}</span>（{selectedUser.email}）吗？</p>
+                    <p className="mt-2 font-medium">此操作无法撤销，所有数据将被永久删除。</p>
+                  </div>
+                </div>
+              </div>
+
+              {deleteError && (
+                <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg mb-4">{deleteError}</p>
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeleteStep(1)}
+                  disabled={deleteLoading2}
+                  className="mobile-touch-target flex-1 py-3 px-4 bg-slate-100 text-slate-600 font-medium rounded-xl transition hover:bg-slate-200 active:scale-[0.98] disabled:opacity-50"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleDeleteUserExec}
+                  disabled={deleteLoading2}
+                  className="mobile-touch-target flex-1 py-3 px-4 bg-red-600 text-white font-medium rounded-xl transition hover:bg-red-700 active:scale-[0.98] disabled:opacity-50"
+                >
+                  {deleteLoading2 ? '删除中...' : '确认删除'}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    )}
   )
 }

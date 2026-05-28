@@ -62,6 +62,8 @@ const rateLimitConfig: Record<string, RateLimitRule> = {
   'admin-users-list':       { limit: 30,  windowMs: 60 * 1000 },
   'admin-users-delete':     { limit: 10,  windowMs: 15 * 60 * 1000 },
   'admin-users-role':       { limit: 10,  windowMs: 15 * 60 * 1000 },
+  'admin-users-update-info': { limit: 10,  windowMs: 15 * 60 * 1000 },
+  'admin-users-update-password': { limit: 5, windowMs: 15 * 60 * 1000 },
   'admin-settings-read':    { limit: 30,  windowMs: 60 * 1000 },
   'admin-settings-update':  { limit: 10,  windowMs: 15 * 60 * 1000 },
 
