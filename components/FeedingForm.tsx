@@ -9,6 +9,8 @@ import FeedingRecordFields from '@/components/FeedingRecordFields'
 import RecordActionBar from '@/components/RecordActionBar'
 import RecordTabBar, { type ActiveTab } from '@/components/RecordTabBar'
 import { RecordNotesField, RecordTimeField } from '@/components/RecordMetaFields'
+import CategorySelector, { type CategoryOption } from '@/components/CategorySelector'
+import { getCategoryColorClasses } from '@/lib/category-colors'
 import {
   Droplets,
   Milk,
@@ -262,50 +264,47 @@ export default function FeedingForm({
   const validationMessage = getValidationMessage()
   const canSubmit = babies.length > 0 && !loading && !validationMessage
 
-  const feedingTypeCards = [
+  const feedingTypeOptions: CategoryOption[] = [
     {
       key: 'BREAST',
-      title: '母乳',
+      label: '母乳',
       icon: Droplets,
-      iconClassName: 'text-pink-500',
-      active: type === 'BREAST_MILK' || type === 'BREAST_MILK_BOTTLE',
-      activeClassName: 'border-pink-500 bg-pink-50/80 text-pink-700',
-      inactiveClassName: 'border-gray-200 bg-white text-gray-500 hover:border-gray-300',
-      onClick: () => {
-        setType(breastMode === 'bottle' ? 'BREAST_MILK_BOTTLE' : 'BREAST_MILK')
-      }
+      color: 'pink',
     },
     {
       key: 'FORMULA',
-      title: '奶粉',
+      label: '奶粉',
       icon: Milk,
-      iconClassName: 'text-blue-500',
-      active: type === 'FORMULA',
-      activeClassName: 'border-blue-500 bg-blue-50/80 text-blue-700',
-      inactiveClassName: 'border-gray-200 bg-white text-gray-500 hover:border-gray-300',
-      onClick: () => setType('FORMULA')
+      color: 'blue',
     },
     {
       key: 'SOLID_FOOD',
-      title: '辅食',
+      label: '辅食',
       icon: UtensilsCrossed,
-      iconClassName: 'text-orange-500',
-      active: type === 'SOLID_FOOD',
-      activeClassName: 'border-orange-500 bg-orange-50/80 text-orange-700',
-      inactiveClassName: 'border-gray-200 bg-white text-gray-500 hover:border-gray-300',
-      onClick: () => setType('SOLID_FOOD')
-    }
+      color: 'orange',
+    },
   ]
 
+  const selectedFeedingKey = type === 'BREAST_MILK' || type === 'BREAST_MILK_BOTTLE' ? 'BREAST' : type
+
+  const handleFeedingTypeChange = (key: string) => {
+    if (key === 'BREAST') {
+      setType(breastMode === 'bottle' ? 'BREAST_MILK_BOTTLE' : 'BREAST_MILK')
+    } else {
+      setType(key as FeedingType)
+    }
+  }
+
   const currentTypeMeta = type === 'FORMULA'
-    ? { title: '奶粉', hint: '适合快速记录奶量，常用数值可以直接一键填写。', badgeClassName: 'bg-blue-50 text-blue-700', iconClassName: 'text-blue-500', icon: Milk }
+    ? { title: '奶粉', hint: '适合快速记录奶量，常用数值可以直接一键填写。', color: 'blue' as const, icon: Milk }
     : type === 'SOLID_FOOD'
-      ? { title: '辅食', hint: '记录辅食种类和量，追踪宝宝辅食添加进度。', badgeClassName: 'bg-orange-50 text-orange-700', iconClassName: 'text-orange-500', icon: UtensilsCrossed }
+      ? { title: '辅食', hint: '记录辅食种类和量，追踪宝宝辅食添加进度。', color: 'orange' as const, icon: UtensilsCrossed }
       : breastMode === 'bottle'
-        ? { title: '母乳瓶喂', hint: '可直接使用常用奶量捷径，减少重复输入。', badgeClassName: 'bg-pink-50 text-pink-700', iconClassName: 'text-pink-500', icon: Droplets }
-        : { title: '母乳亲喂', hint: '左右时长可分开记录，方便回顾本次喂养情况。', badgeClassName: 'bg-pink-50 text-pink-700', iconClassName: 'text-pink-500', icon: Droplets }
+        ? { title: '母乳瓶喂', hint: '可直接使用常用奶量捷径，减少重复输入。', color: 'pink' as const, icon: Droplets }
+        : { title: '母乳亲喂', hint: '左右时长可分开记录，方便回顾本次喂养情况。', color: 'pink' as const, icon: Droplets }
 
   const CurrentTypeIcon = currentTypeMeta.icon
+  const currentColorClasses = getCategoryColorClasses(currentTypeMeta.color, true)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -378,33 +377,23 @@ export default function FeedingForm({
           <label className="block text-sm font-medium text-gray-700">
             喂养类型
           </label>
-          <div className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium sm:hidden ${currentTypeMeta.badgeClassName}`}>
-            <CurrentTypeIcon size={14} className={currentTypeMeta.iconClassName} />
+          <div className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium sm:hidden ${currentColorClasses.bg} ${currentColorClasses.text}`}>
+            <CurrentTypeIcon size={14} className={currentColorClasses.icon} />
             {currentTypeMeta.title}
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-1.5">
-          {feedingTypeCards.map(card => {
-            const Icon = card.icon
-            return (
-              <button
-                key={card.key}
-                type="button"
-                onClick={card.onClick}
-                className={`mobile-touch-target flex min-w-0 items-center justify-center gap-1 rounded-xl border py-2.5 transition ${card.active ? card.activeClassName : card.inactiveClassName}`}
-              >
-                <Icon size={16} className={`shrink-0 ${card.active ? card.iconClassName : 'text-gray-400'}`} />
-                <span className="truncate text-sm font-medium">{card.title}</span>
-              </button>
-            )
-          })}
-        </div>
+        <CategorySelector
+          options={feedingTypeOptions}
+          value={selectedFeedingKey}
+          onChange={handleFeedingTypeChange}
+          gridCols="grid-cols-3"
+        />
       </div>
 
       <div className="rounded-2xl border border-gray-100 bg-white p-3.5 shadow-sm sm:p-4">
         <div className="mb-3 flex items-center gap-3">
-          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl ${currentTypeMeta.badgeClassName.split(' ')[0]}`}>
-            <CurrentTypeIcon size={18} className={currentTypeMeta.iconClassName} />
+          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl ${currentColorClasses.bg}`}>
+            <CurrentTypeIcon size={18} className={currentColorClasses.icon} />
           </div>
           <div className="min-w-0">
             <h3 className="text-sm font-semibold text-gray-900 sm:text-base">编辑记录信息</h3>

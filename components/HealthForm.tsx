@@ -8,6 +8,8 @@ import { buildHealthRecordPayload, buildVaccineSuggestions, findSelectedVaccineS
 import HealthRecordFields, { getHealthFieldValidationMessage } from '@/components/HealthRecordFields'
 import RecordActionBar from '@/components/RecordActionBar'
 import RecordTabBar, { type ActiveTab } from '@/components/RecordTabBar'
+import CategorySelector, { type CategoryOption } from '@/components/CategorySelector'
+import { getCategoryColorClasses } from '@/lib/category-colors'
 import { RecordNotesField, RecordTimeField } from '@/components/RecordMetaFields'
 import {
   Scale,
@@ -451,35 +453,31 @@ export default function HealthForm({
     }
   }
 
-  const typeOptions = [
-    { value: 'WEIGHT', label: '体重', icon: Scale, color: 'green', hint: '建议固定时段测量更方便对比。' },
-    { value: 'HEIGHT', label: '身高', icon: Ruler, color: 'blue', hint: '建议在相近姿势下测量，便于后续观察变化。' },
-    { value: 'TEMPERATURE', label: '体温', icon: Thermometer, color: 'red', hint: '正常范围建议填写 35°C 到 42°C 之间的数值。' },
-    { value: 'AD_VITAMIN', label: 'AD', icon: Pill, color: 'orange', hint: '适合快速打卡，避免遗漏每日补充记录。' },
-    { value: 'MEDICATION', label: '服药', icon: Pill, color: 'purple', hint: '建议至少记录药物名称，后续回看会更清晰。' },
-    { value: 'VACCINE', label: '疫苗', icon: Syringe, color: 'teal', hint: '记录疫苗名称和针次进度，方便以后核对接种情况。' },
-    { value: 'DIAPER', label: '大小便', icon: BabyIcon, color: 'amber', hint: '记录排便状态，方便观察宝宝日常情况。' },
-    { value: 'SLEEP', label: '睡眠', icon: Moon, color: 'indigo', hint: '记录宝宝入睡和醒来时间，追踪睡眠规律。' },
-  ] as const
+  const typeOptions: CategoryOption[] = [
+    { key: 'WEIGHT', label: '体重', icon: Scale, color: 'green' },
+    { key: 'HEIGHT', label: '身高', icon: Ruler, color: 'blue' },
+    { key: 'TEMPERATURE', label: '体温', icon: Thermometer, color: 'red' },
+    { key: 'AD_VITAMIN', label: 'AD', icon: Pill, color: 'orange' },
+    { key: 'MEDICATION', label: '服药', icon: Pill, color: 'purple' },
+    { key: 'VACCINE', label: '疫苗', icon: Syringe, color: 'teal' },
+    { key: 'DIAPER', label: '大小便', icon: BabyIcon, color: 'amber' },
+    { key: 'SLEEP', label: '睡眠', icon: Moon, color: 'indigo' },
+  ]
 
-  const getColorClasses = (color: string, isSelected: boolean) => {
-      const colors: Record<string, { border: string; bg: string; text: string; icon: string }> = {
-      green: { border: 'border-green-500', bg: 'bg-green-50', text: 'text-green-700', icon: 'text-green-500' },
-      blue: { border: 'border-blue-500', bg: 'bg-blue-50', text: 'text-blue-700', icon: 'text-blue-500' },
-      red: { border: 'border-red-500', bg: 'bg-red-50', text: 'text-red-700', icon: 'text-red-500' },
-      orange: { border: 'border-orange-500', bg: 'bg-orange-50', text: 'text-orange-700', icon: 'text-orange-500' },
-      purple: { border: 'border-purple-500', bg: 'bg-purple-50', text: 'text-purple-700', icon: 'text-purple-500' },
-      teal: { border: 'border-teal-500', bg: 'bg-teal-50', text: 'text-teal-700', icon: 'text-teal-500' },
-      amber: { border: 'border-amber-500', bg: 'bg-amber-50', text: 'text-amber-700', icon: 'text-amber-500' },
-      indigo: { border: 'border-indigo-500', bg: 'bg-indigo-50', text: 'text-indigo-700', icon: 'text-indigo-500' },
-    }
-    const c = colors[color] || colors.green
-    return isSelected ? c : { border: 'border-gray-200', bg: '', text: 'text-gray-600', icon: 'text-gray-400' }
-  }
-
-  const selectedTypeMeta = typeOptions.find(option => option.value === type) ?? typeOptions[0]
-  const selectedTypeClasses = getColorClasses(selectedTypeMeta.color, true)
+  const selectedTypeMeta = typeOptions.find(option => option.key === type) ?? typeOptions[0]
+  const selectedTypeClasses = getCategoryColorClasses(selectedTypeMeta.color, true)
   const ActiveTypeIcon = selectedTypeMeta.icon
+
+  const healthTypeHints: Record<string, string> = {
+    WEIGHT: '建议固定时段测量更方便对比。',
+    HEIGHT: '建议在相近姿势下测量，便于后续观察变化。',
+    TEMPERATURE: '正常范围建议填写 35°C 到 42°C 之间的数值。',
+    AD_VITAMIN: '适合快速打卡，避免遗漏每日补充记录。',
+    MEDICATION: '建议至少记录药物名称，后续回看会更清晰。',
+    VACCINE: '记录疫苗名称和针次进度，方便以后核对接种情况。',
+    DIAPER: '记录排便状态，方便观察宝宝日常情况。',
+    SLEEP: '记录宝宝入睡和醒来时间，追踪睡眠规律。',
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3.5 pb-3 sm:space-y-4 sm:pb-0">
@@ -502,28 +500,12 @@ export default function HealthForm({
             {selectedTypeMeta.label}
           </div>
         </div>
-        <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
-          {typeOptions.map(option => {
-            const isSelected = type === option.value
-            const colorClasses = getColorClasses(option.color, isSelected)
-            const Icon = option.icon
-            return (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => setType(option.value)}
-                className={`mobile-touch-target flex min-h-[68px] flex-col items-center justify-center rounded-xl border-2 bg-white px-2 py-2 transition hover:border-gray-300 sm:bg-transparent ${
-                  isSelected ? `${colorClasses.border} ${colorClasses.bg}` : 'border-gray-200'
-                }`}
-              >
-                <Icon size={18} className={colorClasses.icon} />
-                <span className={`mt-1 text-[11px] font-medium leading-4 ${colorClasses.text}`}>
-                  {option.label}
-                </span>
-              </button>
-            )
-          })}
-        </div>
+        <CategorySelector
+          options={typeOptions}
+          value={type}
+          onChange={(key) => setType(key as HealthType)}
+          gridCols="grid-cols-4 sm:grid-cols-8"
+        />
       </div>
 
       <div className="rounded-2xl border border-gray-100 bg-white p-3.5 shadow-sm sm:p-4">
@@ -533,7 +515,7 @@ export default function HealthForm({
           </div>
           <div className="min-w-0">
             <h3 className="text-sm font-semibold text-gray-900 sm:text-base">编辑记录信息</h3>
-            <p className="text-xs text-gray-500 sm:text-sm">{selectedTypeMeta.hint}</p>
+            <p className="text-xs text-gray-500 sm:text-sm">{healthTypeHints[type] ?? healthTypeHints.WEIGHT}</p>
           </div>
         </div>
 
