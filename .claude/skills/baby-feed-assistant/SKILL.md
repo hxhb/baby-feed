@@ -1,6 +1,6 @@
 ---
 name: baby-feed-assistant
-version: 2.5.3
+version: 2.6.0
 description: "Query and manage baby feeding/health data via the Baby Feed HTTP API. Use this skill whenever the user asks about their baby's feeding situation, daily summary, health stats, sleep, diapers, weight trends, memos, reminders, or wants to record a new feeding/health/memo event. Trigger on any mention of: feeding, nursing, formula, breast milk, diaper, sleep, weight, temperature, baby stats, today's summary, how much the baby ate, when was the last feed, record a feed, log a diaper change, memo, reminder, 备忘, 待办, vaccine schedule, upcoming checkup, etc. Even casual questions like '宝宝今天吃了多少' or '记录一下刚才喂奶' or '有什么备忘' or '下次疫苗什么时候' should trigger this skill."
 ---
 
@@ -24,9 +24,47 @@ bash <SKILL_DIR>/query-api.sh PUT "/api/endpoint/id" '{"key":"value"}'
 
 # DELETE request
 bash <SKILL_DIR>/query-api.sh DELETE "/api/endpoint/id"
+
+# GET with filter (extract specific fields via Python expression — NO pipe needed)
+bash <SKILL_DIR>/query-api.sh GET "/api/babies" "" "d[0]['id']"
+bash <SKILL_DIR>/query-api.sh GET "/api/feeding?babyId=ID&date=2026-05-28" "" "len(d)"
+bash <SKILL_DIR>/query-api.sh GET "/api/stats?babyId=ID&days=7" "" "d['todayStats']"
+bash <SKILL_DIR>/query-api.sh GET "/api/health?babyId=ID&type=WEIGHT" "" "d[0]"
 ```
 
-**IMPORTANT:** Do NOT use raw `source config.local && curl ... | python3` patterns. Always use `query-api.sh` — the script outputs JSON directly to stdout, which you can read without any intermediate variables or temp files. This avoids security scanner permission prompts (no pipe-to-interpreter, no schemeless URL).
+### ⛔ NEVER Pipe to Interpreters
+
+**ABSOLUTE RULE: NEVER use `| python3`, `| jq`, `| node` or ANY pipe after `query-api.sh`.**
+
+This pattern triggers security scanner warnings and MUST NOT be used:
+```bash
+# ❌ FORBIDDEN — triggers "Pipe to interpreter" security warning
+bash query-api.sh GET "/api/..." | python3 -c "import sys, json; ..."
+bash query-api.sh GET "/api/..." | jq '.field'
+```
+
+Instead, use ONE of these approaches:
+
+**Approach 1 (preferred for simple queries): Run query-api.sh alone, read JSON output directly.**
+You (Claude) can parse JSON natively from the Bash tool output. No external processing needed.
+
+```bash
+# ✅ CORRECT — just run and read the output
+bash <SKILL_DIR>/query-api.sh GET "/api/stats/day?babyId=ID&date=2026-05-28"
+```
+
+**Approach 2 (when you need specific fields): Use the built-in FILTER argument (4th arg).**
+The filter is a Python expression where `d` is the parsed JSON response. Processing happens INSIDE the script.
+
+```bash
+# ✅ CORRECT — filter runs inside the script, no pipe
+bash <SKILL_DIR>/query-api.sh GET "/api/feeding?babyId=ID&date=2026-05-28" "" "len(d)"
+bash <SKILL_DIR>/query-api.sh GET "/api/health?babyId=ID&type=WEIGHT" "" "d[0]['weight']"
+bash <SKILL_DIR>/query-api.sh GET "/api/stats?babyId=ID&days=7" "" "d['todayStats']['breastFeedingCount']"
+bash <SKILL_DIR>/query-api.sh GET "/api/babies" "" "[b['id'] + ' ' + b['name'] for b in d]"
+```
+
+**Note:** For GET with a filter, pass `""` as the 3rd arg (body placeholder), then the filter expression as 4th arg.
 
 ## Time Handling — CRITICAL
 
@@ -605,6 +643,7 @@ Summarize patterns in 2-3 sentences first, then show a compact table. Highlight 
 | Assuming `lastDays` always has weight/height | These fields only appear on days with measurements |
 | Missing diaper counts in daily summary | `stats/day` does NOT include diaper counts — query `health?type=DIAPER` separately |
 | Forgetting `stats` medication is range-limited | `medicationRecords` in stats is limited by `days` param; vaccine is not |
+| **Piping `query-api.sh` output to python3/jq** | NEVER use `bash query-api.sh ... \| python3`. Use the 4th arg FILTER instead: `bash query-api.sh GET "/api/..." "" "d[0]['field']"`. Or just read the raw JSON output directly — Claude can parse it natively |
 
 ## Quick Reference: Common Queries
 
