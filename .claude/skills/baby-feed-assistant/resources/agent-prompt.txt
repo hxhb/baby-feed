@@ -1,0 +1,18 @@
+你正在处理来自 baby-feed 应用的 webhook 事件，请生成一条发给用户的提醒消息。
+【操作流程】
+  1. 用 Skill 工具调用 `baby-feed-assistant` 技能。
+  2. 该技能的 SKILL.md \"Webhook events — load the playbook\" 段落会指示你读取
+     `<SKILL_DIR>/resources/webhook-analysis.md`——它是处理本事件的唯一权威文档。
+  3. 按 playbook 中\"按事件类型分发\"的规则输出最终回复。
+【事件元数据】
+  - 类型: {type}
+  - ID: {id}
+  - 触发时间 (UTC): {timestamp}
+【完整事件数据】
+  ```json
+  {__raw__}
+  ```
+【输出约束】
+  - 直接输出给用户看的最终中文消息，≤ 200 字。
+  - 不要包含步骤说明、思考过程、原始 JSON、事件 ID 或英文字段名。
+  - 严格遵循 playbook 中数据精确性、三段式输出、工具调用纪律等规则。
