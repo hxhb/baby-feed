@@ -1047,25 +1047,16 @@ export default function ReminderManager({ onBack }: Props) {
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1.5">提醒时间</label>
                         <div className="flex items-center gap-2">
-                          <select
-                            value={cronHour}
-                            onChange={e => setCronHour(parseInt(e.target.value))}
-                            className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none"
-                          >
-                            {Array.from({ length: 24 }, (_, i) => (
-                              <option key={i} value={i}>{String(i).padStart(2, '0')}</option>
-                            ))}
-                          </select>
-                          <span className="text-lg font-bold text-gray-400">:</span>
-                          <select
-                            value={cronMinute}
-                            onChange={e => setCronMinute(parseInt(e.target.value))}
-                            className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none"
-                          >
-                            {Array.from({ length: 60 }, (_, i) => (
-                              <option key={i} value={i}>{String(i).padStart(2, '0')}</option>
-                            ))}
-                          </select>
+                          <input
+                            type="time"
+                            value={`${String(cronHour).padStart(2, '0')}:${String(cronMinute).padStart(2, '0')}`}
+                            onChange={e => {
+                              const [h, m] = e.target.value.split(':')
+                              setCronHour(parseInt(h))
+                              setCronMinute(parseInt(m))
+                            }}
+                            className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none"
+                          />
                         </div>
                         <p className="text-xs text-gray-400 mt-1">每天此时间触发提醒（北京时间）</p>
                       </div>
