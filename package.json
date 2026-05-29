@@ -3,18 +3,21 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "prisma db push && next dev",
+    "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@prisma/adapter-libsql": "^7.5.0",
     "@prisma/client": "^7.5.0",
     "bcryptjs": "^3.0.3",
+    "cross-fetch": "^4.1.0",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.577.0",
     "next": "^15.5.12",
+    "node-fetch": "^3.3.2",
     "next-auth": "^4.24.13",
     "react": "^18",
     "react-dom": "^18",
