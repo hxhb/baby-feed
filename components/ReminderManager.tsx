@@ -1231,7 +1231,7 @@ export default function ReminderManager({ onBack }: Props) {
                           type="text"
                           value={healthContent}
                           onChange={e => setHealthContent(e.target.value)}
-                          placeholder="如：该测一下睡眠了"
+                          placeholder="如：该关注下宝宝的身高、体重了"
                           maxLength={100}
                           className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none"
                         />
