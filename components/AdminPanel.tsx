@@ -566,7 +566,6 @@ export default function AdminPanel({ currentUserId, onBack }: Props) {
           })}
         </div>
       </div>
-    </div>
 
     {/* ========== 修改用户信息弹窗 ========== */}
     {userModal === 'editInfo' && selectedUser && (
@@ -827,5 +826,6 @@ export default function AdminPanel({ currentUserId, onBack }: Props) {
         </div>
       </div>
     )}
+    </div>
   )
 }

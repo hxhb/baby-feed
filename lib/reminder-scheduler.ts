@@ -193,7 +193,7 @@ class ReminderScheduler {
         },
       })
 
-      console.log(`[Reminder] Tick — ${rules.length} rules loaded`)
+      // console.log(`[Reminder] Tick — ${rules.length} rules loaded`)
 
       for (const rule of rules) {
         try {
