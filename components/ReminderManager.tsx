@@ -209,6 +209,7 @@ export default function ReminderManager({ onBack }: Props) {
   const [healthTypes, setHealthTypes] = useState<string[]>(['WEIGHT', 'HEIGHT'])
   const [healthDays, setHealthDays] = useState(14)
   const [healthHours, setHealthHours] = useState(0)
+  const [healthContent, setHealthContent] = useState('')
 
   // Auto-vaccine config
   const [autoVaccineEnabled, setAutoVaccineEnabled] = useState(false)
@@ -344,6 +345,7 @@ export default function ReminderManager({ onBack }: Props) {
     // Reset today as anchor date default
     const now = new Date(Date.now() + 8 * 60 * 60 * 1000)
     setAnchorDate(now.toISOString().slice(0, 10))
+    setHealthContent('')
   }
 
   const handleTypeSelect = (type: TriggerType) => {
@@ -411,6 +413,8 @@ export default function ReminderManager({ onBack }: Props) {
           .map(t => HEALTH_TYPES.find(ht => ht.value === t)?.label)
           .filter(Boolean)
         const itemsText = healthLabels.length > 0 ? healthLabels.join('、') : '健康指标'
+        const baseBody = `定期提醒：${itemsText}`
+        const userNote = healthContent.trim()
         body = {
           ...body,
           name: '健康定期提醒',
@@ -422,8 +426,8 @@ export default function ReminderManager({ onBack }: Props) {
           },
           activeSchedule: null,
           advanceMinutes: 0,
-          notifyTitle: `该给{{babyName}}测量${itemsText}了`,
-          notifyBody: `定期检测提醒：${itemsText}`,
+          notifyTitle: `该关注一下{{babyName}}的${itemsText}了`,
+          notifyBody: userNote ? `${baseBody}\n${userNote}` : baseBody,
         }
       }
 
@@ -506,6 +510,10 @@ export default function ReminderManager({ onBack }: Props) {
         setHealthHours(Math.round((mins % (24 * 60)) / 60))
         const filter = config.filterCondition as { type?: string[] } | undefined
         setHealthTypes(filter?.type || ['WEIGHT', 'HEIGHT'])
+        // Backfill custom health content
+        const body = rule.notifyBody || ''
+        const newlineIdx = body.indexOf('\n')
+        setHealthContent(newlineIdx >= 0 ? body.slice(newlineIdx + 1) : '')
       } else {
         setIntervalHours(Math.floor(mins / 60))
         setIntervalMinutes(mins % 60)
@@ -1215,6 +1223,19 @@ export default function ReminderManager({ onBack }: Props) {
                           <span className="text-sm text-gray-500">小时</span>
                         </div>
                         <p className="text-xs text-gray-400 mt-1">距上次检测超过此时间后提醒</p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">提醒内容（可选）</label>
+                        <input
+                          type="text"
+                          value={healthContent}
+                          onChange={e => setHealthContent(e.target.value)}
+                          placeholder="如：该测一下睡眠了"
+                          maxLength={100}
+                          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none"
+                        />
+                        <p className="text-xs text-gray-400 mt-1">留空则使用默认提醒文案</p>
                       </div>
                     </>
                   )}
