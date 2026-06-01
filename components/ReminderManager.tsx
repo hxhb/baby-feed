@@ -210,6 +210,8 @@ export default function ReminderManager({ onBack }: Props) {
   const [healthDays, setHealthDays] = useState(14)
   const [healthHours, setHealthHours] = useState(0)
   const [healthContent, setHealthContent] = useState('')
+  const [healthScheduleStart, setHealthScheduleStart] = useState('06:00')
+  const [healthScheduleEnd, setHealthScheduleEnd] = useState('23:00')
 
   // Auto-vaccine config
   const [autoVaccineEnabled, setAutoVaccineEnabled] = useState(false)
@@ -424,7 +426,7 @@ export default function ReminderManager({ onBack }: Props) {
             intervalMinutes: totalMinutes,
             filterCondition: healthTypes.length > 0 ? { type: healthTypes } : undefined,
           },
-          activeSchedule: null,
+          activeSchedule: { windows: [{ start: healthScheduleStart, end: healthScheduleEnd }] },
           advanceMinutes: 0,
           notifyTitle: `该关注一下{{babyName}}的${itemsText}了`,
           notifyBody: userNote ? `${baseBody}\n${userNote}` : baseBody,
@@ -514,6 +516,11 @@ export default function ReminderManager({ onBack }: Props) {
         const body = rule.notifyBody || ''
         const newlineIdx = body.indexOf('\n')
         setHealthContent(newlineIdx >= 0 ? body.slice(newlineIdx + 1) : '')
+        // Pre-fill active schedule
+        if (rule.activeSchedule?.windows?.[0]) {
+          setHealthScheduleStart(rule.activeSchedule.windows[0].start)
+          setHealthScheduleEnd(rule.activeSchedule.windows[0].end)
+        }
       } else {
         setIntervalHours(Math.floor(mins / 60))
         setIntervalMinutes(mins % 60)
@@ -1227,6 +1234,26 @@ export default function ReminderManager({ onBack }: Props) {
                           className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none"
                         />
                         <p className="text-xs text-gray-400 mt-1">留空则使用默认提醒文案</p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">活跃时段</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="time"
+                            value={healthScheduleStart}
+                            onChange={e => setHealthScheduleStart(e.target.value)}
+                            className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none"
+                          />
+                          <span className="text-gray-400">—</span>
+                          <input
+                            type="time"
+                            value={healthScheduleEnd}
+                            onChange={e => setHealthScheduleEnd(e.target.value)}
+                            className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none"
+                          />
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1">此时段外不会提醒（如夜间睡眠时）</p>
                       </div>
                     </>
                   )}
