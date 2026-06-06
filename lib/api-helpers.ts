@@ -66,12 +66,11 @@ export function buildSleepAwareOrClause(start: Date, end: Date) {
  * calendar-day segment with:
  *   - `dayStr`          – the Beijing date string (YYYY-MM-DD)
  *   - `durationMinutes` – minutes attributed to that day
- *   - `isStartDay`      – true only for the first segment (useful for count de-duplication)
  */
 export function splitDurationByBeijingDay(
   startMs: number,
   endMs: number,
-  callback: (dayStr: string, durationMinutes: number, isStartDay: boolean) => void,
+  callback: (dayStr: string, durationMinutes: number) => void,
 ): void {
   if (endMs <= startMs) return
 
@@ -82,7 +81,7 @@ export function splitDurationByBeijingDay(
     const segmentEnd = Math.min(endMs, dayEnd.getTime() + 1) // +1 to include 23:59:59.999
     const segmentMin = Math.round((segmentEnd - cursor) / (60 * 1000))
     if (segmentMin > 0) {
-      callback(dayStr, segmentMin, cursor === startMs)
+      callback(dayStr, segmentMin)
     }
     cursor = dayEnd.getTime() + 1
   }

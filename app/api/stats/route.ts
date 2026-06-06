@@ -196,13 +196,11 @@ export async function GET(request: NextRequest) {
         splitDurationByBeijingDay(
           new Date(record.sleepStartTime).getTime(),
           new Date(record.sleepEndTime).getTime(),
-          (dayStr, minutes, isStartDay) => {
+          (dayStr, minutes) => {
             const targetStats = statsMap.get(dayStr)
             if (targetStats) {
               targetStats.sleepDurationMinutes += minutes
-              if (isStartDay) {
-                targetStats.sleepCount += 1
-              }
+              targetStats.sleepCount += 1
             }
           },
         )

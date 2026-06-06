@@ -33,12 +33,29 @@ export const intervalEvaluator: RuleEvaluator = {
       if (config.filterCondition?.type) {
         where.type = { in: config.filterCondition.type }
       }
-      const record = await prisma.healthRecord.findFirst({
-        where,
-        orderBy: { recordedAt: 'desc' },
-        select: { recordedAt: true },
-      })
-      lastRecordTime = record?.recordedAt ?? null
+
+      // Sleep records have duration: use sleepEndTime (wake time) as the
+      // reference point, not recordedAt (the log time). Otherwise out-of-order
+      // logging can make the evaluator pick the wrong "last" sleep.
+      const isSleepOnly =
+        config.filterCondition?.type?.length === 1 &&
+        config.filterCondition.type[0] === 'SLEEP'
+
+      if (isSleepOnly) {
+        const record = await prisma.healthRecord.findFirst({
+          where,
+          orderBy: { sleepEndTime: 'desc' },
+          select: { sleepEndTime: true, sleepStartTime: true, recordedAt: true },
+        })
+        lastRecordTime = record?.sleepEndTime ?? record?.sleepStartTime ?? record?.recordedAt ?? null
+      } else {
+        const record = await prisma.healthRecord.findFirst({
+          where,
+          orderBy: { recordedAt: 'desc' },
+          select: { recordedAt: true },
+        })
+        lastRecordTime = record?.recordedAt ?? null
+      }
     } else {
       return { shouldFire: false }
     }

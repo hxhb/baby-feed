@@ -746,13 +746,11 @@ export default function TimelineComponent({
           const startMs = new Date(hr.sleepStartTime).getTime()
           const endMs = new Date(hr.sleepEndTime).getTime()
           if (endMs > startMs) {
-            splitDurationByBeijingDay(startMs, endMs, (dayStr, minutes, isStartDay) => {
-              if (dayStr !== currentDateStr) return
-              sleepTotalMinutes += minutes
-              if (isStartDay) {
+              splitDurationByBeijingDay(startMs, endMs, (dayStr, minutes) => {
+                if (dayStr !== currentDateStr) return
+                sleepTotalMinutes += minutes
                 sleepCount += 1
-              }
-            })
+              })
           }
         }
       }

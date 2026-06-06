@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
 
       // Use splitDurationByBeijingDay to walk each day segment,
       // but only keep the segment matching the requested date
-      splitDurationByBeijingDay(startMs, endMs, (dayStr, minutes, isStartDay) => {
+      splitDurationByBeijingDay(startMs, endMs, (dayStr, minutes) => {
         if (dayStr !== date) return
 
         // Compute the actual segment boundaries within this day
@@ -129,11 +129,7 @@ export async function GET(request: NextRequest) {
         })
 
         totalMinutes += minutes
-
-        // Count only sessions that started on this day (consistent with stats page)
-        if (isStartDay) {
-          count += 1
-        }
+        count += 1
       })
     }
 
