@@ -79,6 +79,8 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
   const [rightDuration, setRightDuration] = useState(String(feedingRecord?.rightBreastDuration || ''))
   const [breastMilkAmt, setBreastMilkAmt] = useState(String(feedingRecord?.breastMilkAmount || ''))
   const [formulaAmt, setFormulaAmt] = useState(String(feedingRecord?.formulaAmount || ''))
+  const [solidFoodName, setSolidFoodName] = useState(feedingRecord?.solidFoodName || '')
+  const [solidFoodAmount, setSolidFoodAmount] = useState(feedingRecord?.solidFoodAmount || '')
   const [breastMode, setBreastMode] = useState<BreastMode>(feedingRecord ? getBreastModeFromType(feedingRecord.type as FeedingType) : 'direct')
 
   const [weight, setWeight] = useState(String(healthRecord?.weight || ''))
@@ -130,8 +132,8 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
     rightBreastDuration: rightDuration,
     breastMilkAmount: breastMilkAmt,
     formulaAmount: formulaAmt,
-    solidFoodName: '',
-    solidFoodAmount: '',
+    solidFoodName,
+    solidFoodAmount,
   }
 
   useEffect(() => {
@@ -242,6 +244,8 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
         return '母乳瓶喂'
       case 'FORMULA':
         return '奶粉喂养'
+      case 'SOLID_FOOD':
+        return '辅食'
       case 'AD_VITAMIN':
         return 'AD滴剂'
       case 'WEIGHT':
@@ -303,8 +307,8 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
                 setRightBreastDuration: setRightDuration,
                 setBreastMilkAmount: setBreastMilkAmt,
                 setFormulaAmount: setFormulaAmt,
-                setSolidFoodName: () => {},
-                setSolidFoodAmount: () => {},
+                setSolidFoodName,
+                setSolidFoodAmount,
               }}
             />
           ) : (

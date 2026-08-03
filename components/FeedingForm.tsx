@@ -182,6 +182,12 @@ export default function FeedingForm({
       if (typeof parsedDraft.formulaAmount === 'string') {
         setFormulaAmount(parsedDraft.formulaAmount)
       }
+      if (typeof parsedDraft.solidFoodName === 'string') {
+        setSolidFoodName(parsedDraft.solidFoodName)
+      }
+      if (typeof parsedDraft.solidFoodAmount === 'string') {
+        setSolidFoodAmount(parsedDraft.solidFoodAmount)
+      }
     } catch (error) {
       console.error('读取喂养草稿失败:', error)
     }
@@ -205,7 +211,9 @@ export default function FeedingForm({
         !nextDraft.leftBreastDuration &&
         !nextDraft.rightBreastDuration &&
         !nextDraft.breastMilkAmount &&
-        !nextDraft.formulaAmount
+        !nextDraft.formulaAmount &&
+        !nextDraft.solidFoodName &&
+        !nextDraft.solidFoodAmount
 
       if (isEmptyDraft) {
         window.sessionStorage.removeItem(FEEDING_DRAFT_STORAGE_KEY)
@@ -225,7 +233,7 @@ export default function FeedingForm({
 
     setSubmitError('')
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [babyId, type, breastMode, leftBreastDuration, rightBreastDuration, breastMilkAmount, formulaAmount, startTime, notes])
+  }, [babyId, type, breastMode, leftBreastDuration, rightBreastDuration, breastMilkAmount, formulaAmount, solidFoodName, solidFoodAmount, startTime, notes])
 
   const fetchBabies = async () => {
     try {

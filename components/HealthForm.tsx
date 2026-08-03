@@ -46,6 +46,8 @@ interface HealthDraft {
   diaperType: 'PEE' | 'POOP' | 'BOTH'
   diaperStatus: string
   adGiven: boolean
+  sleepStartTime: string
+  sleepEndTime: string
 }
 
 interface Props {
@@ -72,7 +74,9 @@ const emptyHealthDraft: HealthDraft = {
   vaccineTotalDoses: '',
   diaperType: 'PEE',
   diaperStatus: '',
-  adGiven: true
+  adGiven: true,
+  sleepStartTime: '',
+  sleepEndTime: ''
 }
 
 
@@ -216,6 +220,15 @@ export default function HealthForm({
       if (typeof parsedDraft.adGiven === 'boolean') {
         setAdGiven(parsedDraft.adGiven)
       }
+      if (typeof parsedDraft.sleepStartTime === 'string') {
+        setSleepStartTime(parsedDraft.sleepStartTime)
+      }
+      if (typeof parsedDraft.sleepEndTime === 'string') {
+        setSleepEndTime(parsedDraft.sleepEndTime)
+        if (parsedDraft.sleepEndTime) {
+          setRecordedAt(parsedDraft.sleepEndTime)
+        }
+      }
     } catch (error) {
       console.error('读取健康草稿失败:', error)
     }
@@ -236,7 +249,9 @@ export default function HealthForm({
         vaccineTotalDoses,
         diaperType,
         diaperStatus,
-        adGiven
+        adGiven,
+        sleepStartTime,
+        sleepEndTime
       }
 
       const isEmptyDraft =
@@ -252,7 +267,9 @@ export default function HealthForm({
         !nextDraft.vaccineTotalDoses &&
         nextDraft.diaperType === emptyHealthDraft.diaperType &&
         !nextDraft.diaperStatus &&
-        nextDraft.adGiven === emptyHealthDraft.adGiven
+        nextDraft.adGiven === emptyHealthDraft.adGiven &&
+        !nextDraft.sleepStartTime &&
+        !nextDraft.sleepEndTime
 
       if (isEmptyDraft) {
         window.sessionStorage.removeItem(HEALTH_DRAFT_STORAGE_KEY)
@@ -263,7 +280,7 @@ export default function HealthForm({
     } catch (error) {
       console.error('保存健康草稿失败:', error)
     }
-  }, [type, weight, height, temperature, medicationName, medicationDose, vaccineName, vaccineManufacturer, vaccineDoseNumber, vaccineTotalDoses, diaperType, diaperStatus, adGiven])
+  }, [type, weight, height, temperature, medicationName, medicationDose, vaccineName, vaccineManufacturer, vaccineDoseNumber, vaccineTotalDoses, diaperType, diaperStatus, adGiven, sleepStartTime, sleepEndTime])
 
   useEffect(() => {
     if (!submitError) {
@@ -272,7 +289,7 @@ export default function HealthForm({
 
     setSubmitError('')
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [babyId, type, weight, height, temperature, medicationName, medicationDose, vaccineName, vaccineManufacturer, vaccineDoseNumber, vaccineTotalDoses, diaperType, diaperStatus, adGiven, recordedAt, notes])
+  }, [babyId, type, weight, height, temperature, medicationName, medicationDose, vaccineName, vaccineManufacturer, vaccineDoseNumber, vaccineTotalDoses, diaperType, diaperStatus, adGiven, sleepStartTime, sleepEndTime, recordedAt, notes])
 
   useEffect(() => {
     if (type !== 'VACCINE' || !babyId) {
