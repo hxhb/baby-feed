@@ -25,6 +25,7 @@ model User {
   webhookEndpoints WebhookEndpoint[]
   reminderRules    ReminderRule[]
   reminderSettings String?
+  quickRecordSettings String?
 }
 
 model SiteSettings {
@@ -104,6 +105,8 @@ model HealthRecord {
   diaperType        String?
   diaperStatus      String?
   adGiven           Boolean?
+  vitaminDGiven     Boolean?
+  customName        String?
   sleepStartTime    DateTime?
   sleepEndTime      DateTime?
   sleepQuality      String?

@@ -3,6 +3,7 @@
 import { useEffect, useCallback, useState } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   Home,
@@ -12,6 +13,7 @@ import {
   Settings,
   LogOut
 } from 'lucide-react'
+import { useRecordComposer } from '@/components/RecordComposerProvider'
 
 const navItems = [
   { href: '/', label: '首页', icon: Home },
@@ -28,6 +30,7 @@ export default function Navbar() {
   const [isSigningOut, setIsSigningOut] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
+  const { isOpen: isRecordComposerOpen, openComposer } = useRecordComposer()
   const isAuthPage = authRoutes.has(pathname)
   const shouldShowNavbar = status === 'authenticated' && !!session && !isAuthPage && !isSigningOut
 
@@ -94,7 +97,7 @@ export default function Navbar() {
           <div className="flex justify-between h-14">
             <div className="flex items-center">
               <Link href="/" className="flex items-center space-x-2">
-                <span className="text-2xl">🍼</span>
+                <Image src="/icon.svg" alt="" width={28} height={28} priority />
                 <span className="font-bold text-xl text-gray-900">Baby Feed</span>
               </Link>
             </div>
@@ -102,7 +105,27 @@ export default function Navbar() {
             <div className="flex items-center space-x-1">
               {navItems.map((item) => {
                 const Icon = item.icon
-                const isActive = pathname === item.href
+                const isAdd = item.href === '/add'
+                const isActive = pathname === item.href || (isAdd && isRecordComposerOpen)
+                if (isAdd) {
+                  return (
+                    <button
+                      key={item.href}
+                      type="button"
+                      onClick={() => openComposer()}
+                      aria-haspopup="dialog"
+                      aria-expanded={isRecordComposerOpen}
+                      className={`flex min-h-11 items-center space-x-1 rounded-lg px-4 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                        isActive
+                          ? 'bg-blue-50 text-blue-700'
+                          : 'text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      <Icon size={18} />
+                      <span className="text-sm font-medium">{item.label}</span>
+                    </button>
+                  )
+                }
                 return (
                   <Link
                     key={item.href}
@@ -138,28 +161,27 @@ export default function Navbar() {
         <div className="mx-auto flex max-w-md items-end justify-between gap-1 px-2 pt-2 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]">
           {navItems.map((item) => {
             const Icon = item.icon
-            const isActive = pathname === item.href
+            const isActive = pathname === item.href || (item.href === '/add' && isRecordComposerOpen)
             const isAdd = item.href === '/add'
 
             if (isAdd) {
               return (
-                <Link
+                <button
                   key={item.href}
-                  href={item.href}
+                  type="button"
                   aria-label={item.label}
-                  aria-current={isActive ? 'page' : undefined}
-                  onMouseEnter={() => prefetchRoute(item.href)}
-                  onFocus={() => prefetchRoute(item.href)}
-                  onTouchStart={() => prefetchRoute(item.href)}
-                  className="flex min-w-[5rem] flex-col items-center justify-end self-start pt-0.5"
+                  aria-haspopup="dialog"
+                  aria-expanded={isRecordComposerOpen}
+                  onClick={() => openComposer()}
+                  className="flex min-w-[5rem] flex-col items-center justify-end self-start border-0 !bg-transparent p-0 pt-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                 >
-                  <div className={`mobile-touch-target -mt-5 flex h-[52px] w-[52px] items-center justify-center rounded-full gradient-primary shadow-elevated ring-4 ring-white transition-transform active:scale-95`}>
+                  <div className="mobile-touch-target -mt-5 flex h-[52px] w-[52px] items-center justify-center rounded-full bg-blue-600 shadow-[0_6px_18px_rgba(37,99,235,0.3)] ring-4 ring-white transition-colors active:bg-blue-700">
                     <Icon size={24} className="text-white" />
                   </div>
                   <span className={`mt-1 text-[11px] font-semibold ${isActive ? 'text-blue-600' : 'text-slate-400'}`}>
                     {item.label}
                   </span>
-                </Link>
+                </button>
               )
             }
 

@@ -128,7 +128,7 @@ export interface HealthCreatedEventPayload extends WebhookEventPayload {
   data: {
     recordId: string
     babyId: string
-    type: string // 'WEIGHT' | 'HEIGHT' | 'TEMPERATURE' | 'MEDICATION' | 'VACCINE' | 'DIAPER' | 'AD_VITAMIN' | 'SLEEP'
+    type: string // 'WEIGHT' | 'HEIGHT' | 'TEMPERATURE' | 'MEDICATION' | 'VACCINE' | 'DIAPER' | 'AD_VITAMIN' | 'SLEEP' | 'CUSTOM'
     weight?: number
     height?: number
     temperature?: number
@@ -141,6 +141,8 @@ export interface HealthCreatedEventPayload extends WebhookEventPayload {
     diaperType?: string
     diaperStatus?: string
     adGiven?: boolean
+    vitaminDGiven?: boolean
+    customName?: string
     sleepStartTime?: string
     sleepEndTime?: string
     sleepQuality?: string
@@ -181,6 +183,8 @@ export interface HealthUpdatedEventPayload extends WebhookEventPayload {
     diaperType?: string
     diaperStatus?: string
     adGiven?: boolean
+    vitaminDGiven?: boolean
+    customName?: string
     sleepStartTime?: string
     sleepEndTime?: string
     sleepQuality?: string

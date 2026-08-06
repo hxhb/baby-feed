@@ -135,6 +135,8 @@ export async function POST(request: NextRequest) {
       diaperType,
       diaperStatus,
       adGiven,
+      vitaminDGiven,
+      customName,
       recordedAt,
       notes
     } = body
@@ -174,6 +176,8 @@ export async function POST(request: NextRequest) {
     const typedDiaperType = typeof diaperType === 'string' ? diaperType : undefined
     const typedDiaperStatus = typeof diaperStatus === 'string' ? diaperStatus : undefined
     const typedAdGiven = typeof adGiven === 'boolean' ? adGiven : undefined
+    const typedVitaminDGiven = typeof vitaminDGiven === 'boolean' ? vitaminDGiven : undefined
+    const typedCustomName = typeof customName === 'string' ? customName : undefined
     const typedSleepStartTime = typeof body.sleepStartTime === 'string' ? body.sleepStartTime : undefined
     const typedSleepEndTime = typeof body.sleepEndTime === 'string' ? body.sleepEndTime : undefined
     const typedSleepQuality = typeof body.sleepQuality === 'string' ? body.sleepQuality : undefined
@@ -216,6 +220,8 @@ export async function POST(request: NextRequest) {
         diaperType: typedType === 'DIAPER' ? (typedDiaperType ?? null) : null,
         diaperStatus: typedType === 'DIAPER' ? (typedDiaperStatus ?? null) : null,
         adGiven: typedType === 'AD_VITAMIN' ? (typedAdGiven ?? null) : null,
+        vitaminDGiven: typedType === 'AD_VITAMIN' ? (typedVitaminDGiven ?? null) : null,
+        customName: typedType === 'CUSTOM' ? (typedCustomName?.trim() || null) : null,
         sleepStartTime: typedType === 'SLEEP' ? (typedSleepStartTime ? new Date(typedSleepStartTime) : null) : null,
         sleepEndTime: typedType === 'SLEEP' ? (typedSleepEndTime ? new Date(typedSleepEndTime) : null) : null,
         sleepQuality: typedType === 'SLEEP' ? (typedSleepQuality ?? null) : null,

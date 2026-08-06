@@ -222,6 +222,38 @@ textarea {
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+@keyframes composer-enter {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.record-composer .composer-fields input:not([type="checkbox"]),
+.record-composer .composer-fields textarea,
+.record-composer .composer-fields select {
+  border-radius: 0.5rem;
+  border-color: #cbd5e1;
+  background: #ffffff;
+  font-size: 16px;
+}
+
+.record-composer .composer-fields input:not([type="checkbox"]):focus,
+.record-composer .composer-fields textarea:focus,
+.record-composer .composer-fields select:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.14);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /* Auth page */
 .auth-bg {
   min-height: 100vh;

@@ -3,6 +3,12 @@
  * 防止非法类型、极端数值、不合法枚举等通过 API 进入数据库
  */
 
+import { FEEDING_TYPES, type FeedingType } from '@/lib/feeding-records'
+import { HEALTH_TYPES, type HealthType } from '@/lib/health-records'
+
+export { FEEDING_TYPES, HEALTH_TYPES }
+export type { FeedingType, HealthType }
+
 // Password strength requirements
 const PASSWORD_MIN_LENGTH = 8
 
@@ -22,14 +28,6 @@ export function validatePassword(password: string): string | null {
   }
   return null
 }
-
-// 喂养记录类型白名单
-export const FEEDING_TYPES = ['BREAST_MILK', 'BREAST_MILK_BOTTLE', 'FORMULA', 'SOLID_FOOD'] as const
-export type FeedingType = typeof FEEDING_TYPES[number]
-
-// 健康记录类型白名单
-export const HEALTH_TYPES = ['WEIGHT', 'HEIGHT', 'TEMPERATURE', 'MEDICATION', 'VACCINE', 'DIAPER', 'AD_VITAMIN', 'SLEEP'] as const
-export type HealthType = typeof HEALTH_TYPES[number]
 
 // 性别白名单
 export const GENDERS = ['MALE', 'FEMALE'] as const
@@ -282,6 +280,8 @@ export function validateHealthInput(body: Record<string, unknown>) {
     validateEnum(body.diaperType, DIAPER_TYPES, '尿布类型'),
     validateString(body.diaperStatus, '尿布状态', 200),
     validateBoolean(body.adGiven, 'AD补充'),
+    validateBoolean(body.vitaminDGiven, '维生素D补充'),
+    validateString(body.customName, '自定义记录名称', 100),
     validateDateString(body.sleepStartTime, '入睡时间'),
     validateDateString(body.sleepEndTime, '醒来时间'),
     validateDateOrder(body.sleepStartTime, body.sleepEndTime, '入睡时间', '醒来时间'),
@@ -358,12 +358,16 @@ function validateHealthBusinessRules(body: Record<string, unknown>): ValidationR
     return { valid: false, error: '大小便记录需要填写尿布类型' }
   }
 
-  if (type === 'AD_VITAMIN' && !isProvided(body.adGiven)) {
-    return { valid: false, error: 'AD 补充记录需要填写是否已补充' }
+  if (type === 'AD_VITAMIN' && body.adGiven !== true && body.vitaminDGiven !== true) {
+    return { valid: false, error: '请至少选择 AD 或维生素D' }
   }
 
   if (type === 'SLEEP' && !isProvided(body.sleepStartTime)) {
     return { valid: false, error: '睡眠记录需要填写入睡时间' }
+  }
+
+  if (type === 'CUSTOM' && (typeof body.customName !== 'string' || !body.customName.trim())) {
+    return { valid: false, error: '自定义记录需要填写名称' }
   }
 
   return { valid: true }

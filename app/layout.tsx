@@ -21,9 +21,6 @@ export const viewport: Viewport = {
   themeColor: "#3b82f6",
   width: "device-width",
   initialScale: 1,
-  minimumScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   viewportFit: "cover",
 };
 
@@ -100,7 +97,16 @@ export default async function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              if ('serviceWorker' in navigator) {
+              if ('serviceWorker' in navigator && (location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+                navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                  registrations.forEach(function(registration) { registration.unregister(); });
+                });
+                if ('caches' in window) {
+                  caches.keys().then(function(names) {
+                    names.forEach(function(name) { caches.delete(name); });
+                  });
+                }
+              } else if ('serviceWorker' in navigator) {
                 window.addEventListener('load', function() {
                   navigator.serviceWorker.register('/sw.js').then(
                     function(registration) {

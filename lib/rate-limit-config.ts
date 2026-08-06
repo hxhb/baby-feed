@@ -57,6 +57,8 @@ const rateLimitConfig: Record<string, RateLimitRule> = {
   'user-api-key-list':      { limit: 60,  windowMs: 60 * 1000 },
   'user-api-key-create':    { limit: 5,   windowMs: 10 * 60 * 1000 },
   'user-api-key-delete':    { limit: 10,  windowMs: 10 * 60 * 1000 },
+  'user-quick-records-read': { limit: 60, windowMs: 60 * 1000 },
+  'user-quick-records-update': { limit: 20, windowMs: 10 * 60 * 1000 },
 
   // ============ 管理员 ============
   'admin-users-list':       { limit: 30,  windowMs: 60 * 1000 },

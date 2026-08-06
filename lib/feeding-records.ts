@@ -1,4 +1,5 @@
-export type FeedingType = 'BREAST_MILK' | 'BREAST_MILK_BOTTLE' | 'FORMULA' | 'SOLID_FOOD'
+export const FEEDING_TYPES = ['BREAST_MILK', 'BREAST_MILK_BOTTLE', 'FORMULA', 'SOLID_FOOD'] as const
+export type FeedingType = typeof FEEDING_TYPES[number]
 export type BreastMode = 'direct' | 'bottle'
 
 export interface FeedingFieldValues {

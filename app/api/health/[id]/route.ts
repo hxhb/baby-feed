@@ -62,6 +62,8 @@ export async function PUT(
       diaperType,
       diaperStatus,
       adGiven,
+      vitaminDGiven,
+      customName,
       recordedAt,
       notes
     } = body
@@ -106,6 +108,8 @@ export async function PUT(
       diaperType: diaperType === undefined ? existingRecord.diaperType : diaperType,
       diaperStatus: diaperStatus === undefined ? existingRecord.diaperStatus : diaperStatus,
       adGiven: adGiven === undefined ? existingRecord.adGiven : adGiven,
+      vitaminDGiven: vitaminDGiven === undefined ? existingRecord.vitaminDGiven : vitaminDGiven,
+      customName: customName === undefined ? existingRecord.customName : customName,
       sleepStartTime: body.sleepStartTime === undefined ? (existingRecord.sleepStartTime ? existingRecord.sleepStartTime.toISOString() : null) : body.sleepStartTime,
       sleepEndTime: body.sleepEndTime === undefined ? (existingRecord.sleepEndTime ? existingRecord.sleepEndTime.toISOString() : null) : body.sleepEndTime,
       sleepQuality: body.sleepQuality === undefined ? existingRecord.sleepQuality : body.sleepQuality,
@@ -132,6 +136,8 @@ export async function PUT(
       diaperType: null as string | null,
       diaperStatus: null as string | null,
       adGiven: null as boolean | null,
+      vitaminDGiven: null as boolean | null,
+      customName: null as string | null,
       sleepStartTime: null as Date | null,
       sleepEndTime: null as Date | null,
       sleepQuality: null as string | null,
@@ -158,10 +164,13 @@ export async function PUT(
       normalizedData.diaperStatus = normalizedBody.diaperStatus === undefined ? null : normalizedBody.diaperStatus as string | null
     } else if (nextType === 'AD_VITAMIN') {
       normalizedData.adGiven = normalizedBody.adGiven === undefined ? null : normalizedBody.adGiven as boolean | null
+      normalizedData.vitaminDGiven = normalizedBody.vitaminDGiven === undefined ? null : normalizedBody.vitaminDGiven as boolean | null
     } else if (nextType === 'SLEEP') {
       normalizedData.sleepStartTime = normalizedBody.sleepStartTime ? new Date(normalizedBody.sleepStartTime as string) : null
       normalizedData.sleepEndTime = normalizedBody.sleepEndTime ? new Date(normalizedBody.sleepEndTime as string) : null
       normalizedData.sleepQuality = normalizedBody.sleepQuality === undefined ? null : normalizedBody.sleepQuality as string | null
+    } else if (nextType === 'CUSTOM') {
+      normalizedData.customName = typeof normalizedBody.customName === 'string' ? normalizedBody.customName.trim() || null : null
     }
 
     const record = await prisma.healthRecord.update({

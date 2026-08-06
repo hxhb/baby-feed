@@ -3,6 +3,7 @@ import { getBeijingToday } from '@/lib/time'
 import { getBeijingDayRange } from '@/lib/api-helpers'
 import { getPreloadedBabies, type PreloadedBaby } from '@/lib/server-babies'
 import { getServerSession } from '@/lib/server-auth'
+import { DEFAULT_QUICK_RECORD_KEYS, parseQuickRecordSettings, type QuickRecordKey } from '@/lib/quick-records'
 
 export interface PreloadedDashboardFeedingRecord {
   id: string
@@ -35,6 +36,8 @@ export interface PreloadedDashboardHealthRecord {
   diaperType: string | null
   diaperStatus: string | null
   adGiven: boolean | null
+  vitaminDGiven: boolean | null
+  customName: string | null
   sleepStartTime: string | null
   sleepEndTime: string | null
   sleepQuality: string | null
@@ -57,6 +60,7 @@ export interface PreloadedDashboardData {
   initialTodayRecords: PreloadedDashboardFeedingRecord[]
   initialTodayHealthRecords: PreloadedDashboardHealthRecord[]
   initialRecentMemos: PreloadedDashboardMemo[]
+  initialQuickRecordKeys: QuickRecordKey[]
 }
 
 export async function getPreloadedDashboardData(): Promise<PreloadedDashboardData> {
@@ -68,11 +72,19 @@ export async function getPreloadedDashboardData(): Promise<PreloadedDashboardDat
       initialTodayRecords: [],
       initialTodayHealthRecords: [],
       initialRecentMemos: [],
+      initialQuickRecordKeys: [...DEFAULT_QUICK_RECORD_KEYS],
     }
   }
 
-  const initialBabies = await getPreloadedBabies()
+  const [initialBabies, user] = await Promise.all([
+    getPreloadedBabies(),
+    prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { quickRecordSettings: true },
+    }),
+  ])
   const initialSelectedBabyId = initialBabies.activeBabyId || initialBabies.babies[0]?.id || null
+  const initialQuickRecordKeys = parseQuickRecordSettings(user?.quickRecordSettings)
 
   if (!initialSelectedBabyId) {
     return {
@@ -81,6 +93,7 @@ export async function getPreloadedDashboardData(): Promise<PreloadedDashboardDat
       initialTodayRecords: [],
       initialTodayHealthRecords: [],
       initialRecentMemos: [],
+      initialQuickRecordKeys,
     }
   }
 
@@ -137,6 +150,8 @@ export async function getPreloadedDashboardData(): Promise<PreloadedDashboardDat
         diaperType: true,
         diaperStatus: true,
         adGiven: true,
+        vitaminDGiven: true,
+        customName: true,
         sleepStartTime: true,
         sleepEndTime: true,
         sleepQuality: true,
@@ -199,6 +214,8 @@ export async function getPreloadedDashboardData(): Promise<PreloadedDashboardDat
       diaperType: record.diaperType,
       diaperStatus: record.diaperStatus,
       adGiven: record.adGiven,
+      vitaminDGiven: record.vitaminDGiven,
+      customName: record.customName,
       sleepStartTime: record.sleepStartTime?.toISOString() ?? null,
       sleepEndTime: record.sleepEndTime?.toISOString() ?? null,
       sleepQuality: record.sleepQuality,
@@ -213,5 +230,6 @@ export async function getPreloadedDashboardData(): Promise<PreloadedDashboardDat
       completed: memo.completed,
       completedAt: memo.completedAt?.toISOString() ?? null,
     })),
+    initialQuickRecordKeys,
   }
 }

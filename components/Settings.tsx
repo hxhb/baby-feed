@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
@@ -25,8 +25,13 @@ import {
   UserCog,
   MoreVertical,
   Webhook,
-  Bell
+  Bell,
+  LayoutGrid,
+  Loader2,
+  Mars,
+  Venus,
 } from 'lucide-react'
+import AdaptiveDialog from '@/components/AdaptiveDialog'
 
 interface BabyInfo {
   id: string
@@ -63,6 +68,10 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
   const [babyName, setBabyName] = useState('')
   const [birthDate, setBirthDate] = useState('')
   const [gender, setGender] = useState<'MALE' | 'FEMALE'>('MALE')
+  const [babySaving, setBabySaving] = useState(false)
+  const [babyError, setBabyError] = useState('')
+  const babyDialogRef = useRef<HTMLDivElement>(null)
+  const babyDialogPreviousFocusRef = useRef<HTMLElement | null>(null)
 
   // 用户名表单
   const [newName, setNewName] = useState(userName)
@@ -154,54 +163,38 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
   }
 
   // =============== 宝宝管理 ===============
-  const handleAddBaby = async (e: React.FormEvent) => {
+  const handleSaveBaby = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!babyName || !birthDate) {
-      alert('请填写完整信息')
+    if (babySaving) return
+
+    const trimmedName = babyName.trim()
+    if (!trimmedName || !birthDate) {
+      setBabyError('请填写完整信息')
       return
     }
 
+    const isEditing = activeModal === 'editBaby'
+    if (isEditing && !editingBaby) return
+
+    setBabySaving(true)
+    setBabyError('')
     try {
-      const response = await fetch('/api/babies', {
-        method: 'POST',
+      const response = await fetch(isEditing ? `/api/babies/${editingBaby?.id}` : '/api/babies', {
+        method: isEditing ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: babyName, birthDate, gender })
+        body: JSON.stringify({ name: trimmedName, birthDate, gender }),
       })
+      const result = await response.json().catch(() => null)
 
-      if (response.ok) {
-        closeModal()
-        fetchBabies()
-      } else {
-        const error = await response.json()
-        alert(error.error || '添加失败')
-      }
-    } catch (error) {
-      console.error('添加失败:', error)
-      alert('添加失败，请重试')
-    }
-  }
+      if (!response.ok) throw new Error(result?.error || (isEditing ? '更新失败' : '添加失败'))
 
-  const handleUpdateBaby = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!editingBaby || !babyName || !birthDate) return
-
-    try {
-      const response = await fetch(`/api/babies/${editingBaby.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: babyName, birthDate, gender })
-      })
-
-      if (response.ok) {
-        closeModal()
-        fetchBabies()
-      } else {
-        const error = await response.json()
-        alert(error.error || '更新失败')
-      }
-    } catch (error) {
-      console.error('更新失败:', error)
-      alert('更新失败，请重试')
+      await fetchBabies()
+      closeModal()
+    } catch (saveError) {
+      console.error(isEditing ? '更新失败:' : '添加失败:', saveError)
+      setBabyError(saveError instanceof Error ? saveError.message : '保存失败，请重试')
+    } finally {
+      setBabySaving(false)
     }
   }
 
@@ -240,6 +233,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
     setBabyName(baby.name)
     setBirthDate(extractDateStr(baby.birthDate))
     setGender(baby.gender as 'MALE' | 'FEMALE')
+    setBabyError('')
     setActiveModal('editBaby')
   }
 
@@ -395,13 +389,14 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
   }
 
   // =============== 通用 ===============
-  const closeModal = () => {
+  const closeModal = useCallback(() => {
     setActiveModal(null)
     setEditingBaby(null)
     // 重置宝宝表单
     setBabyName('')
     setBirthDate('')
     setGender('MALE')
+    setBabyError('')
     // 重置用户名表单
     setNewName(displayName)
     setNameError('')
@@ -418,7 +413,56 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
     setDeletePassword('')
     setDeleteConfirmText('')
     setDeleteError('')
-  }
+  }, [displayName])
+
+  const babyDialogOpen = activeModal === 'addBaby' || activeModal === 'editBaby'
+
+  useEffect(() => {
+    if (!babyDialogOpen) return
+
+    babyDialogPreviousFocusRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null
+    const focusTimer = window.setTimeout(() => {
+      babyDialogRef.current?.querySelector<HTMLElement>('[data-autofocus]')?.focus()
+    }, 0)
+
+    return () => {
+      window.clearTimeout(focusTimer)
+      const previousFocus = babyDialogPreviousFocusRef.current
+      window.setTimeout(() => previousFocus?.focus(), 0)
+    }
+  }, [babyDialogOpen])
+
+  useEffect(() => {
+    if (!babyDialogOpen) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        if (!babySaving) closeModal()
+        return
+      }
+      if (event.key !== 'Tab' || !babyDialogRef.current) return
+
+      const focusable = Array.from(babyDialogRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      ))
+      if (focusable.length === 0) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [babyDialogOpen, babySaving, closeModal])
 
   if (loading) {
     return (
@@ -482,6 +526,17 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
         </div>
 
         <div className="space-y-2 pt-2 border-t border-gray-100">
+          <button
+            onClick={() => router.push('/settings/quick-records')}
+            className="mobile-touch-target w-full flex items-center justify-between rounded-xl px-2 py-3 text-left transition group hover:bg-gray-50"
+          >
+            <div className="flex items-center space-x-3">
+              <LayoutGrid size={18} className="text-slate-400 group-hover:text-emerald-500 transition" />
+              <span className="text-slate-700">快捷记录管理</span>
+            </div>
+            <span className="text-slate-400 text-sm">›</span>
+          </button>
+
           <button
             onClick={() => router.push('/settings/api-keys')}
             className="mobile-touch-target w-full flex items-center justify-between rounded-xl px-2 py-3 text-left transition group hover:bg-gray-50"
@@ -550,6 +605,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
               setBabyName('')
               setBirthDate('')
               setGender('MALE')
+              setBabyError('')
               setActiveModal('addBaby')
             }}
             className="mobile-touch-target inline-flex w-full items-center justify-center rounded-xl bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100 sm:w-auto"
@@ -664,92 +720,112 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
       {/* ========== 弹窗区域 ========== */}
 
       {/* 添加/编辑宝宝弹窗 */}
-      {(activeModal === 'addBaby' || activeModal === 'editBaby') && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={closeModal}>
-          <div
-            className="w-full max-w-md rounded-t-3xl bg-white p-5 pb-safe shadow-2xl sm:rounded-2xl sm:p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-gray-200 sm:hidden" />
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-slate-900">
+      {babyDialogOpen && (
+        <AdaptiveDialog
+          ref={babyDialogRef}
+          labelledBy="baby-dialog-title"
+          describedBy="baby-dialog-description"
+          onDismiss={() => { if (!babySaving) closeModal() }}
+          maxWidthClassName="sm:max-w-md"
+          zIndexClassName="z-50"
+        >
+          <header className="flex min-h-16 items-center gap-3 border-b border-slate-200 px-4 sm:px-5">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600" aria-hidden="true">
+              <Baby size={20} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 id="baby-dialog-title" className="truncate text-lg font-semibold text-slate-950">
                 {activeModal === 'editBaby' ? '编辑宝宝' : '添加宝宝'}
               </h3>
-              <button
-                onClick={closeModal}
-                className="mobile-touch-target inline-flex items-center justify-center rounded-full p-2 text-slate-400 transition hover:bg-gray-100 hover:text-slate-600"
-              >
-                <X size={20} />
-              </button>
+              <p id="baby-dialog-description" className="truncate text-sm text-slate-600">填写宝宝的基本资料</p>
             </div>
+            <button
+              type="button"
+              onClick={closeModal}
+              disabled={babySaving}
+              aria-label="关闭宝宝资料面板"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            >
+              <X size={21} />
+            </button>
+          </header>
 
-            <form onSubmit={activeModal === 'editBaby' ? handleUpdateBaby : handleAddBaby} className="space-y-4">
+          <form onSubmit={handleSaveBaby} className="flex min-h-0 flex-1 flex-col">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-5 sm:px-5">
+              {babyError ? (
+                <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">
+                  {babyError}
+                </div>
+              ) : null}
+
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  宝宝姓名
-                </label>
+                <label htmlFor="baby-name" className="mb-2 block text-sm font-medium text-slate-700">宝宝姓名</label>
                 <input
+                  id="baby-name"
                   type="text"
                   value={babyName}
-                  onChange={(e) => setBabyName(e.target.value)}
+                  onChange={(e) => { setBabyName(e.target.value); setBabyError('') }}
                   required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  autoComplete="name"
+                  data-autofocus
+                  className="min-h-12 w-full rounded-lg border border-slate-300 px-3.5 text-base outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 sm:text-sm"
                   placeholder="请输入宝宝姓名"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  出生日期
-                </label>
+                <label htmlFor="baby-birth-date" className="mb-2 block text-sm font-medium text-slate-700">出生日期</label>
                 <input
+                  id="baby-birth-date"
                   type="date"
                   value={birthDate}
-                  onChange={(e) => setBirthDate(e.target.value)}
+                  onChange={(e) => { setBirthDate(e.target.value); setBabyError('') }}
                   required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  className="min-h-12 w-full min-w-0 rounded-lg border border-slate-300 px-3.5 text-base outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 sm:text-sm"
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  性别
-                </label>
-                <div className="grid grid-cols-2 gap-3">
+              <fieldset>
+                <legend className="mb-2 text-sm font-medium text-slate-700">性别</legend>
+                <div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-100 p-1" role="radiogroup" aria-label="宝宝性别">
                   <button
                     type="button"
+                    role="radio"
+                    aria-checked={gender === 'MALE'}
                     onClick={() => setGender('MALE')}
-                    className={`mobile-touch-target flex items-center justify-center p-3 rounded-xl border-2 transition ${
-                      gender === 'MALE'
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-200 hover:border-gray-300'
+                    className={`flex min-h-11 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                      gender === 'MALE' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    👦 男宝
+                    <Mars size={17} />男宝
                   </button>
                   <button
                     type="button"
+                    role="radio"
+                    aria-checked={gender === 'FEMALE'}
                     onClick={() => setGender('FEMALE')}
-                    className={`mobile-touch-target flex items-center justify-center p-3 rounded-xl border-2 transition ${
-                      gender === 'FEMALE'
-                        ? 'border-pink-500 bg-pink-50 text-pink-700'
-                        : 'border-gray-200 hover:border-gray-300'
+                    className={`flex min-h-11 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500 ${
+                      gender === 'FEMALE' ? 'bg-white text-pink-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    👧 女宝
+                    <Venus size={17} />女宝
                   </button>
                 </div>
-              </div>
+              </fieldset>
+            </div>
 
+            <footer className="border-t border-slate-200 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] pt-3 sm:px-5 sm:pb-4">
               <button
                 type="submit"
-                className="mobile-touch-target w-full py-3 px-4 gradient-primary shadow-elevated text-white font-medium rounded-xl transition"
+                disabled={babySaving}
+                className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
               >
-                {activeModal === 'editBaby' ? '保存修改' : '添加宝宝'}
+                {babySaving ? <Loader2 size={17} className="animate-spin" /> : null}
+                {babySaving ? '保存中' : activeModal === 'editBaby' ? '保存修改' : '添加宝宝'}
               </button>
-            </form>
-          </div>
-        </div>
+            </footer>
+          </form>
+        </AdaptiveDialog>
       )}
 
       {/* 修改用户名弹窗 */}

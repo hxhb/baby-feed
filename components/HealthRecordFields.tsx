@@ -15,6 +15,8 @@ interface HealthFieldSetters {
   setDiaperType: (value: DiaperType) => void
   setDiaperStatus: (value: string) => void
   setAdGiven: (value: boolean) => void
+  setVitaminDGiven: (value: boolean) => void
+  setCustomName: (value: string) => void
   setSleepStartTime: (value: string) => void
   setSleepEndTime: (value: string) => void
   setSleepQuality: (value: string) => void
@@ -71,6 +73,14 @@ export function getHealthFieldValidationMessage(type: HealthType, values: Health
     if (parsedDoseNumber > parsedTotalDoses) {
       return '当前针次不能大于总针数'
     }
+  }
+
+  if (type === 'AD_VITAMIN' && !values.adGiven && !values.vitaminDGiven) {
+    return '请至少选择 AD 或维生素D'
+  }
+
+  if (type === 'CUSTOM' && !values.customName.trim()) {
+    return '请输入记录名称'
   }
 
   if (type === 'SLEEP' && !values.sleepStartTime) {
@@ -362,30 +372,38 @@ export default function HealthRecordFields({
   }
 
   if (type === 'DIAPER') {
+    const diaperOptions: { value: DiaperType; label: string; icons: string[] }[] = [
+      { value: 'PEE', label: '小便', icons: ['💧'] },
+      { value: 'POOP', label: '大便', icons: ['💩'] },
+      { value: 'BOTH', label: '都有', icons: ['💧', '💩'] },
+    ]
     return (
       <div className="space-y-2.5">
         <div className="grid grid-cols-3 gap-2">
-          {[
-            { value: 'PEE', label: '小便', emoji: '💧' },
-            { value: 'POOP', label: '大便', emoji: '💩' },
-            { value: 'BOTH', label: '都有', emoji: '🚼' },
-          ].map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => setters.setDiaperType(option.value as DiaperType)}
-              className={`mobile-touch-target ${mode === 'create' ? 'min-h-[78px] ' : ''}rounded-xl border-2 px-2 py-2 text-center transition ${
-                values.diaperType === option.value
-                  ? 'border-amber-500 bg-amber-50'
-                  : 'border-gray-200 hover:border-gray-300'
-              }`}
-            >
-              <span className="text-lg">{option.emoji}</span>
-              <p className={`mt-1 text-xs ${values.diaperType === option.value ? 'font-medium text-amber-700' : 'text-gray-600'}`}>
-                {option.label}
-              </p>
-            </button>
-          ))}
+          {diaperOptions.map((option) => {
+            return (
+              <button
+                key={option.value}
+                type="button"
+                aria-pressed={values.diaperType === option.value}
+                onClick={() => setters.setDiaperType(option.value)}
+                className={`mobile-touch-target ${mode === 'create' ? 'min-h-[78px] ' : ''}rounded-lg border px-2 py-2 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
+                  values.diaperType === option.value
+                    ? 'border-amber-500 bg-amber-50'
+                    : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                <span className="flex h-5 items-center justify-center gap-0.5" aria-hidden="true">
+                  {option.icons.map(icon => (
+                    <span key={icon} className={`${option.icons.length > 1 ? 'text-[15px]' : 'text-[18px]'} leading-none`}>{icon}</span>
+                  ))}
+                </span>
+                <span className={`mt-1 block text-xs ${values.diaperType === option.value ? 'font-medium text-amber-700' : 'text-gray-600'}`}>
+                  {option.label}
+                </span>
+              </button>
+            )
+          })}
         </div>
         <div className={mode === 'create' ? 'rounded-2xl bg-gray-50/70 p-3' : ''}>
           <label className="mb-1.5 block text-sm font-medium text-gray-700">
@@ -562,17 +580,44 @@ export default function HealthRecordFields({
     )
   }
 
-  return (
-    <div>
-      <label className="mobile-touch-target flex items-center space-x-3 rounded-2xl bg-gray-50 px-3.5 py-3">
+  if (type === 'CUSTOM') {
+    const showCustomNameError = !!validationMessage
+    return (
+      <div>
+        <label htmlFor="custom-health-name" className="mb-1.5 block text-sm font-medium text-gray-700">
+          记录名称 <span className="text-red-600">*</span>
+        </label>
         <input
-          type="checkbox"
-          checked={values.adGiven}
-          onChange={(e) => setters.setAdGiven(e.target.checked)}
-          className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          id="custom-health-name"
+          type="text"
+          value={values.customName}
+          maxLength={100}
+          autoFocus
+          aria-invalid={showCustomNameError}
+          aria-describedby={showCustomNameError ? 'custom-health-name-error' : undefined}
+          onChange={(event) => setters.setCustomName(event.target.value)}
+          className={`min-h-12 w-full rounded-lg border bg-white px-3.5 text-base text-slate-950 outline-none transition focus:ring-2 ${showCustomNameError ? 'border-red-400 focus:border-red-500 focus:ring-red-100' : 'border-slate-300 focus:border-blue-500 focus:ring-blue-100'}`}
+          placeholder="例如：皮肤状态、康复训练"
         />
-        <span className="text-sm font-medium text-gray-700">已服用AD滴剂</span>
-      </label>
-    </div>
+        {showCustomNameError ? <p id="custom-health-name-error" className="mt-1.5 text-sm text-red-600">{validationMessage}</p> : null}
+      </div>
+    )
+  }
+
+  return (
+    <fieldset>
+      <legend className="mb-1.5 text-sm font-medium text-slate-700">本次补充</legend>
+      <div className="grid grid-cols-2 gap-2">
+        <label className={`flex min-h-12 cursor-pointer items-center gap-2.5 rounded-lg border px-3 transition-colors ${values.adGiven ? 'border-orange-300 bg-orange-50 text-orange-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}>
+          <input type="checkbox" checked={values.adGiven} onChange={(event) => setters.setAdGiven(event.target.checked)} className="h-5 w-5 rounded border-slate-300 text-orange-600 focus:ring-orange-500" />
+          <span className="text-sm font-semibold">AD</span>
+        </label>
+        <label className={`flex min-h-12 cursor-pointer items-center gap-2.5 rounded-lg border px-3 transition-colors ${values.vitaminDGiven ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}>
+          <input type="checkbox" checked={values.vitaminDGiven} onChange={(event) => setters.setVitaminDGiven(event.target.checked)} className="h-5 w-5 rounded border-slate-300 text-amber-600 focus:ring-amber-500" />
+          <span className="text-sm font-semibold">维生素D</span>
+        </label>
+      </div>
+      {validationMessage ? <p className="mt-1.5 text-sm text-red-600">{validationMessage}</p> : null}
+    </fieldset>
   )
 }

@@ -43,6 +43,8 @@ export interface PreloadedTimelineHealthRecord {
   diaperType: string | null
   diaperStatus: string | null
   adGiven: boolean | null
+  vitaminDGiven: boolean | null
+  customName: string | null
   sleepStartTime: string | null
   sleepEndTime: string | null
   sleepQuality: string | null
@@ -157,6 +159,8 @@ async function getPreloadedTimelineRecords(userId: string, babyId: string, dateS
         diaperType: true,
         diaperStatus: true,
         adGiven: true,
+        vitaminDGiven: true,
+        customName: true,
         sleepStartTime: true,
         sleepEndTime: true,
         sleepQuality: true,

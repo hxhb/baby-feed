@@ -14,11 +14,13 @@ import {
   Thermometer,
   ChevronRight,
   Ruler,
-  CalendarCheck,
   ClipboardList
 } from 'lucide-react'
 import { getRecordIcon, getRecordTitle } from '@/lib/record-display'
 import type { DisplayRecord } from '@/lib/record-display'
+import { useRecordComposer } from '@/components/RecordComposerProvider'
+import { getQuickRecordMeta, type RecordTypeMeta } from '@/components/record-composer/record-types'
+import { DEFAULT_QUICK_RECORD_KEYS, type QuickRecordKey } from '@/lib/quick-records'
 
 interface Baby {
   id: string
@@ -58,6 +60,8 @@ interface HealthRecord {
   diaperType?: string | null
   diaperStatus?: string | null
   adGiven?: boolean | null
+  vitaminDGiven?: boolean | null
+  customName?: string | null
   sleepStartTime?: string | null
   sleepEndTime?: string | null
   sleepQuality?: string | null
@@ -73,6 +77,7 @@ interface DailyStats {
   formulaCount: number
   totalFormulaAmount: number
   adGiven: boolean
+  vitaminDGiven: boolean
   weight?: number
   height?: number
   temperature?: number
@@ -96,9 +101,20 @@ interface Props {
   initialTodayRecords?: FeedingRecord[]
   initialTodayHealthRecords?: HealthRecord[]
   initialRecentMemos?: DashboardMemo[]
+  initialQuickRecordKeys?: QuickRecordKey[]
 }
 
-
+const quickRecordToneClasses: Record<RecordTypeMeta['tone'], { button: string; icon: string; text: string }> = {
+  pink: { button: 'border-pink-100/60 from-pink-50 to-pink-100/80 focus-visible:ring-pink-500', icon: 'text-pink-500', text: 'text-pink-700' },
+  blue: { button: 'border-blue-100/60 from-blue-50 to-blue-100/80 focus-visible:ring-blue-500', icon: 'text-blue-500', text: 'text-blue-700' },
+  amber: { button: 'border-amber-100/60 from-amber-50 to-amber-100/80 focus-visible:ring-amber-500', icon: 'text-amber-500', text: 'text-amber-700' },
+  violet: { button: 'border-violet-100/60 from-violet-50 to-violet-100/80 focus-visible:ring-violet-500', icon: 'text-violet-500', text: 'text-violet-700' },
+  orange: { button: 'border-orange-100/60 from-orange-50 to-orange-100/80 focus-visible:ring-orange-500', icon: 'text-orange-500', text: 'text-orange-700' },
+  emerald: { button: 'border-green-100/60 from-green-50 to-green-100/80 focus-visible:ring-emerald-500', icon: 'text-emerald-500', text: 'text-green-700' },
+  red: { button: 'border-red-100/60 from-red-50 to-red-100/80 focus-visible:ring-red-500', icon: 'text-red-500', text: 'text-red-700' },
+  teal: { button: 'border-teal-100/60 from-teal-50 to-teal-100/80 focus-visible:ring-teal-500', icon: 'text-teal-500', text: 'text-teal-700' },
+  indigo: { button: 'border-indigo-100/60 from-indigo-50 to-indigo-100/80 focus-visible:ring-indigo-500', icon: 'text-indigo-500', text: 'text-indigo-700' },
+}
 
 function buildDailyStats(feedingData: FeedingRecord[], healthData: HealthRecord[]): DailyStats {
   const latestWeightRecord = healthData.find(r => r.type === 'WEIGHT' && typeof r.weight === 'number')
@@ -119,6 +135,7 @@ function buildDailyStats(feedingData: FeedingRecord[], healthData: HealthRecord[
       .filter(r => r.type === 'FORMULA')
       .reduce((sum, r) => sum + (r.formulaAmount || 0), 0),
     adGiven: healthData.some(r => r.type === 'AD_VITAMIN' && r.adGiven),
+    vitaminDGiven: healthData.some(r => r.type === 'AD_VITAMIN' && r.vitaminDGiven),
     weight: latestWeightRecord?.weight ?? undefined,
     height: latestHeightRecord?.height ?? undefined,
     temperature: latestTemperatureRecord?.temperature ?? undefined,
@@ -134,7 +151,9 @@ export default function Dashboard({
   initialTodayRecords = [],
   initialTodayHealthRecords = [],
   initialRecentMemos = [],
+  initialQuickRecordKeys = [...DEFAULT_QUICK_RECORD_KEYS],
 }: Props) {
+  const { openComposer } = useRecordComposer()
   const [babies, setBabies] = useState<Baby[]>(initialBabies)
   const [internalSelectedBabyId, setInternalSelectedBabyId] = useState<string | null>(initialBabies[0]?.id ?? null)
   const [todayRecords, setTodayRecords] = useState<FeedingRecord[]>(initialTodayRecords)
@@ -158,6 +177,18 @@ export default function Dashboard({
 
   const resolvedSelectedBabyId = selectedBabyId ?? internalSelectedBabyId
   const hasInitialTodayData = !freshFetch && (initialTodayRecords.length > 0 || initialTodayHealthRecords.length > 0)
+
+  const openQuickRecord = (key: QuickRecordKey) => {
+    if (key === 'GROUP_FEEDING') {
+      openComposer(null, { scope: 'feeding' })
+      return
+    }
+    if (key === 'GROUP_HEALTH') {
+      openComposer(null, { scope: 'health' })
+      return
+    }
+    openComposer(key === 'GROUP_MEMO' ? 'MEMO' : key, { patch: { babyId: resolvedSelectedBabyId || '' } })
+  }
 
   // If a record was just saved, invalidate cache to ensure fresh API responses
   useEffect(() => {
@@ -369,12 +400,12 @@ export default function Dashboard({
         <div className="bg-white rounded-card p-3 shadow-card border border-blue-50">
           <div className="flex items-center justify-between mb-1.5">
             <Pill size={20} className="text-orange-500" />
-            <span className="text-xs text-slate-400 font-medium">AD</span>
+            <span className="text-xs text-slate-400 font-medium">营养补充</span>
           </div>
-          <p className="text-2xl font-extrabold text-slate-900 tracking-tight">
-            {stats?.adGiven ? '✓' : '○'}
+          <p className="text-lg font-extrabold text-slate-900">
+            AD {stats?.adGiven ? '✓' : '○'} · 维D {stats?.vitaminDGiven ? '✓' : '○'}
           </p>
-          <p className="text-xs text-slate-500">{stats?.adGiven ? '已服用' : '未服用'}</p>
+          <p className="text-xs text-slate-500">今日补充状态</p>
         </div>
 
         <div className="bg-white rounded-card p-3 shadow-card border border-blue-50">
@@ -465,30 +496,23 @@ export default function Dashboard({
       <div className="bg-white rounded-card p-4 shadow-card border border-blue-50">
         <h3 className="text-base font-bold text-slate-900 mb-3">快捷记录</h3>
         <div className="grid grid-cols-4 gap-2">
-          <Link href="/add?type=breast" className="flex flex-col items-center py-3 bg-gradient-to-b from-pink-50 to-pink-100/80 rounded-button border border-pink-100/60 hover:shadow-pressed transition active:scale-95">
-            <div className="mb-1.5">
-              <Droplets size={22} className="text-pink-500" />
-            </div>
-            <span className="text-[11px] font-semibold text-pink-700">母乳</span>
-          </Link>
-          <Link href="/add?type=formula" className="flex flex-col items-center py-3 bg-gradient-to-b from-blue-50 to-blue-100/80 rounded-button border border-blue-100/60 hover:shadow-pressed transition active:scale-95">
-            <div className="mb-1.5">
-              <Milk size={22} className="text-blue-500" />
-            </div>
-            <span className="text-[11px] font-semibold text-blue-700">奶粉</span>
-          </Link>
-          <Link href="/add?type=health" className="flex flex-col items-center py-3 bg-gradient-to-b from-green-50 to-green-100/80 rounded-button border border-green-100/60 hover:shadow-pressed transition active:scale-95">
-            <div className="mb-1.5">
-              <Scale size={22} className="text-emerald-500" />
-            </div>
-            <span className="text-[11px] font-semibold text-green-700">健康</span>
-          </Link>
-          <Link href="/add?type=memo" className="flex flex-col items-center py-3 bg-gradient-to-b from-indigo-50 to-indigo-100/80 rounded-button border border-indigo-100/60 hover:shadow-pressed transition active:scale-95">
-            <div className="mb-1.5">
-              <CalendarCheck size={22} className="text-indigo-500" />
-            </div>
-            <span className="text-[11px] font-semibold text-indigo-700">备忘</span>
-          </Link>
+          {initialQuickRecordKeys.map(key => {
+            const item = getQuickRecordMeta(key)
+            const tone = quickRecordToneClasses[item.tone]
+            const Icon = item.icon
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => openQuickRecord(key)}
+                aria-label={`添加${item.label}记录`}
+                className={`flex w-full flex-col items-center rounded-button border bg-gradient-to-b py-3 transition hover:shadow-pressed active:scale-95 focus-visible:outline-none focus-visible:ring-2 ${tone.button}`}
+              >
+                <span className="mb-1.5"><Icon size={22} className={tone.icon} /></span>
+                <span className={`max-w-full truncate px-1 text-[11px] font-semibold ${tone.text}`}>{item.label}</span>
+              </button>
+            )
+          })}
         </div>
       </div>
 

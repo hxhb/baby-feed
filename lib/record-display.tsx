@@ -7,6 +7,7 @@ import {
   Ruler,
   Syringe,
   Baby as BabyIcon,
+  FilePenLine,
   Moon,
   UtensilsCrossed,
 } from 'lucide-react'
@@ -45,6 +46,8 @@ export interface HealthRecordDisplay {
   diaperType?: string | null
   diaperStatus?: string | null
   adGiven?: boolean | null
+  vitaminDGiven?: boolean | null
+  customName?: string | null
   sleepStartTime?: string | null
   sleepEndTime?: string | null
   sleepQuality?: string | null
@@ -83,6 +86,8 @@ export function getRecordIcon(type: string, size: number = 20) {
       return <Milk size={size} className="text-blue-500" />
     case 'AD_VITAMIN':
       return <Pill size={size} className="text-orange-500" />
+    case 'CUSTOM':
+      return <FilePenLine size={size} className="text-indigo-500" />
     case 'WEIGHT':
       return <Scale size={size} className="text-emerald-500" />
     case 'HEIGHT':
@@ -122,7 +127,9 @@ export function getRecordTitle(record: DisplayRecord): string {
     }
     case 'AD_VITAMIN': {
       const health = record as HealthRecordDisplay
-      return health.adGiven ? 'AD滴剂已服用' : 'AD滴剂未服用'
+      const supplements = [health.adGiven ? 'AD' : null, health.vitaminDGiven ? '维生素D' : null].filter(Boolean)
+      if (supplements.length > 0) return `${supplements.join('、')}已补充`
+      return health.adGiven === false ? 'AD滴剂未服用' : '营养补充记录'
     }
     case 'WEIGHT': {
       const health = record as HealthRecordDisplay
@@ -179,6 +186,10 @@ export function getRecordTitle(record: DisplayRecord): string {
       const name = feeding.solidFoodName || '辅食'
       const amount = feeding.solidFoodAmount
       return `${name}${amount ? ` ${amount}` : ''}`
+    }
+    case 'CUSTOM': {
+      const health = record as HealthRecordDisplay
+      return health.customName?.trim() || '自定义健康记录'
     }
     default:
       return '未知记录'

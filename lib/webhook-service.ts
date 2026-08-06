@@ -49,6 +49,8 @@ const HEALTH_FIELDS = [
   'diaperType',
   'diaperStatus',
   'adGiven',
+  'vitaminDGiven',
+  'customName',
   'sleepStartTime',
   'sleepEndTime',
   'sleepQuality',
@@ -71,6 +73,7 @@ const RECORD_TYPE_LABELS: Record<string, string> = {
   DIAPER: '大小便',
   AD_VITAMIN: 'AD滴剂',
   SLEEP: '睡眠',
+  CUSTOM: '自定义健康记录',
 }
 
 const EVENT_LABELS: Record<string, string> = {
@@ -361,6 +364,8 @@ export async function emitHealthCreated(
         diaperType: record.diaperType,
         diaperStatus: record.diaperStatus,
         adGiven: record.adGiven,
+        vitaminDGiven: record.vitaminDGiven,
+        customName: record.customName,
         sleepStartTime: record.sleepStartTime?.toISOString(),
         sleepEndTime: record.sleepEndTime?.toISOString(),
         sleepQuality: record.sleepQuality,
@@ -409,6 +414,8 @@ export async function emitHealthUpdated(
         diaperType: newRecord.diaperType,
         diaperStatus: newRecord.diaperStatus,
         adGiven: newRecord.adGiven,
+        vitaminDGiven: newRecord.vitaminDGiven,
+        customName: newRecord.customName,
         sleepStartTime: newRecord.sleepStartTime?.toISOString(),
         sleepEndTime: newRecord.sleepEndTime?.toISOString(),
         sleepQuality: newRecord.sleepQuality,

@@ -58,6 +58,8 @@ interface HealthRecord {
   diaperType?: string | null
   diaperStatus?: string | null
   adGiven?: boolean | null
+  vitaminDGiven?: boolean | null
+  customName?: string | null
   sleepStartTime?: string | null
   sleepEndTime?: string | null
   sleepQuality?: string | null
@@ -704,7 +706,7 @@ export default function TimelineComponent({
     let totalFormulaAmount = 0
     let peeCount = 0
     let poopCount = 0
-    let hasAdVitamin = false
+    let hasSupplement = false
     let sleepTotalMinutes = 0
     let sleepCount = 0
 
@@ -736,8 +738,11 @@ export default function TimelineComponent({
         return
       }
 
-      if (record.type === 'AD_VITAMIN' && (record as HealthRecord).adGiven) {
-        hasAdVitamin = true
+      if (record.type === 'AD_VITAMIN') {
+        const healthRecord = record as HealthRecord
+        if (healthRecord.adGiven || healthRecord.vitaminDGiven) {
+          hasSupplement = true
+        }
       }
 
       if (record.type === 'SLEEP') {
@@ -763,7 +768,7 @@ export default function TimelineComponent({
       totalFormulaAmount,
       peeCount,
       poopCount,
-      hasAdVitamin,
+      hasSupplement,
       sleepTotalMinutes,
       sleepCount,
     }
@@ -961,8 +966,8 @@ export default function TimelineComponent({
             )}
           </div>
           <div>
-            <p className="text-xl font-bold text-orange-600">{timelineSummary.hasAdVitamin ? '✓' : '○'}</p>
-            <p className="text-xs text-gray-500">AD</p>
+            <p className="text-xl font-bold text-orange-600">{timelineSummary.hasSupplement ? '✓' : '○'}</p>
+            <p className="whitespace-nowrap text-[11px] text-gray-500 sm:text-xs">营养补剂</p>
           </div>
         </div>
       </div>

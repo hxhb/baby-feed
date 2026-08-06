@@ -43,6 +43,8 @@ interface HealthRecord {
   diaperType?: string | null
   diaperStatus?: string | null
   adGiven?: boolean | null
+  vitaminDGiven?: boolean | null
+  customName?: string | null
   sleepStartTime?: string | null
   sleepEndTime?: string | null
   sleepQuality?: string | null
@@ -98,6 +100,8 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
   const [diaperType, setDiaperType] = useState(healthRecord?.diaperType || 'PEE')
   const [diaperStatus, setDiaperStatus] = useState(healthRecord?.diaperStatus || '')
   const [adGiven, setAdGiven] = useState(healthRecord?.adGiven ?? true)
+  const [vitaminDGiven, setVitaminDGiven] = useState(healthRecord?.vitaminDGiven ?? false)
+  const [customName, setCustomName] = useState(healthRecord?.customName || '')
   const [sleepStartTime, setSleepStartTime] = useState(healthRecord?.sleepStartTime ? toBeijingDatetimeLocal(healthRecord.sleepStartTime) : '')
   const [sleepEndTime, setSleepEndTime] = useState(healthRecord?.sleepEndTime ? toBeijingDatetimeLocal(healthRecord.sleepEndTime) : '')
   const [sleepQuality, setSleepQuality] = useState(healthRecord?.sleepQuality || '')
@@ -123,6 +127,8 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
     diaperType: diaperType as 'PEE' | 'POOP' | 'BOTH',
     diaperStatus,
     adGiven,
+    vitaminDGiven,
+    customName,
     sleepStartTime,
     sleepEndTime,
     sleepQuality,
@@ -248,7 +254,7 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
       case 'SOLID_FOOD':
         return '辅食'
       case 'AD_VITAMIN':
-        return 'AD滴剂'
+        return '营养补充'
       case 'WEIGHT':
         return '体重'
       case 'HEIGHT':
@@ -261,6 +267,10 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
         return '疫苗'
       case 'DIAPER':
         return '大小便'
+      case 'SLEEP':
+        return '睡眠'
+      case 'CUSTOM':
+        return customName || '自定义记录'
       default:
         return '记录'
     }
@@ -335,6 +345,8 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
                 setDiaperType: (value) => setDiaperType(value),
                 setDiaperStatus,
                 setAdGiven,
+                setVitaminDGiven,
+                setCustomName,
                 setSleepStartTime,
                 setSleepEndTime: handleSleepEndTimeChange,
                 setSleepQuality,

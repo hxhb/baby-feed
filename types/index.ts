@@ -1,3 +1,8 @@
+import type { FeedingType } from '@/lib/feeding-records'
+import type { HealthType } from '@/lib/health-records'
+
+export type { FeedingType } from '@/lib/feeding-records'
+
 export interface User {
   id: string
   email: string
@@ -19,8 +24,7 @@ export interface Baby {
   createdBy: string
 }
 
-export type FeedingType = 'BREAST_MILK' | 'BREAST_MILK_BOTTLE' | 'FORMULA'
-export type HealthRecordType = 'WEIGHT' | 'HEIGHT' | 'TEMPERATURE' | 'MEDICATION' | 'VACCINE' | 'DIAPER' | 'AD_VITAMIN'
+export type HealthRecordType = HealthType
 
 export interface FeedingRecord {
   id: string
@@ -52,6 +56,11 @@ export interface HealthRecord {
   diaperType?: 'PEE' | 'POOP' | 'BOTH'
   diaperStatus?: string
   adGiven?: boolean
+  vitaminDGiven?: boolean
+  customName?: string
+  sleepStartTime?: string
+  sleepEndTime?: string
+  sleepQuality?: string
   recordedAt: string
   notes?: string
   createdAt: string
@@ -67,6 +76,7 @@ export interface DailyStats {
   formulaCount: number
   totalFormulaAmount: number
   adGiven: boolean
+  vitaminDGiven: boolean
   weight?: number
   temperature?: number
 }

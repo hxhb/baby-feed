@@ -1,6 +1,7 @@
 import { toBeijingISO } from '@/lib/time'
 
-export type HealthType = 'WEIGHT' | 'HEIGHT' | 'TEMPERATURE' | 'MEDICATION' | 'VACCINE' | 'DIAPER' | 'AD_VITAMIN' | 'SLEEP'
+export const HEALTH_TYPES = ['WEIGHT', 'HEIGHT', 'TEMPERATURE', 'MEDICATION', 'VACCINE', 'DIAPER', 'AD_VITAMIN', 'SLEEP', 'CUSTOM'] as const
+export type HealthType = typeof HEALTH_TYPES[number]
 export type DiaperType = 'PEE' | 'POOP' | 'BOTH'
 
 export interface HealthFieldValues {
@@ -16,6 +17,8 @@ export interface HealthFieldValues {
   diaperType: DiaperType
   diaperStatus: string
   adGiven: boolean
+  vitaminDGiven: boolean
+  customName: string
   sleepStartTime: string
   sleepEndTime: string
   sleepQuality: string
@@ -66,6 +69,8 @@ export function buildHealthRecordPayload(type: HealthType, values: HealthFieldVa
     diaperType: null,
     diaperStatus: null,
     adGiven: null,
+    vitaminDGiven: null,
+    customName: null,
     sleepStartTime: null,
     sleepEndTime: null,
     sleepQuality: null,
@@ -122,6 +127,14 @@ export function buildHealthRecordPayload(type: HealthType, values: HealthFieldVa
     return {
       ...basePayload,
       adGiven: values.adGiven,
+      vitaminDGiven: values.vitaminDGiven,
+    }
+  }
+
+  if (type === 'CUSTOM') {
+    return {
+      ...basePayload,
+      customName: normalizeOptionalText(values.customName),
     }
   }
 
