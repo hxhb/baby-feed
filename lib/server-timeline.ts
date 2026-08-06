@@ -13,13 +13,15 @@ export interface PreloadedTimelineFeedingRecord {
   id: string
   type: string
   startTime: string
-  endTime?: string | null
-  leftBreastDuration?: number | null
-  rightBreastDuration?: number | null
-  breastMilkAmount?: number | null
-  formulaAmount?: number | null
-  adGiven?: boolean | null
-  notes?: string | null
+  endTime: string | null
+  leftBreastDuration: number | null
+  rightBreastDuration: number | null
+  breastMilkAmount: number | null
+  formulaAmount: number | null
+  solidFoodName: string | null
+  solidFoodAmount: string | null
+  adGiven: boolean | null
+  notes: string | null
   babyId: string
   baby?: PreloadedTimelineBaby
   recordType: 'feeding'
@@ -29,22 +31,22 @@ export interface PreloadedTimelineHealthRecord {
   id: string
   type: string
   recordedAt: string
-  weight?: number | null
-  height?: number | null
-  temperature?: number | null
-  medicationName?: string | null
-  medicationDose?: string | null
-  vaccineName?: string | null
-  vaccineManufacturer?: string | null
-  vaccineDoseNumber?: number | null
-  vaccineTotalDoses?: number | null
-  diaperType?: string | null
-  diaperStatus?: string | null
-  adGiven?: boolean | null
-  sleepStartTime?: string | null
-  sleepEndTime?: string | null
-  sleepQuality?: string | null
-  notes?: string | null
+  weight: number | null
+  height: number | null
+  temperature: number | null
+  medicationName: string | null
+  medicationDose: string | null
+  vaccineName: string | null
+  vaccineManufacturer: string | null
+  vaccineDoseNumber: number | null
+  vaccineTotalDoses: number | null
+  diaperType: string | null
+  diaperStatus: string | null
+  adGiven: boolean | null
+  sleepStartTime: string | null
+  sleepEndTime: string | null
+  sleepQuality: string | null
+  notes: string | null
   babyId: string
   baby?: PreloadedTimelineBaby
   recordType: 'health'
@@ -123,6 +125,8 @@ async function getPreloadedTimelineRecords(userId: string, babyId: string, dateS
         rightBreastDuration: true,
         breastMilkAmount: true,
         formulaAmount: true,
+        solidFoodName: true,
+        solidFoodAmount: true,
         adGiven: true,
         notes: true,
         babyId: true,

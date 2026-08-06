@@ -17,6 +17,7 @@ interface HealthFieldSetters {
   setAdGiven: (value: boolean) => void
   setSleepStartTime: (value: string) => void
   setSleepEndTime: (value: string) => void
+  setSleepQuality: (value: string) => void
 }
 
 interface Props {
@@ -543,6 +544,19 @@ export default function HealthRecordFields({
               睡眠时长：{formatDurationDisplay(currentDurationMinutes)}
             </p>
           ) : null}
+        </div>
+
+        <div className={mode === 'create' ? 'rounded-2xl bg-gray-50/70 p-3' : ''}>
+          <label className="mb-1.5 block text-sm font-medium text-gray-700">
+            睡眠质量（可选）
+          </label>
+          <input
+            type="text"
+            value={values.sleepQuality}
+            onChange={(e) => setters.setSleepQuality(e.target.value)}
+            className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-transparent focus:ring-2 focus:ring-blue-500"
+            placeholder="例如：安稳、易醒"
+          />
         </div>
       </div>
     )

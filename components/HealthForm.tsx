@@ -48,6 +48,7 @@ interface HealthDraft {
   adGiven: boolean
   sleepStartTime: string
   sleepEndTime: string
+  sleepQuality: string
 }
 
 interface Props {
@@ -76,7 +77,8 @@ const emptyHealthDraft: HealthDraft = {
   diaperStatus: '',
   adGiven: true,
   sleepStartTime: '',
-  sleepEndTime: ''
+  sleepEndTime: '',
+  sleepQuality: ''
 }
 
 
@@ -113,6 +115,7 @@ export default function HealthForm({
   const [adGiven, setAdGiven] = useState(true)
   const [sleepStartTime, setSleepStartTime] = useState('')
   const [sleepEndTime, setSleepEndTime] = useState('')
+  const [sleepQuality, setSleepQuality] = useState('')
   const [recordedAt, setRecordedAt] = useState(initialSharedDraft?.eventTime || getBeijingNow())
 
   // When type is SLEEP, bind recordedAt to sleepEndTime
@@ -229,6 +232,9 @@ export default function HealthForm({
           setRecordedAt(parsedDraft.sleepEndTime)
         }
       }
+      if (typeof parsedDraft.sleepQuality === 'string') {
+        setSleepQuality(parsedDraft.sleepQuality)
+      }
     } catch (error) {
       console.error('读取健康草稿失败:', error)
     }
@@ -251,7 +257,8 @@ export default function HealthForm({
         diaperStatus,
         adGiven,
         sleepStartTime,
-        sleepEndTime
+        sleepEndTime,
+        sleepQuality
       }
 
       const isEmptyDraft =
@@ -269,7 +276,8 @@ export default function HealthForm({
         !nextDraft.diaperStatus &&
         nextDraft.adGiven === emptyHealthDraft.adGiven &&
         !nextDraft.sleepStartTime &&
-        !nextDraft.sleepEndTime
+        !nextDraft.sleepEndTime &&
+        !nextDraft.sleepQuality
 
       if (isEmptyDraft) {
         window.sessionStorage.removeItem(HEALTH_DRAFT_STORAGE_KEY)
@@ -280,7 +288,7 @@ export default function HealthForm({
     } catch (error) {
       console.error('保存健康草稿失败:', error)
     }
-  }, [type, weight, height, temperature, medicationName, medicationDose, vaccineName, vaccineManufacturer, vaccineDoseNumber, vaccineTotalDoses, diaperType, diaperStatus, adGiven, sleepStartTime, sleepEndTime])
+  }, [type, weight, height, temperature, medicationName, medicationDose, vaccineName, vaccineManufacturer, vaccineDoseNumber, vaccineTotalDoses, diaperType, diaperStatus, adGiven, sleepStartTime, sleepEndTime, sleepQuality])
 
   useEffect(() => {
     if (!submitError) {
@@ -289,7 +297,7 @@ export default function HealthForm({
 
     setSubmitError('')
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [babyId, type, weight, height, temperature, medicationName, medicationDose, vaccineName, vaccineManufacturer, vaccineDoseNumber, vaccineTotalDoses, diaperType, diaperStatus, adGiven, sleepStartTime, sleepEndTime, recordedAt, notes])
+  }, [babyId, type, weight, height, temperature, medicationName, medicationDose, vaccineName, vaccineManufacturer, vaccineDoseNumber, vaccineTotalDoses, diaperType, diaperStatus, adGiven, sleepStartTime, sleepEndTime, sleepQuality, recordedAt, notes])
 
   useEffect(() => {
     if (type !== 'VACCINE' || !babyId) {
@@ -382,7 +390,7 @@ export default function HealthForm({
       adGiven,
       sleepStartTime,
       sleepEndTime,
-      sleepQuality: '',
+      sleepQuality,
     })
   }
 
@@ -401,7 +409,7 @@ export default function HealthForm({
     adGiven,
     sleepStartTime,
     sleepEndTime,
-    sleepQuality: '',
+    sleepQuality,
   }
 
   const handleApplyVaccineSuggestion = (suggestion: VaccineSuggestion) => {
@@ -560,6 +568,7 @@ export default function HealthForm({
             setAdGiven,
             setSleepStartTime,
             setSleepEndTime: handleSleepEndTimeChange,
+            setSleepQuality,
           }}
         />
       </div>

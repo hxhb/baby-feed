@@ -32,6 +32,7 @@ interface ReminderRule {
   activeSchedule: { windows: Array<{ start: string; end: string }> } | null
   notifyTitle: string
   notifyBody: string | null
+  advanceMinutes: number
   lastFiredAt: string | null
   createdAt: string
 }
@@ -374,7 +375,7 @@ export default function ReminderManager({ onBack }: Props) {
             filterCondition: feedingTypes.length > 0 ? { type: feedingTypes } : undefined,
           },
           activeSchedule: { windows: [{ start: scheduleStart, end: scheduleEnd }] },
-          advanceMinutes: 0,
+          advanceMinutes: editingRule?.advanceMinutes ?? 0,
           notifyTitle: '该给{{babyName}}喂奶了',
           notifyBody: '距离上次喂养已经{{elapsed}}',
         }
@@ -385,7 +386,7 @@ export default function ReminderManager({ onBack }: Props) {
           triggerType: 'cron',
           triggerConfig: { cronExpr: `${cronMinute} ${cronHour} * * *` },
           activeSchedule: null,
-          advanceMinutes: 0,
+          advanceMinutes: editingRule?.advanceMinutes ?? 0,
           notifyTitle: cronContent || '每日定时提醒',
           notifyBody: null,
         }
@@ -405,7 +406,7 @@ export default function ReminderManager({ onBack }: Props) {
             repeatIntervalMinutes: repeatHours * 60,
           },
           activeSchedule: { windows: [{ start: ewScheduleStart, end: ewScheduleEnd }] },
-          advanceMinutes: 0,
+          advanceMinutes: editingRule?.advanceMinutes ?? 0,
           notifyTitle: '该给{{babyName}}测体温了',
           notifyBody: noteBody,
         }
@@ -427,7 +428,7 @@ export default function ReminderManager({ onBack }: Props) {
             filterCondition: healthTypes.length > 0 ? { type: healthTypes } : undefined,
           },
           activeSchedule: { windows: [{ start: healthScheduleStart, end: healthScheduleEnd }] },
-          advanceMinutes: 0,
+          advanceMinutes: editingRule?.advanceMinutes ?? 0,
           notifyTitle: `该关注一下{{babyName}}的${itemsText}了`,
           notifyBody: userNote ? `${baseBody}\n${userNote}` : baseBody,
         }
@@ -535,8 +536,10 @@ export default function ReminderManager({ onBack }: Props) {
     } else if (rule.triggerType === 'cron') {
       const cronExpr = (config.cronExpr as string) || '0 11 * * *'
       const [min, hour] = cronExpr.split(' ')
-      setCronHour(parseInt(hour) || 11)
-      setCronMinute(parseInt(min) || 0)
+      const parsedHour = Number.parseInt(hour, 10)
+      const parsedMinute = Number.parseInt(min, 10)
+      setCronHour(Number.isNaN(parsedHour) ? 11 : parsedHour)
+      setCronMinute(Number.isNaN(parsedMinute) ? 0 : parsedMinute)
       setCronContent(rule.name === '每日定时提醒' ? '' : rule.name)
     } else if (rule.triggerType === 'event_window') {
       const anchorISO = (config.anchorTime as string) || ''

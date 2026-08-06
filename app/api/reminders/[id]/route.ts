@@ -67,6 +67,7 @@ export async function PUT(
     }
 
     const {
+      babyId,
       name,
       enabled,
       triggerType,
@@ -81,6 +82,30 @@ export async function PUT(
 
     const updateData: Record<string, unknown> = {}
     let shouldResetNextCheckAt = false
+
+    if (babyId !== undefined) {
+      if (typeof babyId !== 'string') {
+        return NextResponse.json({ error: 'babyId 必须是字符串' }, { status: 400, headers: noStoreHeaders })
+      }
+
+      const babyIdCheck = validateId(babyId, '宝宝 ID')
+      if (!babyIdCheck.valid) {
+        return NextResponse.json({ error: babyIdCheck.error }, { status: 400, headers: noStoreHeaders })
+      }
+
+      const baby = await prisma.baby.findFirst({
+        where: { id: babyId, createdBy: session.user.id },
+        select: { id: true },
+      })
+      if (!baby) {
+        return NextResponse.json({ error: '宝宝不存在' }, { status: 404, headers: noStoreHeaders })
+      }
+
+      updateData.babyId = babyId
+      if (babyId !== existing.babyId) {
+        shouldResetNextCheckAt = true
+      }
+    }
 
     // name
     if (name !== undefined) {

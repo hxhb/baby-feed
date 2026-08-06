@@ -100,6 +100,7 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
   const [adGiven, setAdGiven] = useState(healthRecord?.adGiven ?? true)
   const [sleepStartTime, setSleepStartTime] = useState(healthRecord?.sleepStartTime ? toBeijingDatetimeLocal(healthRecord.sleepStartTime) : '')
   const [sleepEndTime, setSleepEndTime] = useState(healthRecord?.sleepEndTime ? toBeijingDatetimeLocal(healthRecord.sleepEndTime) : '')
+  const [sleepQuality, setSleepQuality] = useState(healthRecord?.sleepQuality || '')
 
   // When type is SLEEP, bind editTime to sleepEndTime
   const handleSleepEndTimeChange = (value: string) => {
@@ -124,7 +125,7 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
     adGiven,
     sleepStartTime,
     sleepEndTime,
-    sleepQuality: '',
+    sleepQuality,
   }
 
   const feedingFieldValues: FeedingFieldValues = {
@@ -336,6 +337,7 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
                 setAdGiven,
                 setSleepStartTime,
                 setSleepEndTime: handleSleepEndTimeChange,
+                setSleepQuality,
               }}
             />
           )}

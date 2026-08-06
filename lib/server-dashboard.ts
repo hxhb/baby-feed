@@ -8,12 +8,14 @@ export interface PreloadedDashboardFeedingRecord {
   id: string
   type: string
   startTime: string
-  leftBreastDuration?: number
-  rightBreastDuration?: number
-  breastMilkAmount?: number
-  formulaAmount?: number
-  adGiven?: boolean
-  notes?: string | null
+  leftBreastDuration: number | null
+  rightBreastDuration: number | null
+  breastMilkAmount: number | null
+  formulaAmount: number | null
+  solidFoodName: string | null
+  solidFoodAmount: string | null
+  adGiven: boolean | null
+  notes: string | null
   recordType: 'feeding'
 }
 
@@ -21,18 +23,22 @@ export interface PreloadedDashboardHealthRecord {
   id: string
   type: string
   recordedAt: string
-  weight?: number
-  height?: number
-  temperature?: number
-  medicationName?: string | null
-  vaccineName?: string | null
-  diaperType?: string | null
-  diaperStatus?: string | null
-  adGiven?: boolean
-  sleepStartTime?: string | null
-  sleepEndTime?: string | null
-  sleepQuality?: string | null
-  notes?: string | null
+  weight: number | null
+  height: number | null
+  temperature: number | null
+  medicationName: string | null
+  medicationDose: string | null
+  vaccineName: string | null
+  vaccineManufacturer: string | null
+  vaccineDoseNumber: number | null
+  vaccineTotalDoses: number | null
+  diaperType: string | null
+  diaperStatus: string | null
+  adGiven: boolean | null
+  sleepStartTime: string | null
+  sleepEndTime: string | null
+  sleepQuality: string | null
+  notes: string | null
   recordType: 'health'
 }
 
@@ -102,6 +108,8 @@ export async function getPreloadedDashboardData(): Promise<PreloadedDashboardDat
         rightBreastDuration: true,
         breastMilkAmount: true,
         formulaAmount: true,
+        solidFoodName: true,
+        solidFoodAmount: true,
         adGiven: true,
         notes: true,
       },
@@ -121,7 +129,11 @@ export async function getPreloadedDashboardData(): Promise<PreloadedDashboardDat
         height: true,
         temperature: true,
         medicationName: true,
+        medicationDose: true,
         vaccineName: true,
+        vaccineManufacturer: true,
+        vaccineDoseNumber: true,
+        vaccineTotalDoses: true,
         diaperType: true,
         diaperStatus: true,
         adGiven: true,
@@ -161,11 +173,13 @@ export async function getPreloadedDashboardData(): Promise<PreloadedDashboardDat
       id: record.id,
       type: record.type,
       startTime: record.startTime.toISOString(),
-      leftBreastDuration: record.leftBreastDuration ?? undefined,
-      rightBreastDuration: record.rightBreastDuration ?? undefined,
-      breastMilkAmount: record.breastMilkAmount ?? undefined,
-      formulaAmount: record.formulaAmount ?? undefined,
-      adGiven: record.adGiven ?? undefined,
+      leftBreastDuration: record.leftBreastDuration,
+      rightBreastDuration: record.rightBreastDuration,
+      breastMilkAmount: record.breastMilkAmount,
+      formulaAmount: record.formulaAmount,
+      solidFoodName: record.solidFoodName,
+      solidFoodAmount: record.solidFoodAmount,
+      adGiven: record.adGiven,
       notes: record.notes,
       recordType: 'feeding',
     })),
@@ -173,14 +187,18 @@ export async function getPreloadedDashboardData(): Promise<PreloadedDashboardDat
       id: record.id,
       type: record.type,
       recordedAt: record.recordedAt.toISOString(),
-      weight: record.weight ?? undefined,
-      height: record.height ?? undefined,
-      temperature: record.temperature ?? undefined,
+      weight: record.weight,
+      height: record.height,
+      temperature: record.temperature,
       medicationName: record.medicationName,
+      medicationDose: record.medicationDose,
       vaccineName: record.vaccineName,
+      vaccineManufacturer: record.vaccineManufacturer,
+      vaccineDoseNumber: record.vaccineDoseNumber,
+      vaccineTotalDoses: record.vaccineTotalDoses,
       diaperType: record.diaperType,
       diaperStatus: record.diaperStatus,
-      adGiven: record.adGiven ?? undefined,
+      adGiven: record.adGiven,
       sleepStartTime: record.sleepStartTime?.toISOString() ?? null,
       sleepEndTime: record.sleepEndTime?.toISOString() ?? null,
       sleepQuality: record.sleepQuality,
