@@ -1,3 +1,3 @@
-[submodule ".claude/skills/baby-feed-assistant"]
-	path = .claude/skills/baby-feed-assistant
+[submodule ".agents/skills/baby-feed-assistant"]
+	path = .agents/skills/baby-feed-assistant
 	url = git@github.com:hxhb/baby-feed-assistant.git
