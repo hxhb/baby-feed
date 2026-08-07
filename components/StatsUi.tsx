@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
-import { CalendarDays, LoaderCircle, PencilLine, type LucideIcon } from 'lucide-react'
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { CalendarDays, CalendarRange, Check, ChevronDown, LoaderCircle, PencilLine, type LucideIcon } from 'lucide-react'
 
 interface StatsPanelProps {
   children: ReactNode
@@ -49,6 +49,8 @@ const statsPanelPaddingClasses = {
   toolbar: 'p-2 sm:p-3',
   none: 'p-0',
 }
+
+const mobileRangeOptionClasses = 'flex min-h-11 w-full items-center gap-3 rounded-button px-3 py-2 text-left text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500'
 
 export function StatsPanel({ children, className = '', padding = 'default' }: StatsPanelProps) {
   return (
@@ -132,20 +134,48 @@ export function StatsRangePicker({
   className = '',
 }: StatsRangePickerProps) {
   const [showCustomRange, setShowCustomRange] = useState(false)
+  const [showRangeMenu, setShowRangeMenu] = useState(false)
   const [draftStartDate, setDraftStartDate] = useState(customStartDate)
   const [draftEndDate, setDraftEndDate] = useState(customEndDate)
   const [rangeError, setRangeError] = useState('')
+  const rangePickerRef = useRef<HTMLDivElement>(null)
+  const rangeTriggerRef = useRef<HTMLButtonElement>(null)
+  const rangeOptionRefs = useRef<Array<HTMLButtonElement | null>>([])
+  const customStartInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     setDraftStartDate(customStartDate)
     setDraftEndDate(customEndDate)
   }, [customEndDate, customStartDate])
 
+  useEffect(() => {
+    if (!showRangeMenu) return
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!rangePickerRef.current?.contains(event.target as Node)) {
+        setShowRangeMenu(false)
+      }
+    }
+    const handleEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setShowRangeMenu(false)
+      rangeTriggerRef.current?.focus()
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [showRangeMenu])
+
   const rangeLabel = value === 'custom'
     ? `${customStartDate.slice(5).replace('-', '/')} - ${customEndDate.slice(5).replace('-', '/')}`
     : `近 ${value} 天`
 
   const handleChoice = (nextValue: string) => {
+    setShowRangeMenu(false)
     if (nextValue === 'custom') {
       setDraftStartDate(customStartDate)
       setDraftEndDate(customEndDate)
@@ -156,6 +186,59 @@ export function StatsRangePicker({
 
     setShowCustomRange(false)
     onChange(Number(nextValue))
+  }
+
+  const handleMobileChoice = (nextValue: string) => {
+    handleChoice(nextValue)
+    requestAnimationFrame(() => {
+      if (nextValue === 'custom') {
+        customStartInputRef.current?.focus()
+      } else {
+        rangeTriggerRef.current?.focus()
+      }
+    })
+  }
+
+  const focusRangeOption = (index: number) => {
+    requestAnimationFrame(() => rangeOptionRefs.current[index]?.focus())
+  }
+
+  const openRangeMenu = (focusIndex?: number) => {
+    setShowCustomRange(false)
+    setRangeError('')
+    setShowRangeMenu(true)
+    if (focusIndex !== undefined) focusRangeOption(focusIndex)
+  }
+
+  const handleRangeTriggerKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    const lastIndex = options.length
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      const selectedIndex = value === 'custom' ? lastIndex : Math.max(0, options.indexOf(value))
+      openRangeMenu(selectedIndex)
+    } else if (event.key === 'ArrowUp' || event.key === 'End') {
+      event.preventDefault()
+      openRangeMenu(lastIndex)
+    } else if (event.key === 'Home') {
+      event.preventDefault()
+      openRangeMenu(0)
+    }
+  }
+
+  const handleRangeMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const optionCount = options.length + 1
+    const currentIndex = rangeOptionRefs.current.findIndex(option => option === document.activeElement)
+    let nextIndex: number | undefined
+
+    if (event.key === 'ArrowDown') nextIndex = (currentIndex + 1) % optionCount
+    if (event.key === 'ArrowUp') nextIndex = (currentIndex - 1 + optionCount) % optionCount
+    if (event.key === 'Home') nextIndex = 0
+    if (event.key === 'End') nextIndex = optionCount - 1
+
+    if (nextIndex !== undefined) {
+      event.preventDefault()
+      rangeOptionRefs.current[nextIndex]?.focus()
+    }
   }
 
   const handleCustomSubmit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -191,7 +274,7 @@ export function StatsRangePicker({
   }
 
   return (
-    <div className={`relative w-full lg:w-auto ${className}`.trim()}>
+    <div ref={rangePickerRef} className={`relative w-full lg:w-auto ${className}`.trim()}>
       <div className="flex w-full items-center justify-between gap-3 lg:w-auto lg:justify-end">
         <div className="flex items-center gap-2 text-slate-500">
           <CalendarDays size={16} className="text-blue-600" aria-hidden="true" />
@@ -203,25 +286,109 @@ export function StatsRangePicker({
 
         <div className="flex items-center gap-2 lg:hidden">
           <div className="relative">
-            {loading ? (
-              <LoaderCircle
-                size={15}
-                className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 animate-spin text-blue-600 motion-reduce:animate-none"
+            <button
+              ref={rangeTriggerRef}
+              type="button"
+              aria-label={`数据范围：${rangeLabel}`}
+              aria-haspopup="menu"
+              aria-expanded={showRangeMenu}
+              aria-controls="stats-range-menu"
+              aria-busy={loading}
+              onClick={() => {
+                if (showRangeMenu) {
+                  setShowRangeMenu(false)
+                } else {
+                  openRangeMenu()
+                }
+              }}
+              onKeyDown={handleRangeTriggerKeyDown}
+              className={`flex min-h-11 w-[136px] items-center gap-2 rounded-button border bg-white px-3 py-2 text-sm font-semibold shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 ${
+                showRangeMenu
+                  ? 'border-blue-300 text-blue-700'
+                  : 'border-slate-200 text-slate-700 hover:border-blue-200 hover:text-blue-700'
+              }`}
+            >
+              {loading ? (
+                <LoaderCircle size={16} className="shrink-0 animate-spin text-blue-600 motion-reduce:animate-none" aria-hidden="true" />
+              ) : (
+                <CalendarRange size={16} className="shrink-0 text-blue-600" aria-hidden="true" />
+              )}
+              <span className="min-w-0 flex-1 truncate text-left">
+                {value === 'custom' ? '自定义日期' : `近 ${value} 天`}
+              </span>
+              <ChevronDown
+                size={16}
+                className={`shrink-0 text-slate-400 transition-transform duration-200 ${showRangeMenu ? 'rotate-180' : ''}`}
                 aria-hidden="true"
               />
+            </button>
+
+            {showRangeMenu ? (
+              <div
+                id="stats-range-menu"
+                role="menu"
+                aria-labelledby="stats-range-label"
+                onKeyDown={handleRangeMenuKeyDown}
+                onBlur={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                    setShowRangeMenu(false)
+                  }
+                }}
+                className="absolute right-0 top-full z-40 mt-2 w-56 max-w-[calc(100vw-2rem)] rounded-card border border-slate-200 bg-white p-1.5 shadow-elevated"
+              >
+                <div className="px-2.5 pb-1.5 pt-1 text-[11px] font-semibold text-slate-400" aria-hidden="true">选择数据范围</div>
+                {options.map((option, index) => {
+                  const selected = value === option && !showCustomRange
+
+                  return (
+                    <button
+                      key={option}
+                      ref={(element) => { rangeOptionRefs.current[index] = element }}
+                      id={`stats-range-option-${option}`}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={selected}
+                      onClick={() => handleMobileChoice(String(option))}
+                      className={`${mobileRangeOptionClasses} ${
+                        selected
+                          ? 'bg-blue-50 text-blue-700'
+                          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                      }`}
+                    >
+                      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${
+                        selected ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'
+                      }`} aria-hidden="true">
+                        {option}
+                      </span>
+                      <span className="flex-1">近 {option} 天</span>
+                      {selected ? <Check size={17} className="shrink-0" aria-hidden="true" /> : null}
+                    </button>
+                  )
+                })}
+                <div role="separator" className="my-1 border-t border-slate-100" />
+                <button
+                  ref={(element) => { rangeOptionRefs.current[options.length] = element }}
+                  id="stats-range-option-custom"
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={value === 'custom' || showCustomRange}
+                  onClick={() => handleMobileChoice('custom')}
+                  className={`${mobileRangeOptionClasses} ${
+                    value === 'custom' || showCustomRange
+                      ? 'bg-blue-50 text-blue-700'
+                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                  }`}
+                >
+                  <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
+                    value === 'custom' || showCustomRange ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'
+                  }`}>
+                    <CalendarDays size={15} aria-hidden="true" />
+                  </span>
+                  <span className="flex-1">自定义日期</span>
+                  {value === 'custom' || showCustomRange ? <Check size={17} className="shrink-0" aria-hidden="true" /> : null}
+                </button>
+              </div>
             ) : null}
-            <select
-              aria-labelledby="stats-range-label"
-              aria-busy={loading}
-              value={showCustomRange ? 'custom' : value}
-              onChange={(event) => handleChoice(event.target.value)}
-              className={`min-h-11 w-[124px] rounded-button border border-slate-200 bg-white py-2 pr-9 text-sm font-semibold text-slate-700 shadow-sm outline-none transition-colors focus:border-blue-400 focus:ring-2 focus:ring-blue-100 ${loading ? 'pl-9' : 'pl-3'}`}
-            >
-              {options.map(option => (
-                <option key={option} value={option}>近 {option} 天</option>
-              ))}
-              <option value="custom">自定义日期</option>
-            </select>
           </div>
           {value === 'custom' || showCustomRange ? (
             <button
@@ -292,6 +459,7 @@ export function StatsRangePicker({
             <label className="space-y-1.5 text-xs font-semibold text-slate-600">
               <span>开始日期</span>
               <input
+                ref={customStartInputRef}
                 type="date"
                 value={draftStartDate}
                 max={draftEndDate || maxDate}
