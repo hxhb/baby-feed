@@ -102,15 +102,6 @@ export async function PUT(request: NextRequest) {
       if (activeBabyId !== null && typeof activeBabyId !== 'string') {
         return NextResponse.json({ error: 'activeBabyId 格式不正确' }, { status: 400, headers: noStoreHeaders })
       }
-      if (activeBabyId) {
-        // Verify the baby belongs to this user
-        const baby = await prisma.baby.findFirst({
-          where: { id: activeBabyId, createdBy: session.user.id }
-        })
-        if (!baby) {
-          return NextResponse.json({ error: '宝宝不存在' }, { status: 404, headers: noStoreHeaders })
-        }
-      }
       updateData.activeBabyId = activeBabyId
     }
 
@@ -118,19 +109,31 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: '没有需要更新的字段' }, { status: 400, headers: noStoreHeaders })
     }
 
-    const updatedUser = await prisma.user.update({
-      where: { id: session.user.id },
-      data: updateData,
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        activeBabyId: true,
+    const updatedUser = await prisma.$transaction(async tx => {
+      if (typeof activeBabyId === 'string' && activeBabyId) {
+        const baby = await tx.baby.findFirst({
+          where: { id: activeBabyId, createdBy: session.user.id },
+          select: { id: true },
+        })
+        if (!baby) throw new Error('BABY_NOT_FOUND')
       }
+      return tx.user.update({
+        where: { id: session.user.id },
+        data: updateData,
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          activeBabyId: true,
+        },
+      })
     })
 
     return NextResponse.json(updatedUser, { headers: noStoreHeaders })
   } catch (error) {
+    if (error instanceof Error && error.message === 'BABY_NOT_FOUND') {
+      return NextResponse.json({ error: '宝宝不存在' }, { status: 404, headers: noStoreHeaders })
+    }
     logError('修改用户名失败', error)
     return NextResponse.json({ error: '修改用户名失败' }, { status: 500, headers: noStoreHeaders })
   }

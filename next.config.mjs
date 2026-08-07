@@ -24,6 +24,15 @@ const nextConfig = {
     '@libsql/client',
     'bcryptjs',
   ],
+  // 从 standalone 输出中排除未使用的大包（减小镜像体积 ~45MB）
+  outputFileTracingExcludes: {
+    '*': [
+      'node_modules/@img/**',
+      'node_modules/sharp/**',
+      'node_modules/typescript/**',
+      'node_modules/caniuse-lite/**',
+    ],
+  },
   // 信任反向代理传递的 X-Forwarded-* 头
   // 这对于 HTTPS 反向代理 → HTTP 容器 的场景至关重要
   async headers() {
@@ -115,15 +124,6 @@ const nextConfig = {
   experimental: {
     serverActions: {
       bodySizeLimit: '2mb',
-    },
-    // 从 standalone 输出中排除未使用的大包（减小镜像体积 ~45MB）
-    outputFileTracingExcludes: {
-      '*': [
-        'node_modules/@img/**',
-        'node_modules/sharp/**',
-        'node_modules/typescript/**',
-        'node_modules/caniuse-lite/**',
-      ],
     },
   },
 };

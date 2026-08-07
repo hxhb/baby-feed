@@ -23,6 +23,7 @@ interface FireReminderParams {
   }
   context: Record<string, unknown>
   now: Date
+  eventId: string
 }
 
 /**
@@ -59,7 +60,11 @@ function formatBeijingNow(date: Date): string {
 /**
  * Fire a reminder: render templates, emit webhook, log to activity-logger
  */
-export async function fireReminder({ rule, context, now }: FireReminderParams): Promise<void> {
+export async function fireReminder({ rule, context, now, eventId }: FireReminderParams): Promise<{
+  title: string
+  body: string | null
+  eventId: string | null
+}> {
   try {
     // Get baby name for template
     const baby = await prisma.baby.findUnique({
@@ -80,7 +85,7 @@ export async function fireReminder({ rule, context, now }: FireReminderParams): 
     const renderedBody = rule.notifyBody ? renderTemplate(rule.notifyBody, vars) : null
 
     // Emit webhook event
-    await emitWebhookEvent(
+    const emitted = await emitWebhookEvent(
       rule.userId,
       'reminder.fired',
       {
@@ -94,7 +99,8 @@ export async function fireReminder({ rule, context, now }: FireReminderParams): 
           body: renderedBody,
           context,
         },
-      }
+      },
+      { eventId },
     )
 
     // Log to activity-logger
@@ -116,6 +122,7 @@ export async function fireReminder({ rule, context, now }: FireReminderParams): 
         context,
       },
     })
+    return { title: renderedTitle, body: renderedBody, eventId: emitted.eventId }
   } catch (error) {
     logError(`Reminder dispatch failed for rule ${rule.id}`, error)
 
@@ -133,5 +140,6 @@ export async function fireReminder({ rule, context, now }: FireReminderParams): 
         error: error instanceof Error ? error.message : String(error),
       },
     })
+    throw error
   }
 }

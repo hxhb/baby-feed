@@ -233,21 +233,12 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: idCheck.error }, { status: 400, headers: noStoreHeaders })
     }
 
-    // 确保只能删除自己的 Key
-    const apiKey = await prisma.apiKey.findFirst({
-      where: {
-        id: keyId,
-        userId: session.user.id,
-      }
+    const deleted = await prisma.apiKey.deleteMany({
+      where: { id: keyId, userId: session.user.id },
     })
-
-    if (!apiKey) {
+    if (deleted.count !== 1) {
       return NextResponse.json({ error: 'API Key 不存在' }, { status: 404, headers: noStoreHeaders })
     }
-
-    await prisma.apiKey.delete({
-      where: { id: keyId }
-    })
 
     return NextResponse.json({ message: 'API Key 已删除' }, { headers: noStoreHeaders })
   } catch (error) {

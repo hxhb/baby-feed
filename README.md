@@ -53,6 +53,8 @@ docker run -d \
   -e NEXTAUTH_URL="http://localhost:3000" \
   -e DATABASE_URL="file:/app/data/baby-feed.db" \
   -e TRUST_PROXY="true" \
+  -e REMINDER_ENABLED="true" \
+  -e INSTANCE_ID="baby-feed-main" \
   -v ./data:/app/data \
   --restart unless-stopped \
   ahzknarf/baby-feed:latest
@@ -78,6 +80,8 @@ services:
       - NEXTAUTH_SECRET=your-random-secret-at-least-32-chars  # 必须修改！
       - NEXTAUTH_URL=http://localhost:3000                     # 修改为实际访问地址
       - TRUST_PROXY=true                                       # 信任代理头，用于正确识别客户端 IP
+      - REMINDER_ENABLED=true                                  # 仅生产数据库实例启用
+      - INSTANCE_ID=baby-feed-main                             # 用于追踪提醒来源
     volumes:
       - ./data:/app/data
     healthcheck:
@@ -103,7 +107,9 @@ docker-compose up -d
 | `NEXTAUTH_URL` | 是 | 应用访问地址，如 `http://localhost:3000` 或 `https://baby.yourdomain.com` |
 | `CORS_ALLOWED_ORIGIN` | 否 | 自定义 CORS 来源，默认使用 `NEXTAUTH_URL` |
 | `TRUST_PROXY` | 否 | 设为 `true` 时信任反向代理传递的 `X-Forwarded-For` 头（用于正确识别客户端 IP 以实施速率限制）。使用 Nginx/Traefik 等反向代理时**必须设为 `true`**，默认 `true` |
-| `REMINDER_ENABLED` | 否 | 设为 `false` 禁用提醒调度器（默认启用） |
+| `REMINDER_ENABLED` | 是（使用提醒时） | 仅值为 `true` 时启动调度器。只能在持有生产数据库的实例启用，测试、预发布和旧部署必须保持 `false` |
+| `INSTANCE_ID` | 否 | 调度实例标识，会写入提醒事件上下文，建议设置为部署名称以便定位事件来源 |
+| `APP_VERSION` | 否 | 应用版本，会写入提醒事件上下文以便定位旧版本实例 |
 
 > **注意**：如果使用 HTTPS 反向代理，`NEXTAUTH_URL` 必须以 `https://` 开头。
 

@@ -7,6 +7,7 @@ import { getRateLimit } from '@/lib/rate-limit-config'
 import { safeParseBody, validatePassword } from '@/lib/validation'
 import { getAllowRegistration } from '@/lib/site-settings'
 import { validateInviteCode, consumeInviteCode } from '@/lib/invite'
+import { Prisma } from '@/app/generated/prisma/client'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -16,7 +17,8 @@ export async function POST(request: NextRequest) {
     const inviteCode = url.searchParams.get('code')
 
     const allowRegistration = await getAllowRegistration()
-    if (!allowRegistration) {
+    const inviteRequired = !allowRegistration
+    if (inviteRequired) {
       if (!inviteCode || !(await validateInviteCode(inviteCode))) {
         return NextResponse.json({ error: '管理员已关闭注册功能' }, { status: 403 })
       }
@@ -75,18 +77,21 @@ export async function POST(request: NextRequest) {
 
     const hashedPassword = await bcrypt.hash(password, 12)
 
-    const user = await prisma.user.create({
-      data: {
-        email: email.toLowerCase().trim(),
-        password: hashedPassword,
-        name: name.trim()
-      }
-    })
+    const user = await prisma.$transaction(async tx => {
+      const created = await tx.user.create({
+        data: {
+          email: email.toLowerCase().trim(),
+          password: hashedPassword,
+          name: name.trim()
+        }
+      })
 
-    // Consume invite code after successful registration
-    if (inviteCode) {
-      await consumeInviteCode(inviteCode, user.id)
-    }
+      if (inviteCode) {
+        const consumed = await consumeInviteCode(inviteCode, created.id, tx)
+        if (inviteRequired && !consumed) throw new Error('INVITE_CONFLICT')
+      }
+      return created
+    })
 
     return NextResponse.json({
       id: user.id,
@@ -94,6 +99,12 @@ export async function POST(request: NextRequest) {
       name: user.name
     }, { status: 201 })
   } catch (error) {
+    if (error instanceof Error && error.message === 'INVITE_CONFLICT') {
+      return NextResponse.json({ error: '邀请码已失效或已被使用' }, { status: 409 })
+    }
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return NextResponse.json({ error: '注册失败，请检查输入信息' }, { status: 400 })
+    }
     logError('注册失败', error)
     return NextResponse.json({ error: '注册失败' }, { status: 500 })
   }

@@ -7,6 +7,7 @@ import { getRateLimit } from '@/lib/rate-limit-config'
 import { noStoreHeaders } from '@/lib/api-helpers'
 import { logError } from '@/lib/logger'
 import { emitFeedingUpdated, emitFeedingDeleted } from '@/lib/webhook-service'
+import { rescheduleIntervalRulesForRecordChange } from '@/lib/reminder-rescheduler'
 
 export async function PUT(
   request: NextRequest,
@@ -142,19 +143,34 @@ export async function PUT(
       normalizedData.solidFoodAmount = normalizedBody.solidFoodAmount === undefined ? null : normalizedBody.solidFoodAmount as string | null
     }
 
-    const record = await prisma.feedingRecord.update({
-      where: { id },
-      data: normalizedData,
-      include: { baby: true }
+    const record = await prisma.$transaction(async tx => {
+      const claimed = await tx.feedingRecord.updateMany({
+        where: { id, updatedAt: existingRecord.updatedAt },
+        data: normalizedData,
+      })
+      if (claimed.count !== 1) throw new Error('RECORD_UPDATE_CONFLICT')
+      const updated = await tx.feedingRecord.findUnique({ where: { id }, include: { baby: true } })
+      if (!updated) throw new Error('RECORD_UPDATE_CONFLICT')
+      await rescheduleIntervalRulesForRecordChange({
+        userId: session.user.id,
+        babyId: updated.babyId,
+        sourceType: 'feeding',
+        oldRecord: existingRecord,
+        newRecord: updated,
+        db: tx,
+      })
+      return updated
     })
 
-    // Emit webhook event (fire and forget)
-    emitFeedingUpdated(session.user.id, existingRecord, record, record.baby).catch(error => {
+    await emitFeedingUpdated(session.user.id, existingRecord, record, record.baby).catch(error => {
       logError('Failed to emit feeding updated webhook', error)
     })
 
     return NextResponse.json(record, { headers: noStoreHeaders })
   } catch (error) {
+    if (error instanceof Error && error.message === 'RECORD_UPDATE_CONFLICT') {
+      return NextResponse.json({ error: '记录已被其他请求修改，请刷新后重试' }, { status: 409, headers: noStoreHeaders })
+    }
     logError('更新喂养记录失败', error)
     return NextResponse.json({ error: '更新失败' }, { status: 500, headers: noStoreHeaders })
   }
@@ -206,17 +222,29 @@ export async function DELETE(
       return NextResponse.json({ error: '记录不存在' }, { status: 404, headers: noStoreHeaders })
     }
 
-    await prisma.feedingRecord.delete({
-      where: { id }
+    await prisma.$transaction(async tx => {
+      const deleted = await tx.feedingRecord.deleteMany({
+        where: { id, updatedAt: existingRecord.updatedAt },
+      })
+      if (deleted.count !== 1) throw new Error('RECORD_UPDATE_CONFLICT')
+      await rescheduleIntervalRulesForRecordChange({
+        userId: session.user.id,
+        babyId: existingRecord.babyId,
+        sourceType: 'feeding',
+        oldRecord: existingRecord,
+        db: tx,
+      })
     })
 
-    // Emit webhook event (fire and forget)
-    emitFeedingDeleted(session.user.id, existingRecord).catch(error => {
+    await emitFeedingDeleted(session.user.id, existingRecord).catch(error => {
       logError('Failed to emit feeding deleted webhook', error)
     })
 
     return NextResponse.json({ success: true }, { headers: noStoreHeaders })
   } catch (error) {
+    if (error instanceof Error && error.message === 'RECORD_UPDATE_CONFLICT') {
+      return NextResponse.json({ error: '记录已被其他请求修改，请刷新后重试' }, { status: 409, headers: noStoreHeaders })
+    }
     logError('删除喂养记录失败', error)
     return NextResponse.json({ error: '删除失败' }, { status: 500, headers: noStoreHeaders })
   }

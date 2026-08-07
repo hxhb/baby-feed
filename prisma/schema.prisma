@@ -8,23 +8,25 @@ datasource db {
 }
 
 model User {
-  id              String   @id @default(cuid())
-  email           String   @unique
-  name            String
-  password        String
-  role            String   @default("USER")
-  passwordVersion Int      @default(0)
-  activeBabyId    String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  babies          Baby[]
-  feedingRecords  FeedingRecord[]
-  healthRecords   HealthRecord[]
-  apiKeys          ApiKey[]
-  memos            Memo[]
-  webhookEndpoints WebhookEndpoint[]
-  reminderRules    ReminderRule[]
-  reminderSettings String?
+  id                  String              @id @default(cuid())
+  email               String              @unique
+  name                String
+  password            String
+  role                String              @default("USER")
+  passwordVersion     Int                 @default(0)
+  activeBabyId        String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  babies              Baby[]
+  feedingRecords      FeedingRecord[]
+  healthRecords       HealthRecord[]
+  apiKeys             ApiKey[]
+  memos               Memo[]
+  webhookEndpoints    WebhookEndpoint[]
+  webhookEvents       WebhookEvent[]
+  reminderRules       ReminderRule[]
+  reminderExecutions  ReminderExecution[]
+  reminderSettings    String?
   quickRecordSettings String?
 }
 
@@ -35,30 +37,30 @@ model SiteSettings {
 }
 
 model ApiKey {
-  id          String    @id @default(cuid())
-  name        String                          // 用户自定义名称，如 "iOS快捷指令"
-  prefix      String                          // Key 前缀，如 "bfk_a1b2"，用于识别
-  keyHash     String    @unique               // SHA-256 哈希值，不存储明文
-  userId      String                          // 所属用户
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  lastUsedAt  DateTime?                       // 最后使用时间
-  expiresAt   DateTime?                       // 过期时间（可选）
-  createdAt   DateTime  @default(now())
+  id         String    @id @default(cuid())
+  name       String // 用户自定义名称，如 "iOS快捷指令"
+  prefix     String // Key 前缀，如 "bfk_a1b2"，用于识别
+  keyHash    String    @unique // SHA-256 哈希值，不存储明文
+  userId     String // 所属用户
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastUsedAt DateTime? // 最后使用时间
+  expiresAt  DateTime? // 过期时间（可选）
+  createdAt  DateTime  @default(now())
 
   @@index([userId])
 }
 
 model Baby {
-  id        String   @id @default(cuid())
-  name      String
-  birthDate DateTime
-  gender    String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  createdBy String
-  user      User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  id             String          @id @default(cuid())
+  name           String
+  birthDate      DateTime
+  gender         String
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  createdBy      String
+  user           User            @relation(fields: [createdBy], references: [id], onDelete: Cascade)
   feedingRecords FeedingRecord[]
-  healthRecords HealthRecord[]
+  healthRecords  HealthRecord[]
   memos          Memo[]
   reminderRules  ReminderRule[]
 
@@ -90,33 +92,33 @@ model FeedingRecord {
 }
 
 model HealthRecord {
-  id                String    @id @default(cuid())
-  babyId            String
-  type              String
-  weight            Float?
-  height            Float?
-  temperature       Float?
-  medicationName    String?
-  medicationDose    String?
-  vaccineName       String?
+  id                  String    @id @default(cuid())
+  babyId              String
+  type                String
+  weight              Float?
+  height              Float?
+  temperature         Float?
+  medicationName      String?
+  medicationDose      String?
+  vaccineName         String?
   vaccineManufacturer String?
-  vaccineDoseNumber Int?
-  vaccineTotalDoses Int?
-  diaperType        String?
-  diaperStatus      String?
-  adGiven           Boolean?
-  vitaminDGiven     Boolean?
-  customName        String?
-  sleepStartTime    DateTime?
-  sleepEndTime      DateTime?
-  sleepQuality      String?
-  recordedAt        DateTime
-  notes             String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  createdBy         String
-  baby              Baby      @relation(fields: [babyId], references: [id], onDelete: Cascade)
-  user              User      @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  vaccineDoseNumber   Int?
+  vaccineTotalDoses   Int?
+  diaperType          String?
+  diaperStatus        String?
+  adGiven             Boolean?
+  vitaminDGiven       Boolean?
+  customName          String?
+  sleepStartTime      DateTime?
+  sleepEndTime        DateTime?
+  sleepQuality        String?
+  recordedAt          DateTime
+  notes               String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  createdBy           String
+  baby                Baby      @relation(fields: [babyId], references: [id], onDelete: Cascade)
+  user                User      @relation(fields: [createdBy], references: [id], onDelete: Cascade)
 
   @@index([createdBy, babyId, recordedAt])
   @@index([babyId, type, recordedAt])
@@ -125,11 +127,11 @@ model HealthRecord {
 model Memo {
   id          String    @id @default(cuid())
   babyId      String
-  title       String                          // 备忘标题
-  content     String?                         // 备忘详细内容（可选）
-  scheduledAt DateTime                        // 备忘时间（什么时候该做这件事）
-  completed   Boolean   @default(false)       // 是否已处理
-  completedAt DateTime?                       // 标记完成的时间
+  title       String // 备忘标题
+  content     String? // 备忘详细内容（可选）
+  scheduledAt DateTime // 备忘时间（什么时候该做这件事）
+  completed   Boolean   @default(false) // 是否已处理
+  completedAt DateTime? // 标记完成的时间
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   createdBy   String
@@ -141,65 +143,138 @@ model Memo {
 }
 
 model WebhookEndpoint {
-  id          String    @id @default(cuid())
+  id          String  @id @default(cuid())
   userId      String
   url         String
+  dedupeKey   String? @unique
   description String?
   // Webhook event types this endpoint subscribes to (JSON array of strings)
   // e.g. ["feeding.created", "feeding.updated", "health.created", "user.deleted"]
-  events      String    @default("[]")
-  
+  events      String  @default("[]")
+
   // Signature secret for HMAC-SHA256 verification
-  secret      String
-  
+  secret String
+
   // Active/inactive toggle
-  active      Boolean   @default(true)
-  
+  active Boolean @default(true)
+
   // Retry configuration
-  maxRetries  Int       @default(5)
-  retryDelay  Int       @default(60) // seconds
-  
+  maxRetries Int @default(5)
+  retryDelay Int @default(60) // seconds
+
   // Metadata
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   lastTriedAt DateTime?
-  
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries WebhookDelivery[]
 
   @@index([userId])
   @@index([active])
 }
 
+model WebhookEvent {
+  id         String   @id
+  userId     String
+  type       String
+  payload    String
+  summary    String
+  recordId   String?
+  recordType String?
+  status     String   @default("PENDING")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries WebhookDelivery[]
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([recordId])
+}
+
+model WebhookDelivery {
+  id            String    @id @default(cuid())
+  eventId       String
+  endpointId    String
+  status        String    @default("PENDING")
+  attemptNumber Int       @default(0)
+  nextRetryAt   DateTime  @default(now())
+  leaseUntil    DateTime?
+  leaseToken    String?
+  httpStatus    Int?
+  errorMessage  String?
+  sentAt        DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  event    WebhookEvent    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  endpoint WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, endpointId])
+  @@index([status, nextRetryAt])
+  @@index([endpointId, createdAt])
+}
+
 model ReminderRule {
-  id              String    @id @default(cuid())
-  userId          String
-  babyId          String
+  id     String @id @default(cuid())
+  userId String
+  babyId String
 
-  name            String
-  enabled         Boolean   @default(true)
+  name    String
+  enabled Boolean @default(true)
 
-  triggerType     String
-  triggerConfig   String
-  activeSchedule  String?
+  triggerType    String
+  triggerConfig  String
+  activeSchedule String?
 
-  advanceMinutes  Int       @default(0)
+  advanceMinutes Int @default(0)
 
-  notifyTitle     String
-  notifyBody      String?
+  notifyTitle String
+  notifyBody  String?
+  sourceKey   String?
 
-  startsAt        DateTime?
-  expiresAt       DateTime?
+  startsAt  DateTime?
+  expiresAt DateTime?
 
-  lastFiredAt     DateTime?
-  nextCheckAt     DateTime?
+  lastFiredAt DateTime?
+  nextCheckAt DateTime?
 
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  baby            Baby      @relation(fields: [babyId], references: [id], onDelete: Cascade)
+  user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  baby       Baby                @relation(fields: [babyId], references: [id], onDelete: Cascade)
+  executions ReminderExecution[]
 
+  @@unique([babyId, sourceKey])
   @@index([userId, enabled])
   @@index([babyId])
   @@index([enabled, nextCheckAt])
+}
+
+model ReminderExecution {
+  id           String    @id @default(cuid())
+  ruleId       String
+  userId       String
+  fireKey      String    @unique
+  status       String    @default("CLAIMED")
+  context      String
+  evaluatedAt  DateTime
+  title        String?
+  body         String?
+  eventId      String?
+  dispatchedAt DateTime?
+  errorMessage String?
+  archivedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  rule ReminderRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([ruleId, evaluatedAt])
+  @@index([userId, evaluatedAt])
+  @@index([status, createdAt])
 }

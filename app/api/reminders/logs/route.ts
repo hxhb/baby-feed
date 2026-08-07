@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { activityLogger } from '@/lib/activity-logger'
+import { prisma } from '@/lib/prisma'
 import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
 import { getRateLimit } from '@/lib/rate-limit-config'
 import { noStoreHeaders } from '@/lib/api-helpers'
@@ -9,7 +9,7 @@ import { logError } from '@/lib/logger'
 
 /**
  * GET /api/reminders/logs
- * Query reminder execution logs from the in-memory activity logger.
+ * Query durable reminder execution logs.
  *
  * Query params:
  *   ruleId? - filter by specific reminder rule ID
@@ -45,15 +45,45 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(parseInt(searchParams.get('limit') || '50') || 50, 100)
     const offset = Math.max(parseInt(searchParams.get('offset') || '0') || 0, 0)
 
-    const result = activityLogger.query('reminder', session.user.id, {
-      groupKey: ruleId,
-      limit,
-      offset,
-    })
+    const where = {
+      userId: session.user.id,
+      archivedAt: null,
+      ...(ruleId ? { ruleId } : {}),
+    }
+    const [rows, total] = await Promise.all([
+      prisma.reminderExecution.findMany({
+        where,
+        include: { rule: { select: { name: true, triggerType: true, babyId: true } } },
+        orderBy: { evaluatedAt: 'desc' },
+        skip: offset,
+        take: limit,
+      }),
+      prisma.reminderExecution.count({ where }),
+    ])
+    const logs = rows.map(row => ({
+      id: row.id,
+      timestamp: row.evaluatedAt.getTime(),
+      source: 'reminder',
+      userId: row.userId,
+      groupKey: row.ruleId,
+      groupLabel: row.rule.name,
+      status: row.status === 'DISPATCHED' ? 'success' : row.status === 'FAILED' ? 'failed' : 'pending',
+      summary: row.title ? `${row.rule.name} · ${row.title}` : row.rule.name,
+      meta: {
+        ruleId: row.ruleId,
+        triggerType: row.rule.triggerType,
+        babyId: row.rule.babyId,
+        title: row.title,
+        body: row.body,
+        eventId: row.eventId,
+        context: JSON.parse(row.context),
+        error: row.errorMessage,
+      },
+    }))
 
     return NextResponse.json({
-      logs: result.entries,
-      total: result.total,
+      logs,
+      total,
       offset,
       limit,
     }, { headers: noStoreHeaders })
@@ -102,9 +132,16 @@ export async function DELETE(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const ruleId = searchParams.get('ruleId') || undefined
 
-    const deleted = activityLogger.clear('reminder', session.user.id, ruleId)
+    const result = await prisma.reminderExecution.updateMany({
+      where: {
+        userId: session.user.id,
+        archivedAt: null,
+        ...(ruleId ? { ruleId } : {}),
+      },
+      data: { archivedAt: new Date() },
+    })
 
-    return NextResponse.json({ success: true, deleted }, { headers: noStoreHeaders })
+    return NextResponse.json({ success: true, deleted: result.count }, { headers: noStoreHeaders })
   } catch (error) {
     logError('清理提醒日志失败', error)
     return NextResponse.json({ error: '清理失败' }, { status: 500, headers: noStoreHeaders })

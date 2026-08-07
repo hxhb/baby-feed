@@ -8,6 +8,8 @@ import { getRateLimit } from '@/lib/rate-limit-config'
 import { noStoreHeaders, getBeijingDayRange, buildSleepAwareOrClause } from '@/lib/api-helpers'
 import { logError } from '@/lib/logger'
 import { emitHealthCreated } from '@/lib/webhook-service'
+import { rescheduleIntervalRulesForRecordChange } from '@/lib/reminder-rescheduler'
+import { syncAutoVaccineReminders } from '@/lib/reminder-auto-vaccine'
 
 export async function GET(request: NextRequest) {
   try {
@@ -204,39 +206,55 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '婴儿不存在' }, { status: 404, headers: noStoreHeaders })
     }
 
-    const record = await prisma.healthRecord.create({
-      data: {
+    const record = await prisma.$transaction(async tx => {
+      const created = await tx.healthRecord.create({
+        data: {
+          babyId,
+          type: typedType,
+          weight: typedType === 'WEIGHT' ? (typedWeight ?? null) : null,
+          height: typedType === 'HEIGHT' ? (typedHeight ?? null) : null,
+          temperature: typedType === 'TEMPERATURE' ? (typedTemperature ?? null) : null,
+          medicationName: typedType === 'MEDICATION' ? (typedMedicationName ?? null) : null,
+          medicationDose: typedType === 'MEDICATION' ? (typedMedicationDose ?? null) : null,
+          vaccineName: typedType === 'VACCINE' ? (typedVaccineName ?? null) : null,
+          vaccineManufacturer: typedType === 'VACCINE' ? (typedVaccineManufacturer ?? null) : null,
+          vaccineDoseNumber: typedType === 'VACCINE' ? (typedVaccineDoseNumber ?? null) : null,
+          vaccineTotalDoses: typedType === 'VACCINE' ? (typedVaccineTotalDoses ?? null) : null,
+          diaperType: typedType === 'DIAPER' ? (typedDiaperType ?? null) : null,
+          diaperStatus: typedType === 'DIAPER' ? (typedDiaperStatus ?? null) : null,
+          adGiven: typedType === 'AD_VITAMIN' ? (typedAdGiven ?? null) : null,
+          vitaminDGiven: typedType === 'AD_VITAMIN' ? (typedVitaminDGiven ?? null) : null,
+          customName: typedType === 'CUSTOM' ? (typedCustomName?.trim() || null) : null,
+          sleepStartTime: typedType === 'SLEEP' ? (typedSleepStartTime ? new Date(typedSleepStartTime) : null) : null,
+          sleepEndTime: typedType === 'SLEEP' ? (typedSleepEndTime ? new Date(typedSleepEndTime) : null) : null,
+          sleepQuality: typedType === 'SLEEP' ? (typedSleepQuality ?? null) : null,
+          recordedAt: new Date(recordedAt),
+          notes: typedNotes,
+          createdBy: session.user.id,
+        },
+        include: { baby: true },
+      })
+      await rescheduleIntervalRulesForRecordChange({
+        userId: session.user.id,
         babyId,
-        type: typedType,
-        weight: typedType === 'WEIGHT' ? (typedWeight ?? null) : null,
-        height: typedType === 'HEIGHT' ? (typedHeight ?? null) : null,
-        temperature: typedType === 'TEMPERATURE' ? (typedTemperature ?? null) : null,
-        medicationName: typedType === 'MEDICATION' ? (typedMedicationName ?? null) : null,
-        medicationDose: typedType === 'MEDICATION' ? (typedMedicationDose ?? null) : null,
-        vaccineName: typedType === 'VACCINE' ? (typedVaccineName ?? null) : null,
-        vaccineManufacturer: typedType === 'VACCINE' ? (typedVaccineManufacturer ?? null) : null,
-        vaccineDoseNumber: typedType === 'VACCINE' ? (typedVaccineDoseNumber ?? null) : null,
-        vaccineTotalDoses: typedType === 'VACCINE' ? (typedVaccineTotalDoses ?? null) : null,
-        diaperType: typedType === 'DIAPER' ? (typedDiaperType ?? null) : null,
-        diaperStatus: typedType === 'DIAPER' ? (typedDiaperStatus ?? null) : null,
-        adGiven: typedType === 'AD_VITAMIN' ? (typedAdGiven ?? null) : null,
-        vitaminDGiven: typedType === 'AD_VITAMIN' ? (typedVitaminDGiven ?? null) : null,
-        customName: typedType === 'CUSTOM' ? (typedCustomName?.trim() || null) : null,
-        sleepStartTime: typedType === 'SLEEP' ? (typedSleepStartTime ? new Date(typedSleepStartTime) : null) : null,
-        sleepEndTime: typedType === 'SLEEP' ? (typedSleepEndTime ? new Date(typedSleepEndTime) : null) : null,
-        sleepQuality: typedType === 'SLEEP' ? (typedSleepQuality ?? null) : null,
-        recordedAt: new Date(recordedAt),
-        notes: typedNotes,
-        createdBy: session.user.id
-      },
-      include: { baby: true }
+        sourceType: 'health',
+        newRecord: created,
+        db: tx,
+      })
+      if (created.type === 'VACCINE') {
+        await syncAutoVaccineReminders({
+          userId: session.user.id,
+          babyId: created.babyId,
+          recordedAtValues: [created.recordedAt],
+          db: tx,
+        })
+      }
+      return created
     })
 
-    // Emit webhook event (fire and forget)
-    emitHealthCreated(session.user.id, record, record.baby).catch(error => {
+    await emitHealthCreated(session.user.id, record, record.baby).catch(error => {
       logError('Failed to emit health created webhook', error)
     })
-
     revalidatePath('/')
     revalidatePath('/stats')
     revalidatePath('/timeline')

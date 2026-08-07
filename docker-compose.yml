@@ -23,6 +23,9 @@ services:
       - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
       # 如果使用反向代理（nginx/traefik），设为 true 以信任 X-Forwarded-For 头
       - TRUST_PROXY=${TRUST_PROXY:-true}
+      - REMINDER_ENABLED=${REMINDER_ENABLED:-true}
+      - INSTANCE_ID=${INSTANCE_ID:-baby-feed-main}
+      - APP_VERSION=${APP_VERSION:-unknown}
     volumes:
       - ${DATA_PATH:-./data}:/app/data
     healthcheck:

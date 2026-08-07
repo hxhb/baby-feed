@@ -7,6 +7,8 @@ import { getRateLimit } from '@/lib/rate-limit-config'
 import { noStoreHeaders } from '@/lib/api-helpers'
 import { logError } from '@/lib/logger'
 import { getAllEventTypes } from '@/lib/webhook-events'
+import { buildWebhookEndpointDedupeKey } from '@/lib/webhook-endpoint'
+import { Prisma } from '@/app/generated/prisma/client'
 
 /**
  * PUT /api/webhooks/[id]
@@ -77,6 +79,7 @@ export async function PUT(
         return NextResponse.json({ error: urlCheck.error || 'URL 格式不正确' }, { status: 400, headers: noStoreHeaders })
       }
       updateData.url = url
+      updateData.dedupeKey = buildWebhookEndpointDedupeKey(session.user.id, url)
     }
 
     if (description !== undefined) {
@@ -141,6 +144,12 @@ export async function PUT(
       { headers: noStoreHeaders }
     )
   } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return NextResponse.json(
+        { error: '该 URL 已存在，请使用不同的 URL 或编辑现有端点' },
+        { status: 409, headers: noStoreHeaders }
+      )
+    }
     logError('更新 webhook 端点失败', error)
     return NextResponse.json({ error: '更新失败' }, { status: 500, headers: noStoreHeaders })
   }

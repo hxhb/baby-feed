@@ -6,6 +6,7 @@
     "dev": "prisma db push && next dev",
     "build": "prisma generate && next build",
     "start": "next start",
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test tests/*.test.mjs",
     "lint": "next lint",
     "postinstall": "prisma generate"
   },

@@ -12,6 +12,16 @@ import { getEvaluator } from './reminder-evaluators/index'
 import type { EvaluateResult } from './reminder-evaluators/index'
 import { fireReminder } from './reminder-dispatcher'
 import { logError } from './logger'
+import { Prisma } from '@/app/generated/prisma/client'
+import { createHash, randomBytes } from 'crypto'
+import { buildReminderConfigFingerprint } from './reminder-core'
+
+const schedulerInstanceId = process.env.INSTANCE_ID || randomBytes(6).toString('hex')
+const databaseFingerprint = createHash('sha256')
+  .update(process.env.DATABASE_URL || 'file:./dev.db')
+  .digest('hex')
+  .slice(0, 12)
+const EXECUTION_RECOVERY_DELAY_MS = 2 * 60_000
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -48,6 +58,13 @@ type ReminderRuleRow = {
   expiresAt: Date | null
   lastFiredAt: Date | null
   nextCheckAt: Date | null
+  updatedAt: Date
+}
+
+class StaleReminderRuleError extends Error {
+  constructor() {
+    super('STALE_REMINDER_RULE')
+  }
 }
 
 // ─── Beijing-time helpers ─────────────────────────────────────────────────────
@@ -139,11 +156,11 @@ class ReminderScheduler {
    * connections to establish), then ticks every 60 s thereafter.
    *
    * No-op if already started.
-   * No-op if `REMINDER_ENABLED=false`.
+   * No-op unless `REMINDER_ENABLED=true`.
    */
   start(): void {
-    if (process.env.REMINDER_ENABLED === 'false') {
-      console.log('[Reminder] Scheduler disabled via REMINDER_ENABLED=false')
+    if (process.env.REMINDER_ENABLED !== 'true') {
+      console.log('[Reminder] Scheduler disabled (set REMINDER_ENABLED=true on the single database-owning instance)')
       return
     }
     if (this._timer || this._startTimeout) {
@@ -186,6 +203,8 @@ class ReminderScheduler {
     const now = new Date()
 
     try {
+      await this.recoverPendingExecutions(now)
+
       const rules = await prisma.reminderRule.findMany({
         where: {
           enabled: true,
@@ -224,19 +243,13 @@ class ReminderScheduler {
   async evaluateRule(rule: ReminderRuleRow, now: Date): Promise<void> {
     // 1. startsAt guard
     if (rule.startsAt && now < rule.startsAt) {
-      await prisma.reminderRule.update({
-        where: { id: rule.id },
-        data: { nextCheckAt: rule.startsAt },
-      })
+      await this.updateRuleIfCurrent(rule, { nextCheckAt: rule.startsAt })
       return
     }
 
     // 2. expiresAt guard — auto-disable
     if (rule.expiresAt && now > rule.expiresAt) {
-      await prisma.reminderRule.update({
-        where: { id: rule.id },
-        data: { enabled: false },
-      })
+      await this.updateRuleIfCurrent(rule, { enabled: false })
       return
     }
 
@@ -251,10 +264,7 @@ class ReminderScheduler {
           new Error('JSON parse error'),
         )
         // Update nextCheckAt to avoid re-evaluating this broken rule every tick
-        await prisma.reminderRule.update({
-          where: { id: rule.id },
-          data: { nextCheckAt: new Date(now.getTime() + 60_000) },
-        })
+        await this.updateRuleIfCurrent(rule, { nextCheckAt: new Date(now.getTime() + 60_000) })
         return
       }
 
@@ -264,9 +274,8 @@ class ReminderScheduler {
         console.log(
           `[Reminder] Rule ${rule.id} outside active window — deferred to ${nextOpen?.toISOString() ?? 'next minute'}`
         )
-        await prisma.reminderRule.update({
-          where: { id: rule.id },
-          data: { nextCheckAt: nextOpen ?? new Date(now.getTime() + 60_000) },
+        await this.updateRuleIfCurrent(rule, {
+          nextCheckAt: nextOpen ?? new Date(now.getTime() + 60_000),
         })
         return
       }
@@ -289,35 +298,196 @@ class ReminderScheduler {
     } catch (err) {
       logError(`Scheduler: evaluator threw for rule ${rule.id}`, err)
       // Update nextCheckAt so a broken rule doesn't retry every tick forever
-      await prisma.reminderRule.update({
-        where: { id: rule.id },
-        data: { nextCheckAt: new Date(now.getTime() + 60_000) },
-      })
+      await this.updateRuleIfCurrent(rule, { nextCheckAt: new Date(now.getTime() + 60_000) })
+      return
+    }
+
+    if (result.disableRule) {
+      await this.updateRuleIfCurrent(rule, { enabled: false, nextCheckAt: null })
       return
     }
 
     if (result.shouldFire) {
-      // 6. Fire
-      console.log(`[Reminder] Firing rule=${rule.id} name="${rule.name}" type=${rule.triggerType}`)
-      await fireReminder({ rule, context: result.context ?? {}, now })
+      if (!result.fireKey) {
+        logError(`Scheduler: evaluator omitted fireKey for rule ${rule.id}`, new Error('missing fire key'))
+        await this.updateRuleIfCurrent(rule, { nextCheckAt: new Date(now.getTime() + 60_000) })
+        return
+      }
 
-      // 7a. Update lastFiredAt + nextCheckAt (post-fire cooldown)
-      await prisma.reminderRule.update({
-        where: { id: rule.id },
-        data: {
-          lastFiredAt: now,
-          nextCheckAt: this.computeNextCheck(rule, now, true),
-        },
-      })
+      const nextCheckAt = result.nextCheckAt ?? this.computeNextCheck(rule, now, true)
+      const dispatchContext = {
+        ...(result.context ?? {}),
+        evaluatedAt: now.toISOString(),
+        configFingerprint: buildReminderConfigFingerprint(
+          rule.triggerType,
+          rule.triggerConfig,
+          rule.advanceMinutes,
+        ),
+        schedulerInstanceId,
+        databaseFingerprint,
+        buildVersion: process.env.APP_VERSION || null,
+      }
+      const execution = await this.claimReminderFire(rule, result.fireKey, dispatchContext, now, nextCheckAt)
+      if (!execution) {
+        await this.updateRuleIfCurrent(rule, { nextCheckAt })
+        return
+      }
+
+      // The database claim happens before dispatch, so another worker cannot
+      // emit the same logical reminder slot.
+      console.log(`[Reminder] Firing rule=${rule.id} name="${rule.name}" type=${rule.triggerType}`)
+      try {
+        const dispatched = await fireReminder({
+          rule,
+          context: dispatchContext,
+          now,
+          eventId: execution.eventId,
+        })
+        await prisma.reminderExecution.updateMany({
+          where: { id: execution.id, status: 'CLAIMED' },
+          data: {
+            status: 'DISPATCHED',
+            title: dispatched.title,
+            body: dispatched.body,
+            eventId: dispatched.eventId,
+            dispatchedAt: new Date(),
+          },
+        })
+      } catch (error) {
+        await prisma.reminderExecution.updateMany({
+          where: { id: execution.id, status: 'CLAIMED' },
+          data: {
+            status: 'FAILED',
+            errorMessage: error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500),
+          },
+        }).catch(updateError => logError(`Failed to mark reminder execution ${execution.id}`, updateError))
+        logError(`Reminder dispatch failed for rule ${rule.id}`, error)
+      }
     } else {
       // 7b. Update nextCheckAt only (no fire this tick)
       if (rule.triggerType === 'interval') {
         console.log(`[Reminder] Skip rule=${rule.id} name="${rule.name}" — not firing`)
       }
-      await prisma.reminderRule.update({
-        where: { id: rule.id },
-        data: { nextCheckAt: this.computeNextCheck(rule, now, false) },
+      await this.updateRuleIfCurrent(rule, {
+        nextCheckAt: result.nextCheckAt ?? this.computeNextCheck(rule, now, false),
       })
+    }
+  }
+
+  private async updateRuleIfCurrent(
+    rule: ReminderRuleRow,
+    data: Prisma.ReminderRuleUpdateManyMutationInput,
+  ): Promise<boolean> {
+    const updated = await prisma.reminderRule.updateMany({
+      where: { id: rule.id, updatedAt: rule.updatedAt },
+      data,
+    })
+    return updated.count === 1
+  }
+
+  private async claimReminderFire(
+    rule: ReminderRuleRow,
+    evaluatorFireKey: string,
+    context: Record<string, unknown>,
+    now: Date,
+    nextCheckAt: Date,
+  ): Promise<{ id: string; eventId: string } | null> {
+    const configFingerprint = buildReminderConfigFingerprint(
+      rule.triggerType,
+      rule.triggerConfig,
+      rule.advanceMinutes,
+    )
+    const fireKey = `${rule.id}:${configFingerprint}:${evaluatorFireKey}`
+    const executionId = randomBytes(12).toString('hex')
+    try {
+      return await prisma.$transaction(async tx => {
+        const claimed = await tx.reminderRule.updateMany({
+          where: { id: rule.id, enabled: true, updatedAt: rule.updatedAt },
+          data: { lastFiredAt: now, nextCheckAt },
+        })
+        if (claimed.count !== 1) throw new StaleReminderRuleError()
+
+        const created = await tx.reminderExecution.create({
+          data: {
+            id: executionId,
+            ruleId: rule.id,
+            userId: rule.userId,
+            fireKey,
+            context: JSON.stringify(context),
+            evaluatedAt: now,
+            eventId: executionId,
+          },
+          select: { id: true },
+        })
+        return { id: created.id, eventId: executionId }
+      })
+    } catch (error) {
+      if (error instanceof StaleReminderRuleError) return null
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return null
+      throw error
+    }
+  }
+
+  private async recoverPendingExecutions(now: Date): Promise<void> {
+    const cutoff = new Date(now.getTime() - EXECUTION_RECOVERY_DELAY_MS)
+    const pending = await prisma.reminderExecution.findMany({
+      where: {
+        status: { in: ['CLAIMED', 'FAILED', 'RECOVERING'] },
+        updatedAt: { lte: cutoff },
+      },
+      include: { rule: true },
+      orderBy: { updatedAt: 'asc' },
+      take: 20,
+    })
+
+    for (const execution of pending) {
+      const claimed = await prisma.reminderExecution.updateMany({
+        where: {
+          id: execution.id,
+          status: execution.status,
+          updatedAt: execution.updatedAt,
+        },
+        data: { status: 'RECOVERING' },
+      })
+      if (claimed.count !== 1) continue
+
+      try {
+        if (!execution.rule.enabled) {
+          await prisma.reminderExecution.updateMany({
+            where: { id: execution.id, status: 'RECOVERING' },
+            data: { status: 'CANCELLED', errorMessage: 'Reminder rule is disabled' },
+          })
+          continue
+        }
+
+        const context = JSON.parse(execution.context) as Record<string, unknown>
+        const eventId = execution.eventId ?? execution.id
+        const dispatched = await fireReminder({
+          rule: execution.rule,
+          context,
+          now: execution.evaluatedAt,
+          eventId,
+        })
+        await prisma.reminderExecution.updateMany({
+          where: { id: execution.id, status: 'RECOVERING' },
+          data: {
+            status: 'DISPATCHED',
+            title: dispatched.title,
+            body: dispatched.body,
+            eventId: dispatched.eventId,
+            dispatchedAt: new Date(),
+            errorMessage: null,
+          },
+        })
+      } catch (error) {
+        await prisma.reminderExecution.updateMany({
+          where: { id: execution.id, status: 'RECOVERING' },
+          data: {
+            status: 'FAILED',
+            errorMessage: error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500),
+          },
+        }).catch(updateError => logError(`Failed to release reminder execution ${execution.id}`, updateError))
+      }
     }
   }
 
@@ -367,58 +537,3 @@ class ReminderScheduler {
 // Use globalThis to prevent dev-mode HMR from creating multiple scheduler instances
 const globalForScheduler = globalThis as unknown as { __reminderScheduler?: ReminderScheduler }
 export const reminderScheduler = globalForScheduler.__reminderScheduler ??= new ReminderScheduler()
-
-// ─── resetIntervalRules ───────────────────────────────────────────────────────
-
-/**
- * Reset interval-type reminder rules when a new feeding or health record is
- * created, so the countdown restarts from the new record time.
- *
- * Sets `lastFiredAt = null` (clear previous fire marker) and
- * `nextCheckAt = now + intervalMinutes` (defer the next evaluation).
- *
- * Errors are logged but not re-thrown (non-critical best-effort call).
- */
-export async function resetIntervalRules(
-  userId: string,
-  babyId: string,
-  sourceType: 'feeding' | 'health',
-  recordTime: Date,
-): Promise<void> {
-  try {
-
-    const rules = await prisma.reminderRule.findMany({
-      where: { userId, babyId, enabled: true, triggerType: 'interval' },
-      select: { id: true, triggerConfig: true },
-    })
-
-    for (const rule of rules) {
-      try {
-        const config = JSON.parse(rule.triggerConfig) as {
-          sourceType: string
-          intervalMinutes: number
-        }
-
-        // Only reset rules whose sourceType matches the new record
-        if (config.sourceType !== sourceType) continue
-
-        const nextCheckAt = new Date(
-          recordTime.getTime() + Math.max(config.intervalMinutes, 1) * 60 * 1000,
-        )
-
-        await prisma.reminderRule.update({
-          where: { id: rule.id },
-          data: { lastFiredAt: null, nextCheckAt },
-        })
-        console.log(
-          `[Reminder] resetIntervalRules rule=${rule.id} sourceType=${sourceType} ` +
-          `nextCheckAt=${nextCheckAt.toISOString()}`
-        )
-      } catch (err) {
-        logError(`resetIntervalRules: failed to reset rule ${rule.id}`, err)
-      }
-    }
-  } catch (err) {
-    logError('resetIntervalRules: failed to query rules', err)
-  }
-}

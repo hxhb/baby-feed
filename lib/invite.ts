@@ -1,5 +1,8 @@
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
+import type { Prisma } from '@/app/generated/prisma/client'
+
+type InviteDb = Pick<Prisma.TransactionClient, 'siteSettings'>
 
 const INVITE_PREFIX = 'invite:'
 
@@ -43,8 +46,12 @@ export async function validateInviteCode(code: string): Promise<boolean> {
   return data.usedBy === null
 }
 
-export async function consumeInviteCode(code: string, usedBy: string): Promise<boolean> {
-  const record = await prisma.siteSettings.findUnique({
+export async function consumeInviteCode(
+  code: string,
+  usedBy: string,
+  db: InviteDb = prisma,
+): Promise<boolean> {
+  const record = await db.siteSettings.findUnique({
     where: { key: `${INVITE_PREFIX}${code}` },
   })
   if (!record) return false
@@ -52,11 +59,11 @@ export async function consumeInviteCode(code: string, usedBy: string): Promise<b
   if (data.usedBy !== null) return false
   data.usedBy = usedBy
   data.usedAt = new Date().toISOString()
-  await prisma.siteSettings.update({
-    where: { key: `${INVITE_PREFIX}${code}` },
+  const consumed = await db.siteSettings.updateMany({
+    where: { key: `${INVITE_PREFIX}${code}`, value: record.value },
     data: { value: JSON.stringify(data) },
   })
-  return true
+  return consumed.count === 1
 }
 
 export async function listInviteCodes(): Promise<Array<{ code: string } & InviteData>> {

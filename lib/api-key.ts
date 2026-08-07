@@ -125,9 +125,13 @@ export async function authByApiKey(request: NextRequest): Promise<Session | null
     }
 
     // 异步更新最后使用时间（非阻塞，不影响请求响应速度）
-    prisma.apiKey.update({
-      where: { id: apiKey.id },
-      data: { lastUsedAt: new Date() }
+    const usedAt = new Date()
+    prisma.apiKey.updateMany({
+      where: {
+        id: apiKey.id,
+        OR: [{ lastUsedAt: null }, { lastUsedAt: { lt: usedAt } }],
+      },
+      data: { lastUsedAt: usedAt }
     }).catch(() => {
       // 静默失败，更新最后使用时间不是关键操作
     })

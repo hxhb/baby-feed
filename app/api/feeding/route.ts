@@ -8,6 +8,7 @@ import { getRateLimit } from '@/lib/rate-limit-config'
 import { noStoreHeaders, getBeijingDayRange } from '@/lib/api-helpers'
 import { logError } from '@/lib/logger'
 import { emitFeedingCreated } from '@/lib/webhook-service'
+import { rescheduleIntervalRulesForRecordChange } from '@/lib/reminder-rescheduler'
 
 export async function GET(request: NextRequest) {
   try {
@@ -163,27 +164,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '婴儿不存在' }, { status: 404, headers: noStoreHeaders })
     }
 
-    const record = await prisma.feedingRecord.create({
-      data: {
+    const record = await prisma.$transaction(async tx => {
+      const created = await tx.feedingRecord.create({
+        data: {
+          babyId,
+          type: typedType,
+          leftBreastDuration: typedType === 'BREAST_MILK' ? (typedLeftBreastDuration ?? null) : null,
+          rightBreastDuration: typedType === 'BREAST_MILK' ? (typedRightBreastDuration ?? null) : null,
+          breastMilkAmount: typedType === 'BREAST_MILK_BOTTLE' ? (typedBreastMilkAmount ?? null) : null,
+          formulaAmount: typedType === 'FORMULA' ? (typedFormulaAmount ?? null) : null,
+          solidFoodName: typedType === 'SOLID_FOOD' ? (typedSolidFoodName ?? null) : null,
+          solidFoodAmount: typedType === 'SOLID_FOOD' ? (typedSolidFoodAmount ?? null) : null,
+          adGiven: null,
+          startTime: new Date(startTime),
+          endTime: typedEndTime ? new Date(typedEndTime) : null,
+          notes: typedNotes,
+          createdBy: session.user.id,
+        },
+        include: { baby: true },
+      })
+      await rescheduleIntervalRulesForRecordChange({
+        userId: session.user.id,
         babyId,
-        type: typedType,
-        leftBreastDuration: typedType === 'BREAST_MILK' ? (typedLeftBreastDuration ?? null) : null,
-        rightBreastDuration: typedType === 'BREAST_MILK' ? (typedRightBreastDuration ?? null) : null,
-        breastMilkAmount: typedType === 'BREAST_MILK_BOTTLE' ? (typedBreastMilkAmount ?? null) : null,
-        formulaAmount: typedType === 'FORMULA' ? (typedFormulaAmount ?? null) : null,
-        solidFoodName: typedType === 'SOLID_FOOD' ? (typedSolidFoodName ?? null) : null,
-        solidFoodAmount: typedType === 'SOLID_FOOD' ? (typedSolidFoodAmount ?? null) : null,
-        adGiven: null,
-        startTime: new Date(startTime),
-        endTime: typedEndTime ? new Date(typedEndTime) : null,
-        notes: typedNotes,
-        createdBy: session.user.id
-      },
-      include: { baby: true }
+        sourceType: 'feeding',
+        newRecord: created,
+        db: tx,
+      })
+      return created
     })
 
-    // Emit webhook event (fire and forget - don't wait for it)
-    emitFeedingCreated(session.user.id, record, record.baby).catch(error => {
+    await emitFeedingCreated(session.user.id, record, record.baby).catch(error => {
       logError('Failed to emit feeding created webhook', error)
     })
 

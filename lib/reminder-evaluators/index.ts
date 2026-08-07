@@ -10,6 +10,9 @@ import { eventWindowEvaluator } from './event-window'
 export interface EvaluateResult {
   shouldFire: boolean
   context?: Record<string, unknown>
+  fireKey?: string
+  nextCheckAt?: Date
+  disableRule?: boolean
 }
 
 export interface ReminderRuleForEval {

@@ -154,50 +154,29 @@ export const authOptions: AuthOptions = {
   debug: process.env.NODE_ENV !== 'production' && process.env.NEXTAUTH_DEBUG === 'true',
 }
 
-// 用户验证缓存（5分钟TTL），避免每次请求都查询数据库
-// 用于检测已被管理员删除但JWT尚未过期的用户，以及密码版本变更
 interface UserCacheEntry {
   exists: boolean
   passwordVersion: number
-  expiry: number
+  role: string
 }
-
-const userValidationCache = new Map<string, UserCacheEntry>()
-const USER_CACHE_TTL = 5 * 60 * 1000 // 5分钟
-const USER_CACHE_MAX_SIZE = 100
 
 async function validateUser(userId: string): Promise<UserCacheEntry | null> {
-  const now = Date.now()
-  const cached = userValidationCache.get(userId)
-
-  if (cached && now < cached.expiry) {
-    return cached
-  }
-
-  // 清理过期缓存
-  if (userValidationCache.size > USER_CACHE_MAX_SIZE) {
-    for (const [key, val] of userValidationCache) {
-      if (now > val.expiry) userValidationCache.delete(key)
-    }
-  }
-
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, passwordVersion: true }
+    select: { id: true, passwordVersion: true, role: true }
   })
 
-  const entry: UserCacheEntry = {
+  return {
     exists: !!user,
     passwordVersion: user?.passwordVersion ?? 0,
-    expiry: now + USER_CACHE_TTL,
+    role: user?.role ?? 'USER',
   }
-  userValidationCache.set(userId, entry)
-  return entry
 }
 
-// 当用户被删除或密码变更时，清除缓存（供 admin API 和密码变更 API 调用）
-export function invalidateUserCache(userId: string) {
-  userValidationCache.delete(userId)
+// Kept for call-site compatibility. Validation is intentionally uncached so
+// password, deletion, and role changes are visible across all app processes.
+export function invalidateUserCache(_userId: string) {
+  void _userId
 }
 
 export async function auth(request: NextRequest): Promise<Session | null> {
@@ -235,7 +214,7 @@ export async function auth(request: NextRequest): Promise<Session | null> {
           id: token.id as string,
           email: token.email as string,
           name: token.name as string,
-          role: (token.role as string) || 'USER'
+          role: userEntry.role
         },
         expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
       }

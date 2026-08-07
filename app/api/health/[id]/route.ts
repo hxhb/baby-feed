@@ -7,6 +7,8 @@ import { getRateLimit } from '@/lib/rate-limit-config'
 import { noStoreHeaders } from '@/lib/api-helpers'
 import { logError } from '@/lib/logger'
 import { emitHealthUpdated, emitHealthDeleted } from '@/lib/webhook-service'
+import { rescheduleIntervalRulesForRecordChange } from '@/lib/reminder-rescheduler'
+import { syncAutoVaccineReminders } from '@/lib/reminder-auto-vaccine'
 
 export async function PUT(
   request: NextRequest,
@@ -173,19 +175,41 @@ export async function PUT(
       normalizedData.customName = typeof normalizedBody.customName === 'string' ? normalizedBody.customName.trim() || null : null
     }
 
-    const record = await prisma.healthRecord.update({
-      where: { id },
-      data: normalizedData,
-      include: { baby: true }
+    const record = await prisma.$transaction(async tx => {
+      const claimed = await tx.healthRecord.updateMany({
+        where: { id, updatedAt: existingRecord.updatedAt },
+        data: normalizedData,
+      })
+      if (claimed.count !== 1) throw new Error('RECORD_UPDATE_CONFLICT')
+      const updated = await tx.healthRecord.findUnique({ where: { id }, include: { baby: true } })
+      if (!updated) throw new Error('RECORD_UPDATE_CONFLICT')
+      await rescheduleIntervalRulesForRecordChange({
+        userId: session.user.id,
+        babyId: updated.babyId,
+        sourceType: 'health',
+        oldRecord: existingRecord,
+        newRecord: updated,
+        db: tx,
+      })
+      if (existingRecord.type === 'VACCINE' || updated.type === 'VACCINE') {
+        await syncAutoVaccineReminders({
+          userId: session.user.id,
+          babyId: updated.babyId,
+          recordedAtValues: [existingRecord.recordedAt, updated.recordedAt],
+          db: tx,
+        })
+      }
+      return updated
     })
 
-    // Emit webhook event (fire and forget)
-    emitHealthUpdated(session.user.id, existingRecord, record, record.baby).catch(error => {
+    await emitHealthUpdated(session.user.id, existingRecord, record, record.baby).catch(error => {
       logError('Failed to emit health updated webhook', error)
     })
-
     return NextResponse.json(record, { headers: noStoreHeaders })
   } catch (error) {
+    if (error instanceof Error && error.message === 'RECORD_UPDATE_CONFLICT') {
+      return NextResponse.json({ error: '记录已被其他请求修改，请刷新后重试' }, { status: 409, headers: noStoreHeaders })
+    }
     logError('更新健康记录失败', error)
     return NextResponse.json({ error: '更新失败' }, { status: 500, headers: noStoreHeaders })
   }
@@ -237,17 +261,36 @@ export async function DELETE(
       return NextResponse.json({ error: '记录不存在' }, { status: 404, headers: noStoreHeaders })
     }
 
-    await prisma.healthRecord.delete({
-      where: { id }
+    await prisma.$transaction(async tx => {
+      const deleted = await tx.healthRecord.deleteMany({
+        where: { id, updatedAt: existingRecord.updatedAt },
+      })
+      if (deleted.count !== 1) throw new Error('RECORD_UPDATE_CONFLICT')
+      await rescheduleIntervalRulesForRecordChange({
+        userId: session.user.id,
+        babyId: existingRecord.babyId,
+        sourceType: 'health',
+        oldRecord: existingRecord,
+        db: tx,
+      })
+      if (existingRecord.type === 'VACCINE') {
+        await syncAutoVaccineReminders({
+          userId: session.user.id,
+          babyId: existingRecord.babyId,
+          recordedAtValues: [existingRecord.recordedAt],
+          db: tx,
+        })
+      }
     })
 
-    // Emit webhook event (fire and forget)
-    emitHealthDeleted(session.user.id, existingRecord).catch(error => {
+    await emitHealthDeleted(session.user.id, existingRecord).catch(error => {
       logError('Failed to emit health deleted webhook', error)
     })
-
     return NextResponse.json({ success: true }, { headers: noStoreHeaders })
   } catch (error) {
+    if (error instanceof Error && error.message === 'RECORD_UPDATE_CONFLICT') {
+      return NextResponse.json({ error: '记录已被其他请求修改，请刷新后重试' }, { status: 409, headers: noStoreHeaders })
+    }
     logError('删除健康记录失败', error)
     return NextResponse.json({ error: '删除失败' }, { status: 500, headers: noStoreHeaders })
   }

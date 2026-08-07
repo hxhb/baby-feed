@@ -144,13 +144,19 @@ export async function PUT(
       return NextResponse.json({ error: '婴儿不存在' }, { status: 404, headers: noStoreHeaders })
     }
 
-    const baby = await prisma.baby.update({
-      where: { id },
-      data: updateData
+    const updated = await prisma.baby.updateMany({
+      where: { id, createdBy: session.user.id, updatedAt: existingBaby.updatedAt },
+      data: updateData,
     })
+    if (updated.count !== 1) throw new Error('BABY_UPDATE_CONFLICT')
+    const baby = await prisma.baby.findUnique({ where: { id } })
+    if (!baby) throw new Error('BABY_UPDATE_CONFLICT')
 
     return NextResponse.json(baby, { headers: noStoreHeaders })
   } catch (error) {
+    if (error instanceof Error && error.message === 'BABY_UPDATE_CONFLICT') {
+      return NextResponse.json({ error: '宝宝信息已被其他请求修改，请刷新后重试' }, { status: 409, headers: noStoreHeaders })
+    }
     logError('更新婴儿信息失败', error)
     return NextResponse.json({ error: '更新失败' }, { status: 500, headers: noStoreHeaders })
   }
@@ -202,24 +208,22 @@ export async function DELETE(
       return NextResponse.json({ error: '婴儿不存在' }, { status: 404, headers: noStoreHeaders })
     }
 
-    await prisma.baby.delete({
-      where: { id }
-    })
-
-    // If the deleted baby was the user's active baby, clear it
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { activeBabyId: true }
-    })
-    if (user?.activeBabyId === id) {
-      await prisma.user.update({
-        where: { id: session.user.id },
-        data: { activeBabyId: null }
+    await prisma.$transaction(async tx => {
+      const deleted = await tx.baby.deleteMany({
+        where: { id, createdBy: session.user.id, updatedAt: existingBaby.updatedAt },
       })
-    }
+      if (deleted.count !== 1) throw new Error('BABY_UPDATE_CONFLICT')
+      await tx.user.updateMany({
+        where: { id: session.user.id, activeBabyId: id },
+        data: { activeBabyId: null },
+      })
+    })
 
     return NextResponse.json({ success: true }, { headers: noStoreHeaders })
   } catch (error) {
+    if (error instanceof Error && error.message === 'BABY_UPDATE_CONFLICT') {
+      return NextResponse.json({ error: '宝宝信息已被其他请求修改，请刷新后重试' }, { status: 409, headers: noStoreHeaders })
+    }
     logError('删除婴儿信息失败', error)
     return NextResponse.json({ error: '删除失败' }, { status: 500, headers: noStoreHeaders })
   }

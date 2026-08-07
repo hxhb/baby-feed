@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/prisma'
+import { buildEventWindowFireKey } from '@/lib/reminder-core'
 import type { RuleEvaluator, ReminderRuleForEval, EvaluateResult } from './index'
 
 interface EventWindowTriggerConfig {
@@ -15,11 +15,7 @@ export const eventWindowEvaluator: RuleEvaluator = {
 
     // Window expired — auto-disable rule
     if (now.getTime() > windowEndMs) {
-      await prisma.reminderRule.update({
-        where: { id: rule.id },
-        data: { enabled: false },
-      })
-      return { shouldFire: false }
+      return { shouldFire: false, disableRule: true }
     }
 
     const advancedNow = new Date(now.getTime() + rule.advanceMinutes * 60 * 1000)
@@ -33,6 +29,7 @@ export const eventWindowEvaluator: RuleEvaluator = {
       if (currentSlot > lastSlot) {
         return {
           shouldFire: true,
+          fireKey: buildEventWindowFireKey(currentSlot),
           context: { slot: currentSlot, windowEnd: new Date(windowEndMs).toISOString() },
         }
       }
@@ -42,6 +39,7 @@ export const eventWindowEvaluator: RuleEvaluator = {
       if (currentSlot >= 1) {
         return {
           shouldFire: true,
+          fireKey: buildEventWindowFireKey(currentSlot),
           context: { slot: currentSlot, windowEnd: new Date(windowEndMs).toISOString() },
         }
       }

@@ -133,14 +133,18 @@ export async function PUT(
       }
     }
 
-    const record = await prisma.memo.update({
-      where: { id },
-      data: updateData,
-      include: { baby: true },
+    const record = await prisma.$transaction(async tx => {
+      const claimed = await tx.memo.updateMany({
+        where: { id, updatedAt: existingMemo.updatedAt },
+        data: updateData,
+      })
+      if (claimed.count !== 1) throw new Error('RECORD_UPDATE_CONFLICT')
+      const updated = await tx.memo.findUnique({ where: { id }, include: { baby: true } })
+      if (!updated) throw new Error('RECORD_UPDATE_CONFLICT')
+      return updated
     })
 
-    // Emit webhook event (fire and forget)
-    emitMemoUpdated(session.user.id, existingMemo, record, record.baby).catch(error => {
+    await emitMemoUpdated(session.user.id, existingMemo, record, record.baby).catch(error => {
       logError('Failed to emit memo updated webhook', error)
     })
 
@@ -148,6 +152,9 @@ export async function PUT(
 
     return NextResponse.json(record, { headers: noStoreHeaders })
   } catch (error) {
+    if (error instanceof Error && error.message === 'RECORD_UPDATE_CONFLICT') {
+      return NextResponse.json({ error: '备忘已被其他请求修改，请刷新后重试' }, { status: 409, headers: noStoreHeaders })
+    }
     logError('更新备忘录失败', error)
     return NextResponse.json({ error: '更新失败' }, { status: 500, headers: noStoreHeaders })
   }
@@ -199,12 +206,12 @@ export async function DELETE(
       return NextResponse.json({ error: '备忘不存在' }, { status: 404, headers: noStoreHeaders })
     }
 
-    await prisma.memo.delete({
-      where: { id },
+    const deleted = await prisma.memo.deleteMany({
+      where: { id, updatedAt: existingMemo.updatedAt },
     })
+    if (deleted.count !== 1) throw new Error('RECORD_UPDATE_CONFLICT')
 
-    // Emit webhook event (fire and forget)
-    emitMemoDeleted(session.user.id, existingMemo).catch(error => {
+    await emitMemoDeleted(session.user.id, existingMemo).catch(error => {
       logError('Failed to emit memo deleted webhook', error)
     })
 
@@ -212,6 +219,9 @@ export async function DELETE(
 
     return NextResponse.json({ success: true }, { headers: noStoreHeaders })
   } catch (error) {
+    if (error instanceof Error && error.message === 'RECORD_UPDATE_CONFLICT') {
+      return NextResponse.json({ error: '备忘已被其他请求修改，请刷新后重试' }, { status: 409, headers: noStoreHeaders })
+    }
     logError('删除备忘录失败', error)
     return NextResponse.json({ error: '删除失败' }, { status: 500, headers: noStoreHeaders })
   }

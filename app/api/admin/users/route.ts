@@ -9,6 +9,7 @@ import { logError } from '@/lib/logger'
 import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
 import { getRateLimit } from '@/lib/rate-limit-config'
 import { emitUserDeleted } from '@/lib/webhook-service'
+import { Prisma } from '@/app/generated/prisma/client'
 
 export async function GET(request: NextRequest) {
   const check = await requireAdmin(request)
@@ -117,8 +118,7 @@ export async function DELETE(request: NextRequest) {
       await tx.user.delete({ where: { id: userId } })
     })
 
-    // Emit webhook event to admin (fire and forget)
-    emitUserDeleted(check.session.user.id, targetUser, counts).catch(error => {
+    await emitUserDeleted(check.session.user.id, targetUser, counts).catch(error => {
       logError('Failed to emit user deleted webhook', error)
     })
 
@@ -225,16 +225,16 @@ export async function PUT(request: NextRequest) {
       }
 
       const hashedPassword = await bcrypt.hash(newPassword, 12)
-      await prisma.user.update({
-        where: { id: userId },
-        data: {
-          password: hashedPassword,
-          passwordVersion: { increment: 1 },
-        },
+      await prisma.$transaction(async tx => {
+        await tx.user.update({
+          where: { id: userId },
+          data: {
+            password: hashedPassword,
+            passwordVersion: { increment: 1 },
+          },
+        })
+        await tx.apiKey.deleteMany({ where: { userId } })
       })
-
-      // Revoke all API keys for security
-      await prisma.apiKey.deleteMany({ where: { userId } })
 
       invalidateUserCache(userId)
 
@@ -270,6 +270,9 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json(user)
     }
   } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return NextResponse.json({ error: '该邮箱已被其他用户使用' }, { status: 409 })
+    }
     logError('修改用户失败', error)
     return NextResponse.json({ error: '操作失败' }, { status: 500 })
   }

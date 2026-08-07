@@ -1,146 +1,168 @@
-/**
- * Auto-create vaccine temperature monitoring reminders
- *
- * When a vaccine health record is created and the user has enabled
- * auto-vaccine reminders, this module creates an event_window rule
- * with deduplication (won't create duplicates on same day for same baby).
- */
-
 import { prisma } from './prisma'
+import { getBeijingDateStr, getBeijingDayRange } from './api-helpers'
 import { logError } from './logger'
+import type { Prisma } from '@/app/generated/prisma/client'
 
-interface VaccineRecord {
-  id: string
-  babyId: string
+type VaccineReminderDb = Pick<
+  Prisma.TransactionClient,
+  'user' | 'healthRecord' | 'reminderRule'
+>
+
+interface VaccineReminderDefaults {
+  windowDays: number
+  repeatHours: number
+  scheduleStart: string
+  scheduleEnd: string
+}
+
+const DEFAULTS: VaccineReminderDefaults = {
+  windowDays: 3,
+  repeatHours: 5,
+  scheduleStart: '09:00',
+  scheduleEnd: '22:00',
+}
+
+function vaccineInfo(record: {
   vaccineName: string | null
-  vaccineManufacturer: string | null
   vaccineDoseNumber: number | null
   vaccineTotalDoses: number | null
-  recordedAt: Date
-}
-
-/**
- * Auto-create a vaccine monitoring reminder rule if:
- * 1. User has autoVaccineReminder enabled in their config
- * 2. No existing event_window rule was created today for this baby
- *
- * If a rule already exists today, append the new vaccine info to it.
- */
-export async function autoCreateVaccineReminder(
-  userId: string,
-  record: VaccineRecord,
-  babyName: string
-): Promise<void> {
-  try {
-    // 1. Check user config
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { reminderSettings: true },
-    })
-    if (!user?.reminderSettings) return
-
-    const settings = JSON.parse(user.reminderSettings)
-    if (!settings.autoVaccineReminder) return
-
-    const defaults = settings.vaccineReminderDefaults || {
-      windowDays: 3,
-      repeatHours: 5,
-      scheduleStart: '09:00',
-      scheduleEnd: '22:00',
-    }
-
-    // 2. Build vaccine info string
-    const vaccineInfo = buildVaccineInfo(record)
-
-    // 3. Dedup check: look for an event_window rule created today for same baby
-    const todayStart = getTodayBeijingStart()
-
-    const existingRule = await prisma.reminderRule.findFirst({
-      where: {
-        userId,
-        babyId: record.babyId,
-        triggerType: 'event_window',
-        name: { startsWith: '疫苗后测体温' },
-        enabled: true,
-        createdAt: { gte: todayStart },
-      },
-    })
-
-    if (existingRule) {
-      // Update existing rule: append new vaccine info to notifyBody
-      const currentBody = existingRule.notifyBody || ''
-      const updatedBody = currentBody
-        ? `${currentBody}\n${vaccineInfo}`
-        : `疫苗接种后体温监测 · ${vaccineInfo}`
-
-      // Update name to reflect multiple vaccines
-      const updatedName = `疫苗后测体温 · 今日${await countTodayVaccines(userId, record.babyId, todayStart)}针`
-
-      await prisma.reminderRule.update({
-        where: { id: existingRule.id },
-        data: {
-          name: updatedName,
-          notifyBody: updatedBody,
-        },
-      })
-      return
-    }
-
-    // 4. Create new rule
-    await prisma.reminderRule.create({
-      data: {
-        userId,
-        babyId: record.babyId,
-        name: `疫苗后测体温 · ${record.vaccineName || '疫苗'}`,
-        enabled: true,
-        triggerType: 'event_window',
-        triggerConfig: JSON.stringify({
-          anchorTime: record.recordedAt.toISOString(),
-          windowHours: defaults.windowDays * 24,
-          repeatIntervalMinutes: defaults.repeatHours * 60,
-        }),
-        activeSchedule: JSON.stringify({
-          windows: [{ start: defaults.scheduleStart, end: defaults.scheduleEnd }],
-        }),
-        advanceMinutes: 0,
-        notifyTitle: '该给{{babyName}}测体温了',
-        notifyBody: `疫苗接种后体温监测 · ${vaccineInfo}`,
-      },
-    })
-  } catch (error) {
-    logError('[Reminder] autoCreateVaccineReminder failed', error)
-  }
-}
-
-function buildVaccineInfo(record: VaccineRecord): string {
-  const parts: string[] = []
-  if (record.vaccineName) parts.push(record.vaccineName)
+}): string {
+  const parts = [record.vaccineName || '疫苗']
   if (record.vaccineDoseNumber && record.vaccineTotalDoses) {
     parts.push(`第${record.vaccineDoseNumber}针/共${record.vaccineTotalDoses}针`)
   } else if (record.vaccineDoseNumber) {
     parts.push(`第${record.vaccineDoseNumber}针`)
   }
-  return parts.join(' ') || '疫苗接种'
+  return parts.join(' ')
 }
 
-function getTodayBeijingStart(): Date {
-  const now = new Date()
-  const beijingMs = now.getTime() + 8 * 60 * 60 * 1000
-  const beijingDate = new Date(beijingMs)
-  const year = beijingDate.getUTCFullYear()
-  const month = beijingDate.getUTCMonth()
-  const day = beijingDate.getUTCDate()
-  // Beijing 00:00:00 = UTC 前一天 16:00:00
-  return new Date(Date.UTC(year, month, day) - 8 * 60 * 60 * 1000)
-}
+export async function syncAutoVaccineReminders(params: {
+  userId: string
+  babyId: string
+  recordedAtValues: Date[]
+  db?: VaccineReminderDb
+}): Promise<void> {
+  const db = params.db ?? prisma
+  const dates = [...new Set(params.recordedAtValues.map(getBeijingDateStr))]
+  if (dates.length === 0) return
 
-async function countTodayVaccines(userId: string, babyId: string, todayStart: Date): Promise<number> {
-  return prisma.healthRecord.count({
-    where: {
-      createdBy: userId,
-      babyId,
-      type: 'VACCINE',
-      createdAt: { gte: todayStart },
-    },
+  const user = await db.user.findUnique({
+    where: { id: params.userId },
+    select: { reminderSettings: true },
   })
+  if (!user?.reminderSettings) return
+
+  let settings: { autoVaccineReminder?: boolean; vaccineReminderDefaults?: VaccineReminderDefaults }
+  try {
+    settings = JSON.parse(user.reminderSettings)
+  } catch (error) {
+    logError('[Reminder] Invalid vaccine reminder settings', error)
+    return
+  }
+  if (!settings.autoVaccineReminder) return
+  const defaults = { ...DEFAULTS, ...settings.vaccineReminderDefaults }
+
+  for (const date of dates) {
+    const sourceKey = `auto-vaccine:${date}`
+    const { start, end } = getBeijingDayRange(date)
+    const records = await db.healthRecord.findMany({
+      where: {
+        createdBy: params.userId,
+        babyId: params.babyId,
+        type: 'VACCINE',
+        recordedAt: { gte: start, lte: end },
+      },
+      orderBy: [{ recordedAt: 'asc' }, { id: 'asc' }],
+      select: {
+        vaccineName: true,
+        vaccineDoseNumber: true,
+        vaccineTotalDoses: true,
+        recordedAt: true,
+      },
+    })
+
+    const managed = await db.reminderRule.findUnique({
+      where: { babyId_sourceKey: { babyId: params.babyId, sourceKey } },
+    })
+    const legacy = managed ? null : await db.reminderRule.findFirst({
+      where: {
+        userId: params.userId,
+        babyId: params.babyId,
+        sourceKey: null,
+        triggerType: 'event_window',
+        name: { startsWith: '疫苗后测体温' },
+        createdAt: { gte: start, lte: end },
+      },
+      orderBy: { createdAt: 'asc' },
+    })
+    const existing = managed ?? legacy
+
+    if (records.length === 0) {
+      if (existing) {
+        await db.reminderRule.update({
+          where: { id: existing.id },
+          data: { enabled: false, nextCheckAt: null, sourceKey },
+        })
+      }
+      await db.reminderRule.updateMany({
+        where: {
+          userId: params.userId,
+          babyId: params.babyId,
+          sourceKey: null,
+          triggerType: 'event_window',
+          name: { startsWith: '疫苗后测体温' },
+          createdAt: { gte: start, lte: end },
+        },
+        data: { enabled: false, nextCheckAt: null },
+      })
+      continue
+    }
+
+    const anchorTime = records[records.length - 1].recordedAt
+    const body = records.map(record => vaccineInfo(record)).join('\n')
+    const values = {
+      userId: params.userId,
+      babyId: params.babyId,
+      name: records.length === 1
+        ? `疫苗后测体温 · ${records[0].vaccineName || '疫苗'}`
+        : `疫苗后测体温 · 今日${records.length}针`,
+      enabled: true,
+      triggerType: 'event_window',
+      triggerConfig: JSON.stringify({
+        anchorTime: anchorTime.toISOString(),
+        windowHours: defaults.windowDays * 24,
+        repeatIntervalMinutes: defaults.repeatHours * 60,
+      }),
+      activeSchedule: JSON.stringify({
+        windows: [{ start: defaults.scheduleStart, end: defaults.scheduleEnd }],
+      }),
+      advanceMinutes: 0,
+      notifyTitle: '该给{{babyName}}测体温了',
+      notifyBody: `疫苗接种后体温监测 · ${body}`,
+      sourceKey,
+      lastFiredAt: null,
+      nextCheckAt: null,
+    }
+
+    if (existing) {
+      await db.reminderRule.update({ where: { id: existing.id }, data: values })
+    } else {
+      await db.reminderRule.upsert({
+        where: { babyId_sourceKey: { babyId: params.babyId, sourceKey } },
+        create: values,
+        update: values,
+      })
+    }
+    await db.reminderRule.updateMany({
+      where: {
+        userId: params.userId,
+        babyId: params.babyId,
+        sourceKey: null,
+        triggerType: 'event_window',
+        name: { startsWith: '疫苗后测体温' },
+        createdAt: { gte: start, lte: end },
+      },
+      data: { enabled: false, nextCheckAt: null },
+    })
+  }
 }

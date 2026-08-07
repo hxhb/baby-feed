@@ -75,7 +75,8 @@ export async function DELETE(request: NextRequest) {
       await tx.healthRecord.deleteMany({ where: { createdBy: userId } })
       await tx.baby.deleteMany({ where: { createdBy: userId } })
       await tx.apiKey.deleteMany({ where: { userId } })
-      await tx.user.delete({ where: { id: userId } })
+      const deleted = await tx.user.deleteMany({ where: { id: userId, password: user.password } })
+      if (deleted.count !== 1) throw new Error('PASSWORD_UPDATE_CONFLICT')
     })
 
     // 清除缓存，使 JWT 立即失效
@@ -83,6 +84,9 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ message: '账户已注销' }, { headers: noStoreHeaders })
   } catch (error) {
+    if (error instanceof Error && error.message === 'PASSWORD_UPDATE_CONFLICT') {
+      return NextResponse.json({ error: '密码已发生变化，请重新登录后重试' }, { status: 409, headers: noStoreHeaders })
+    }
     logError('注销账户失败', error)
     return NextResponse.json({ error: '注销账户失败' }, { status: 500, headers: noStoreHeaders })
   }

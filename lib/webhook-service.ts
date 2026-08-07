@@ -1,17 +1,15 @@
 /**
- * Webhook Service (In-Memory)
+ * Durable Webhook Outbox Service
  *
- * Handles emission of webhook events. Events are delivered immediately
- * and logged to the in-memory activity logger. Failed deliveries are
- * queued for retry in the in-memory retry queue.
+ * Persists webhook events and endpoint deliveries before scheduling an
+ * immediate attempt. Failed attempts remain in the database for retry.
  */
 
 import { prisma } from './prisma'
 import { type AnyWebhookPayload, type WebhookEventType } from './webhook-events'
-import { sendWebhookImmediate } from './webhook-runner'
+import { attemptWebhookDelivery } from './webhook-runner'
 import { logError } from './logger'
-import { resetIntervalRules } from '@/lib/reminder-scheduler'
-import { autoCreateVaccineReminder } from '@/lib/reminder-auto-vaccine'
+import { Prisma } from '@/app/generated/prisma/client'
 import crypto from 'crypto'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -180,58 +178,74 @@ export async function emitWebhookEvent(
   userId: string,
   eventType: WebhookEventType,
   payload: Omit<AnyWebhookPayload, 'id' | 'timestamp' | 'userId' | 'type'> & { recordId?: string; recordType?: string },
-): Promise<void> {
-  try {
-    const eventId = crypto.randomBytes(8).toString('hex')
+  options?: { eventId?: string },
+): Promise<{ eventId: string; queuedDeliveries: number }> {
+  const eventId = options?.eventId ?? crypto.randomBytes(8).toString('hex')
 
-    // Build the full payload
-    const fullPayload = JSON.stringify({
-      id: eventId,
-      type: eventType,
-      timestamp: new Date().toISOString(),
-      userId,
-      ...payload,
-    })
+  const fullPayload = JSON.stringify({
+    id: eventId,
+    type: eventType,
+    timestamp: new Date().toISOString(),
+    userId,
+    ...payload,
+  })
 
-    // Generate summary for activity logger
-    const summary = buildSummary(eventType, payload.data)
+  const summary = buildSummary(eventType, payload.data)
 
-    // Find all active endpoints subscribed to this event type
-    const endpoints = await prisma.webhookEndpoint.findMany({
-      where: {
-        userId,
-        active: true,
-      },
-    })
+  const endpoints = await prisma.webhookEndpoint.findMany({
+    where: { userId, active: true },
+    select: { id: true, events: true },
+  })
 
-    // For each endpoint, check if it subscribes to this event and deliver
-    for (const endpoint of endpoints) {
+  const endpointIds: string[] = []
+  for (const endpoint of endpoints) {
+    try {
       const subscribedEvents = JSON.parse(endpoint.events || '[]') as string[]
-
       if (subscribedEvents.includes(eventType) || subscribedEvents.includes('*')) {
-        // Fire-and-forget immediate delivery (non-blocking)
-        sendWebhookImmediate(
-          fullPayload,
-          eventType,
-          eventId,
-          {
-            id: endpoint.id,
-            url: endpoint.url,
-            secret: endpoint.secret,
-            maxRetries: endpoint.maxRetries,
-            retryDelay: endpoint.retryDelay,
-          },
-          userId,
-          summary
-        ).catch(err => {
-          logError(`Immediate webhook delivery failed for endpoint ${endpoint.id}`, err)
-        })
+        endpointIds.push(endpoint.id)
       }
+    } catch (error) {
+      logError(`Invalid webhook subscription JSON for endpoint ${endpoint.id}`, error)
     }
-  } catch (error) {
-    logError(`Failed to emit webhook event: ${eventType}`, error)
-    // Don't throw - webhook failures should not block the main operation
   }
+
+  let event: { deliveries: { id: string }[] }
+  try {
+    event = await prisma.webhookEvent.create({
+      data: {
+        id: eventId,
+        userId,
+        type: eventType,
+        payload: fullPayload,
+        summary,
+        recordId: payload.recordId ?? null,
+        recordType: payload.recordType ?? null,
+        status: endpointIds.length === 0 ? 'DELIVERED' : 'PENDING',
+        deliveries: {
+          create: endpointIds.map(endpointId => ({ endpointId })),
+        },
+      },
+      include: { deliveries: { select: { id: true } } },
+    })
+  } catch (error) {
+    if (!options?.eventId || !(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') {
+      throw error
+    }
+    const existing = await prisma.webhookEvent.findUnique({
+      where: { id: eventId },
+      select: { userId: true, type: true, deliveries: { select: { id: true } } },
+    })
+    if (!existing || existing.userId !== userId || existing.type !== eventType) throw error
+    event = existing
+  }
+
+  for (const delivery of event.deliveries) {
+    void attemptWebhookDelivery(delivery.id).catch(error => {
+      logError(`Immediate webhook delivery failed for delivery ${delivery.id}`, error)
+    })
+  }
+
+  return { eventId, queuedDeliveries: event.deliveries.length }
 }
 
 // ─── Feeding event emitters ──────────────────────────────────────────────────
@@ -241,11 +255,6 @@ export async function emitFeedingCreated(
   record: any,
   baby: any
 ): Promise<void> {
-  // Reset interval reminder timers BEFORE emitting webhook so that
-  // slow webhook delivery doesn't widen the race window between
-  // resetIntervalRules and the next scheduler tick.
-  resetIntervalRules(userId, record.babyId, 'feeding', record.startTime).catch(() => {})
-
   await emitWebhookEvent(
     userId,
     'feeding.created',
@@ -338,10 +347,6 @@ export async function emitHealthCreated(
   record: any,
   baby: any
 ): Promise<void> {
-  // Reset interval reminder timers BEFORE emitting webhook (same reason as
-  // emitFeedingCreated — avoid widening the race window).
-  resetIntervalRules(userId, record.babyId, 'health', record.recordedAt).catch(() => {})
-
   await emitWebhookEvent(
     userId,
     'health.created',
@@ -376,11 +381,6 @@ export async function emitHealthCreated(
       },
     },
   )
-
-  // Auto-create vaccine monitoring reminder if configured
-  if (record.type === 'VACCINE') {
-    autoCreateVaccineReminder(userId, record, baby.name).catch(() => {})
-  }
 }
 
 export async function emitHealthUpdated(

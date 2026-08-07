@@ -1,4 +1,5 @@
 import { cronMatchesDate } from '@/lib/cron-parser'
+import { buildCronFireKey } from '@/lib/reminder-core'
 import type { RuleEvaluator, ReminderRuleForEval, EvaluateResult } from './index'
 
 interface CronTriggerConfig {
@@ -24,7 +25,11 @@ export const cronEvaluator: RuleEvaluator = {
           return { shouldFire: false }
         }
       }
-      return { shouldFire: true, context: { cronExpr: config.cronExpr } }
+      return {
+        shouldFire: true,
+        fireKey: buildCronFireKey(advancedNow),
+        context: { cronExpr: config.cronExpr },
+      }
     }
 
     return { shouldFire: false }

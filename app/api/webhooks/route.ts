@@ -7,7 +7,8 @@ import { getRateLimit } from '@/lib/rate-limit-config'
 import { noStoreHeaders } from '@/lib/api-helpers'
 import { logError } from '@/lib/logger'
 import { getAllEventTypes } from '@/lib/webhook-events'
-import { activityLogger } from '@/lib/activity-logger'
+import { buildWebhookEndpointDedupeKey } from '@/lib/webhook-endpoint'
+import { Prisma } from '@/app/generated/prisma/client'
 import crypto from 'crypto'
 
 /**
@@ -54,13 +55,17 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' }
     })
 
-    // Get delivery counts from in-memory activity logger
-    const logStats = activityLogger.stats('webhook', session.user.id)
+    const deliveryRows = await prisma.webhookDelivery.groupBy({
+      by: ['endpointId'],
+      where: { event: { userId: session.user.id } },
+      _count: { _all: true },
+    })
+    const deliveryCounts = new Map(deliveryRows.map(row => [row.endpointId, row._count._all]))
 
     const enriched = endpoints.map(ep => ({
       ...ep,
       events: JSON.parse(ep.events || '[]'),
-      deliveriesCount: logStats.byGroup[ep.id] || 0,
+      deliveriesCount: deliveryCounts.get(ep.id) || 0,
     }))
 
     return NextResponse.json(enriched, { headers: noStoreHeaders })
@@ -156,6 +161,7 @@ export async function POST(request: NextRequest) {
       data: {
         userId: session.user.id,
         url,
+        dedupeKey: buildWebhookEndpointDedupeKey(session.user.id, url),
         description: typeof description === 'string' && description ? description : null,
         events: JSON.stringify(events),
         secret,
@@ -183,6 +189,12 @@ export async function POST(request: NextRequest) {
       { status: 201, headers: noStoreHeaders }
     )
   } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return NextResponse.json(
+        { error: '该 URL 已存在，请使用不同的 URL 或编辑现有端点' },
+        { status: 409, headers: noStoreHeaders }
+      )
+    }
     logError('创建 webhook 端点失败', error)
     return NextResponse.json({ error: '创建失败' }, { status: 500, headers: noStoreHeaders })
   }

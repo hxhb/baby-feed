@@ -83,13 +83,14 @@ export async function PUT(request: NextRequest) {
     // 哈希新密码并更新，同时递增 passwordVersion 使所有现有 JWT 失效
     const hashedPassword = await bcrypt.hash(newPassword, 12)
     await prisma.$transaction(async (tx) => {
-      await tx.user.update({
-        where: { id: session.user.id },
+      const updated = await tx.user.updateMany({
+        where: { id: session.user.id, password: user.password },
         data: {
           password: hashedPassword,
           passwordVersion: { increment: 1 },
         }
       })
+      if (updated.count !== 1) throw new Error('PASSWORD_UPDATE_CONFLICT')
       // 吊销所有 API Key（密码泄露场景下，API Key 也应失效）
       await tx.apiKey.deleteMany({ where: { userId: session.user.id } })
     })
@@ -99,6 +100,9 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ message: '密码修改成功，请重新登录' }, { headers: noStoreHeaders })
   } catch (error) {
+    if (error instanceof Error && error.message === 'PASSWORD_UPDATE_CONFLICT') {
+      return NextResponse.json({ error: '密码已被其他请求修改，请重新登录后重试' }, { status: 409, headers: noStoreHeaders })
+    }
     logError('修改密码失败', error)
     return NextResponse.json({ error: '修改密码失败' }, { status: 500, headers: noStoreHeaders })
   }

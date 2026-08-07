@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
 import { getRateLimit } from '@/lib/rate-limit-config'
 import { validateId, safeParseBody, validateSameOrigin, validateString } from '@/lib/validation'
-import { validateTriggerConfig } from '@/lib/reminder-validation'
+import { validateActiveSchedule, validateTriggerConfig } from '@/lib/reminder-validation'
 import { noStoreHeaders } from '@/lib/api-helpers'
 import { logError } from '@/lib/logger'
 
@@ -133,6 +133,19 @@ export async function PUT(
         return NextResponse.json({ error: '无效的 triggerType' }, { status: 400, headers: noStoreHeaders })
       }
       updateData.triggerType = triggerType as string
+      let effectiveConfig: Record<string, unknown>
+      try {
+        effectiveConfig = triggerConfig !== undefined
+          ? triggerConfig as Record<string, unknown>
+          : JSON.parse(existing.triggerConfig) as Record<string, unknown>
+      } catch {
+        return NextResponse.json({ error: '现有 triggerConfig 格式不正确，请同时提交有效配置' }, { status: 400, headers: noStoreHeaders })
+      }
+      const configCheck = validateTriggerConfig(triggerType as string, effectiveConfig)
+      if (!configCheck.valid) {
+        return NextResponse.json({ error: configCheck.error }, { status: 400, headers: noStoreHeaders })
+      }
+      shouldResetNextCheckAt = true
     }
 
     // triggerConfig
@@ -157,15 +170,13 @@ export async function PUT(
       if (activeSchedule === null) {
         updateData.activeSchedule = null
       } else {
-        if (typeof activeSchedule !== 'object' || Array.isArray(activeSchedule)) {
-          return NextResponse.json({ error: 'activeSchedule 必须是对象或 null' }, { status: 400, headers: noStoreHeaders })
-        }
-        const schedule = activeSchedule as Record<string, unknown>
-        if (schedule.windows && Array.isArray(schedule.windows) && schedule.windows.length > 10) {
-          return NextResponse.json({ error: 'activeSchedule.windows 最多10个时间窗口' }, { status: 400, headers: noStoreHeaders })
+        const scheduleCheck = validateActiveSchedule(activeSchedule)
+        if (!scheduleCheck.valid) {
+          return NextResponse.json({ error: scheduleCheck.error }, { status: 400, headers: noStoreHeaders })
         }
         updateData.activeSchedule = JSON.stringify(activeSchedule)
       }
+      shouldResetNextCheckAt = true
     }
 
     // advanceMinutes
@@ -174,6 +185,7 @@ export async function PUT(
         return NextResponse.json({ error: 'advanceMinutes 必须是 0-1440 的整数' }, { status: 400, headers: noStoreHeaders })
       }
       updateData.advanceMinutes = advanceMinutes
+      shouldResetNextCheckAt = true
     }
 
     // notifyTitle
@@ -182,6 +194,7 @@ export async function PUT(
       if (!titleCheck.valid) {
         return NextResponse.json({ error: titleCheck.error }, { status: 400, headers: noStoreHeaders })
       }
+      shouldResetNextCheckAt = true
       updateData.notifyTitle = (notifyTitle as string).trim()
     }
 
@@ -196,6 +209,7 @@ export async function PUT(
         }
         updateData.notifyBody = String(notifyBody).trim()
       }
+      shouldResetNextCheckAt = true
     }
 
     // startsAt
@@ -209,6 +223,7 @@ export async function PUT(
         }
         updateData.startsAt = d
       }
+      shouldResetNextCheckAt = true
     }
 
     // expiresAt
@@ -222,6 +237,13 @@ export async function PUT(
         }
         updateData.expiresAt = d
       }
+      shouldResetNextCheckAt = true
+    }
+
+    const effectiveStartsAt = updateData.startsAt === undefined ? existing.startsAt : updateData.startsAt as Date | null
+    const effectiveExpiresAt = updateData.expiresAt === undefined ? existing.expiresAt : updateData.expiresAt as Date | null
+    if (effectiveStartsAt && effectiveExpiresAt && effectiveStartsAt >= effectiveExpiresAt) {
+      return NextResponse.json({ error: 'startsAt 必须早于 expiresAt' }, { status: 400, headers: noStoreHeaders })
     }
 
     // Reset nextCheckAt if enabled or triggerConfig changed

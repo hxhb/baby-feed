@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
 import { getRateLimit } from '@/lib/rate-limit-config'
 import { validateString, validateId, safeParseBody, validateSameOrigin } from '@/lib/validation'
-import { validateTriggerConfig } from '@/lib/reminder-validation'
+import { validateActiveSchedule, validateTriggerConfig } from '@/lib/reminder-validation'
 import { noStoreHeaders } from '@/lib/api-helpers'
 import { logError } from '@/lib/logger'
 
@@ -203,12 +203,9 @@ export async function POST(request: NextRequest) {
 
     // Validate optional activeSchedule
     if (activeSchedule !== undefined && activeSchedule !== null) {
-      if (typeof activeSchedule !== 'object' || Array.isArray(activeSchedule)) {
-        return NextResponse.json({ error: 'activeSchedule 格式不正确' }, { status: 400, headers: noStoreHeaders })
-      }
-      const schedule = activeSchedule as Record<string, unknown>
-      if (schedule.windows && Array.isArray(schedule.windows) && schedule.windows.length > 10) {
-        return NextResponse.json({ error: 'activeSchedule.windows 最多10个时间窗口' }, { status: 400, headers: noStoreHeaders })
+      const scheduleCheck = validateActiveSchedule(activeSchedule)
+      if (!scheduleCheck.valid) {
+        return NextResponse.json({ error: scheduleCheck.error }, { status: 400, headers: noStoreHeaders })
       }
     }
 
@@ -229,6 +226,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'expiresAt 日期格式不正确' }, { status: 400, headers: noStoreHeaders })
       }
       expiresAtDate = d
+    }
+    if (startsAtDate && expiresAtDate && startsAtDate >= expiresAtDate) {
+      return NextResponse.json({ error: 'startsAt 必须早于 expiresAt' }, { status: 400, headers: noStoreHeaders })
     }
 
     // Verify baby belongs to current user (and exists)

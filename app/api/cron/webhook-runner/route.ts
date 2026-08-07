@@ -5,7 +5,7 @@ import crypto from 'crypto'
 import { buildIpActionKey, enforceRateLimit } from '@/lib/rate-limit'
 
 /**
- * Cron endpoint for processing webhook deliveries from in-memory queue.
+ * Cron endpoint for processing durable webhook deliveries.
  *
  * This should be called periodically (every 1-5 minutes) by an external cron service.
  * Secured by CRON_SECRET environment variable (required).
@@ -63,11 +63,11 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Process webhook deliveries from in-memory queue
+    // Process due deliveries from the durable outbox.
     const deliveryStats = await processWebhookDeliveries({ maxDeliveries: 100 })
 
     // Get current queue stats
-    const queueStats = getQueueStats()
+    const queueStats = await getQueueStats()
 
     return NextResponse.json({
       success: true,

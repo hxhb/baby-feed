@@ -184,8 +184,7 @@ export async function POST(request: NextRequest) {
       include: { baby: true },
     })
 
-    // Emit webhook event (fire and forget)
-    emitMemoCreated(session.user.id, record, record.baby).catch(error => {
+    await emitMemoCreated(session.user.id, record, record.baby).catch(error => {
       logError('Failed to emit memo created webhook', error)
     })
 

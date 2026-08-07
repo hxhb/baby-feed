@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { activityLogger } from '@/lib/activity-logger'
 import { buildUserActionKey, enforceRateLimit } from '@/lib/rate-limit'
 import { getRateLimit } from '@/lib/rate-limit-config'
 import { noStoreHeaders } from '@/lib/api-helpers'
@@ -10,7 +9,7 @@ import { validateSameOrigin } from '@/lib/validation'
 
 /**
  * GET /api/webhooks/deliveries
- * Get webhook delivery logs from in-memory activity logger.
+ * Get durable webhook delivery logs.
  *
  * Query params:
  *   endpointId? - filter by specific endpoint
@@ -59,17 +58,54 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const result = activityLogger.query('webhook', session.user.id, {
-      groupKey: endpointId,
-      status,
-      limit,
-      offset,
-    })
+    const statusMap: Record<string, string[]> = {
+      success: ['SUCCESS'],
+      failed: ['FAILED', 'CANCELLED'],
+      pending: ['PENDING', 'PROCESSING'],
+    }
+    const where = {
+      event: { userId: session.user.id },
+      ...(endpointId ? { endpointId } : {}),
+      ...(status && statusMap[status] ? { status: { in: statusMap[status] } } : {}),
+    }
+    const [rows, total] = await Promise.all([
+      prisma.webhookDelivery.findMany({
+        where,
+        include: {
+          event: { select: { type: true, summary: true, userId: true, id: true } },
+          endpoint: { select: { url: true } },
+        },
+        orderBy: { updatedAt: 'desc' },
+        skip: offset,
+        take: limit,
+      }),
+      prisma.webhookDelivery.count({ where }),
+    ])
+    const deliveries = rows.map(row => ({
+      id: row.id,
+      timestamp: row.updatedAt.getTime(),
+      source: 'webhook',
+      userId: row.event.userId,
+      groupKey: row.endpointId,
+      groupLabel: row.endpoint.url,
+      status: row.status === 'SUCCESS' ? 'success' : row.status === 'FAILED' || row.status === 'CANCELLED' ? 'failed' : 'pending',
+      summary: row.event.summary,
+      meta: {
+        eventType: row.event.type,
+        eventId: row.event.id,
+        deliveryId: row.id,
+        attemptNumber: row.attemptNumber,
+        httpStatus: row.httpStatus,
+        errorMessage: row.errorMessage,
+        sentAt: (row.sentAt ?? row.updatedAt).toISOString(),
+        endpointUrl: row.endpoint.url,
+      },
+    }))
 
     return NextResponse.json(
       {
-        deliveries: result.entries,
-        total: result.total,
+        deliveries,
+        total,
         offset,
         limit,
       },
@@ -83,7 +119,7 @@ export async function GET(request: NextRequest) {
 
 /**
  * DELETE /api/webhooks/deliveries?endpointId=xxx
- * Clear webhook delivery logs from activity logger.
+ * Clear completed webhook delivery logs from durable storage.
  *
  * Query params:
  *   endpointId? - clear logs for specific endpoint; omit to clear all
@@ -131,10 +167,16 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
-    const deleted = activityLogger.clear('webhook', session.user.id, endpointId)
+    const result = await prisma.webhookDelivery.deleteMany({
+      where: {
+        event: { userId: session.user.id },
+        ...(endpointId ? { endpointId } : {}),
+        status: { in: ['SUCCESS', 'FAILED', 'CANCELLED'] },
+      },
+    })
 
     return NextResponse.json(
-      { success: true, deleted },
+      { success: true, deleted: result.count },
       { headers: noStoreHeaders }
     )
   } catch (error) {
