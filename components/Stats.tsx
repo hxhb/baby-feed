@@ -1,8 +1,7 @@
 'use client'
 
-import { cloneElement, isValidElement, useState, useEffect, useCallback, useRef, type ReactElement } from 'react'
+import { cloneElement, isValidElement, useState, useEffect, useCallback, useRef, type ReactElement, type ReactNode } from 'react'
 import {
-  BarChart,
   Bar,
   XAxis,
   YAxis,
@@ -16,12 +15,14 @@ import {
   LabelList,
 } from 'recharts'
 import type { Props as LabelProps } from 'recharts/types/component/Label'
-import { Baby as BabyIcon, ChartColumn, ChevronDown, ChevronUp, ClipboardList, Clock, Droplets, Lightbulb, Milk, Moon, Pill, Ruler, Scale, Syringe, Thermometer, TrendingUp } from 'lucide-react'
+import { Activity, AlertTriangle, Baby as BabyIcon, ChartColumn, CheckCircle2, ChevronDown, ChevronUp, ClipboardList, Clock, Droplets, Lightbulb, Milk, Moon, Pill, Ruler, Scale, Syringe, Thermometer, TrendingUp } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { dedupeRequest, invalidateRequestCache } from '@/lib/client-request-cache'
 import type { PreloadedStatsData } from '@/lib/server-stats'
 import { StatsEmptyState, StatsPanel, StatsRangePicker, StatsSegmentedTabs } from '@/components/StatsUi'
 import MemoSection from '@/components/MemoSection'
 import { generateWHOCurve } from '@/lib/who-growth-standards'
+import { getBeijingToday } from '@/lib/time'
 
 interface Baby {
   id: string
@@ -39,6 +40,21 @@ interface Props {
 }
 
 type StatsSubpage = 'dashboard' | 'insights' | 'memos'
+
+type StatsRangeSelection =
+  | { kind: 'preset'; days: number }
+  | { kind: 'custom'; startDate: string; endDate: string }
+
+const HEATMAP_VISIBLE_ROWS = 10
+const HEATMAP_ROW_HEIGHT_PX = 24
+const HEATMAP_ROW_GAP_PX = 3
+const HEATMAP_MAX_HEIGHT_PX = HEATMAP_VISIBLE_ROWS * HEATMAP_ROW_HEIGHT_PX + (HEATMAP_VISIBLE_ROWS - 1) * HEATMAP_ROW_GAP_PX
+
+function addUtcDays(date: string, days: number) {
+  const value = new Date(`${date}T00:00:00Z`)
+  value.setUTCDate(value.getUTCDate() + days)
+  return value.toISOString().slice(0, 10)
+}
 
 type MeasuredChartElement = ReactElement<{
   width?: number
@@ -109,15 +125,44 @@ function StableResponsiveChart({
  * 智能稀疏标签渲染器：数据点多时只显示首末点 + 均匀间隔点的标签，
  * 并上下交替偏移防止相邻标签重叠。
  */
+function getTimeDistributedIndices(timestamps: number[], targetCount = 4) {
+  const totalPoints = timestamps.length
+  if (totalPoints <= targetCount) {
+    return new Set(timestamps.map((_, index) => index))
+  }
+
+  const selectedIndices = [0]
+  const firstTimestamp = timestamps[0]
+  const lastTimestamp = timestamps[totalPoints - 1]
+  let previousIndex = 0
+
+  for (let slot = 1; slot < targetCount - 1; slot += 1) {
+    const targetTimestamp = firstTimestamp + ((lastTimestamp - firstTimestamp) * slot) / (targetCount - 1)
+    const minIndex = previousIndex + 1
+    const maxIndex = totalPoints - (targetCount - slot)
+    let nearestIndex = minIndex
+
+    for (let index = minIndex + 1; index <= maxIndex; index += 1) {
+      if (Math.abs(timestamps[index] - targetTimestamp) < Math.abs(timestamps[nearestIndex] - targetTimestamp)) {
+        nearestIndex = index
+      }
+    }
+
+    selectedIndices.push(nearestIndex)
+    previousIndex = nearestIndex
+  }
+
+  selectedIndices.push(totalPoints - 1)
+  return new Set(selectedIndices)
+}
+
 function makeSparseLabel(
-  dataKey: string,
   color: string,
   unit: string,
-  totalPoints: number,
+  timestamps: number[],
 ) {
-  // 数据点 ≤ 5 时全部显示，> 5 时按间隔稀疏
-  const THRESHOLD = 5
-  const step = totalPoints > THRESHOLD ? Math.max(2, Math.floor(totalPoints / 4)) : 1
+  const labelIndices = getTimeDistributedIndices(timestamps)
+  const labelOrder = new Map([...labelIndices].map((index, order) => [index, order]))
 
   return function SparseLabel(props: LabelProps) {
     const { x, y, width, index, value } = props as LabelProps & {
@@ -125,13 +170,10 @@ function makeSparseLabel(
     }
     if (value == null || value === '') return null
 
-    const isFirst = index === 0
-    const isLast = index === totalPoints - 1
-    const isStepHit = index % step === 0
-    if (!isFirst && !isLast && !isStepHit) return null
+    if (!labelIndices.has(index)) return null
 
     // 交替偏移：偶数索引向上 14px，奇数向上 26px
-    const offsetY = (index % 2 === 0) ? -14 : -26
+    const offsetY = ((labelOrder.get(index) || 0) % 2 === 0) ? -14 : -26
     const cx = (width != null) ? x + width / 2 : x
 
     return (
@@ -147,6 +189,123 @@ function makeSparseLabel(
       </text>
     )
   }
+}
+
+function makeKeyPointDot(timestamps: number[], color: string) {
+  const keyPointIndices = getTimeDistributedIndices(timestamps)
+
+  return function KeyPointDot({ cx, cy, index }: { cx?: number; cy?: number; index?: number }) {
+    if (cx == null || cy == null || index == null || !keyPointIndices.has(index)) {
+      return null
+    }
+
+    return <circle cx={cx} cy={cy} r={3.5} fill="white" stroke={color} strokeWidth={2.25} />
+  }
+}
+
+interface GrowthTrendCardProps<T extends { timestamp: number }> {
+  title: string
+  description: string
+  descriptionClassName: string
+  data: T[]
+  dataKey: string
+  unit: string
+  color: string
+  axisColor: string
+  yPadding: number
+  emptyIcon: LucideIcon
+  emptyTitle: string
+  emptyDescription: string
+  formatAxisDate: (timestamp: number) => string
+  formatTooltipDate: (timestamp: number) => string
+  formatAge: (timestamp: number) => string | null
+  renderTooltipDetails?: (datum: T) => ReactNode
+}
+
+function GrowthTrendCard<T extends { timestamp: number }>({
+  title,
+  description,
+  descriptionClassName,
+  data,
+  dataKey,
+  unit,
+  color,
+  axisColor,
+  yPadding,
+  emptyIcon,
+  emptyTitle,
+  emptyDescription,
+  formatAxisDate,
+  formatTooltipDate,
+  formatAge,
+  renderTooltipDetails,
+}: GrowthTrendCardProps<T>) {
+  const timestamps = data.map(item => item.timestamp)
+
+  return (
+    <div className="min-w-0 rounded-card border border-slate-200 bg-white p-3 shadow-card">
+      <div className="mb-3">
+        <p className="text-sm font-semibold text-slate-900">{title}</p>
+        <p className={`mt-1 text-xs ${descriptionClassName}`}>{description}</p>
+      </div>
+      {data.length > 0 ? (
+        <StableResponsiveChart className="-ml-2 h-56 min-w-0 sm:h-64">
+          <LineChart data={data} margin={{ top: 34, right: 28, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+            <XAxis
+              dataKey="timestamp"
+              type="number"
+              domain={['dataMin', 'dataMax']}
+              scale="time"
+              tick={{ fontSize: 11, fill: '#475569' }}
+              tickFormatter={formatAxisDate}
+              tickCount={Math.min(data.length, 6)}
+              axisLine={{ stroke: axisColor }}
+              tickLine={{ stroke: axisColor }}
+            />
+            <YAxis
+              domain={[`dataMin - ${yPadding}`, `dataMax + ${yPadding}`]}
+              tick={{ fontSize: 11, fill: '#475569' }}
+              tickFormatter={unit ? value => `${value}${unit}` : undefined}
+              axisLine={{ stroke: axisColor }}
+              tickLine={{ stroke: axisColor }}
+            />
+            <Tooltip content={({ active, payload }) => {
+              if (!active || !payload?.length) return null
+              const datum = payload[0].payload as T
+              const age = formatAge(datum.timestamp)
+
+              return (
+                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-md">
+                  <p className="font-semibold text-slate-900">
+                    {formatTooltipDate(datum.timestamp)}
+                    {age ? <span className="ml-1.5 font-normal text-slate-400">({age})</span> : null}
+                  </p>
+                  <p className="mt-0.5" style={{ color }}>
+                    {title.replace('趋势', '').trim()}：{String(payload[0].value)}{unit ? ` ${unit}` : ''}
+                  </p>
+                  {renderTooltipDetails?.(datum)}
+                </div>
+              )
+            }} />
+            <Line
+              type="monotone"
+              dataKey={dataKey}
+              stroke={color}
+              strokeWidth={2.5}
+              dot={makeKeyPointDot(timestamps, color)}
+              activeDot={{ r: 6 }}
+              isAnimationActive={false}
+            >
+              <LabelList dataKey={dataKey} content={makeSparseLabel(color, unit, timestamps)} />
+            </Line>
+          </LineChart>
+        </StableResponsiveChart>
+      ) : (
+        <StatsEmptyState icon={emptyIcon} title={emptyTitle} description={emptyDescription} />
+      )}
+    </div>
+  )
 }
 
 /**
@@ -286,8 +445,16 @@ export default function StatsComponent({
   const [stats, setStats] = useState<StatsData | null>(initialStats)
   const [loading, setLoading] = useState(initialBabies.length === 0)
   const [statsRefreshing, setStatsRefreshing] = useState(false)
-  const [days, setDays] = useState(7)
+  const [statsError, setStatsError] = useState('')
+  const [rangeSelection, setRangeSelection] = useState<StatsRangeSelection>({ kind: 'preset', days: 7 })
+  const [customRange, setCustomRange] = useState(() => {
+    const endDate = getBeijingToday()
+    return { startDate: addUtcDays(endDate, -6), endDate }
+  })
   const [activeSubpage, setActiveSubpage] = useState<StatsSubpage>(defaultTab)
+  const heatmapScrollRef = useRef<HTMLDivElement | null>(null)
+  const statsRequestIdRef = useRef(0)
+  const initialStatsUsedRef = useRef(false)
   const [freshFetch] = useState(() => {
     if (typeof window !== 'undefined') {
       const savedTs = window.sessionStorage.getItem('record_saved_ts')
@@ -298,7 +465,14 @@ export default function StatsComponent({
     return false
   })
   const [showCompletedVaccines, setShowCompletedVaccines] = useState(false)
-  const hasInitialStats = !freshFetch && !!initialStats && selectedBabyId === initialStats.baby.id && days === 7
+  const today = getBeijingToday()
+  const rangeDayCount = rangeSelection.kind === 'preset'
+    ? rangeSelection.days
+    : Math.floor((new Date(`${rangeSelection.endDate}T00:00:00Z`).getTime() - new Date(`${rangeSelection.startDate}T00:00:00Z`).getTime()) / (24 * 60 * 60 * 1000)) + 1
+  const rangeLabel = rangeSelection.kind === 'preset'
+    ? `近 ${rangeSelection.days} 天`
+    : `${rangeSelection.startDate.slice(5).replace('-', '/')} - ${rangeSelection.endDate.slice(5).replace('-', '/')}`
+  const hasInitialStats = !freshFetch && !!initialStats && selectedBabyId === initialStats.baby.id && rangeSelection.kind === 'preset' && rangeSelection.days === 7
 
   // Sync activeSubpage when URL param (defaultTab) changes (e.g. browser back/forward)
   useEffect(() => {
@@ -341,30 +515,54 @@ export default function StatsComponent({
   }, [selectedBabyId, onSelectBaby])
 
   const fetchStats = useCallback(async () => {
-    if (!selectedBabyId) return
+    const requestId = ++statsRequestIdRef.current
+    if (!selectedBabyId) {
+      setStats(null)
+      setStatsError('')
+      setStatsRefreshing(false)
+      return
+    }
 
-    if (hasInitialStats) {
+    if (hasInitialStats && !initialStatsUsedRef.current) {
+      initialStatsUsedRef.current = true
       setStats(initialStats)
+      setStatsError('')
+      setStatsRefreshing(false)
       return
     }
 
     setStatsRefreshing(true)
+    setStatsError('')
+    setStats(previous => previous?.baby.id === selectedBabyId ? previous : null)
     try {
-      const cacheKey = `stats:${selectedBabyId}:${days}`
-      const data = await dedupeRequest(cacheKey, async () => {
-        const response = await fetch(`/api/stats?babyId=${selectedBabyId}&days=${days}`)
+      const rangeQuery = rangeSelection.kind === 'preset'
+        ? `days=${rangeSelection.days}`
+        : `startDate=${rangeSelection.startDate}&endDate=${rangeSelection.endDate}`
+      const cacheKey = `stats:${selectedBabyId}:${rangeQuery}`
+      const data = await dedupeRequest<StatsData>(cacheKey, async () => {
+        const response = await fetch(`/api/stats?babyId=${selectedBabyId}&${rangeQuery}`)
         if (!response.ok) {
-          throw new Error('获取统计数据失败')
+          const payload = await response.json().catch(() => null) as { error?: unknown } | null
+          throw new Error(typeof payload?.error === 'string' ? payload.error : '获取统计数据失败')
         }
-        return response.json()
+        return response.json() as Promise<StatsData>
       })
-      setStats(data)
+      if (statsRequestIdRef.current === requestId) {
+        setStats(data)
+      }
     } catch (error) {
       console.error('获取统计数据失败:', error)
+      if (statsRequestIdRef.current === requestId) {
+        const message = error instanceof Error ? error.message : '获取统计数据失败'
+        setStats(null)
+        setStatsError(/重试|稍后再试/.test(message) ? message : `${message}，请重试`)
+      }
     } finally {
-      setStatsRefreshing(false)
+      if (statsRequestIdRef.current === requestId) {
+        setStatsRefreshing(false)
+      }
     }
-  }, [selectedBabyId, days, hasInitialStats, initialStats])
+  }, [selectedBabyId, rangeSelection, hasInitialStats, initialStats])
 
   useEffect(() => {
     if (initialBabies.length > 0) {
@@ -383,6 +581,16 @@ export default function StatsComponent({
     fetchStats()
   }, [fetchStats])
 
+  useEffect(() => {
+    const node = heatmapScrollRef.current
+    if (!node) return
+
+    const frame = window.requestAnimationFrame(() => {
+      node.scrollTop = node.scrollHeight
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [activeSubpage, stats?.lastDays.length])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -394,7 +602,7 @@ export default function StatsComponent({
   if (babies.length === 0) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">
-        <StatsPanel className="py-16 text-center">
+        <StatsPanel padding="none" className="px-4 py-16 text-center">
           <h2 className="mb-2 text-2xl font-bold text-slate-900">还没有添加宝宝</h2>
           <p className="text-slate-600">请先添加宝宝信息查看统计数据</p>
         </StatsPanel>
@@ -415,8 +623,13 @@ export default function StatsComponent({
       奶粉次数: day.formulaCount,
     }
   }) || []
+  const isDenseRange = chartData.length > 14
+  const dailyTickInterval = Math.max(0, Math.ceil(chartData.length / 6) - 1)
 
-  const weightData = (stats?.weightTrend || []).map(p => {
+  const weightRecords = stats?.weightTrend || []
+  const heightRecords = stats?.heightTrend || []
+
+  const weightData = weightRecords.map(p => {
     return {
       timestamp: new Date(p.recordedAt).getTime(),
       label: formatTrendAxisDate(new Date(p.recordedAt).getTime()),
@@ -424,7 +637,7 @@ export default function StatsComponent({
     }
   })
 
-  const heightData = (stats?.heightTrend || []).map(p => {
+  const heightData = heightRecords.map(p => {
     return {
       timestamp: new Date(p.recordedAt).getTime(),
       label: formatTrendAxisDate(new Date(p.recordedAt).getTime()),
@@ -464,7 +677,7 @@ export default function StatsComponent({
     const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000
 
     // Build a sorted array of height records with timestamps (ascending by time)
-    const sortedHeights = (stats?.heightTrend || [])
+    const sortedHeights = heightRecords
       .map(h => ({ timestamp: new Date(h.recordedAt).getTime(), height: h.height }))
       .filter(h => h.height > 0)
       .sort((a, b) => a.timestamp - b.timestamp)
@@ -490,7 +703,7 @@ export default function StatsComponent({
     }
 
     const results: { timestamp: number; label: string; BMI: number; weight: number; height: number }[] = []
-    for (const w of stats?.weightTrend || []) {
+    for (const w of weightRecords) {
       const wTimestamp = new Date(w.recordedAt).getTime()
       const h = findBestHeight(wTimestamp)
       if (h && h > 0) {
@@ -553,10 +766,10 @@ export default function StatsComponent({
     return best
   }, null)
 
-  const latestWeightRecord = stats?.weightTrend[stats.weightTrend.length - 1] || null
-  const previousWeightRecord = stats && stats.weightTrend.length > 1 ? stats.weightTrend[stats.weightTrend.length - 2] : null
-  const latestHeightRecord = stats?.heightTrend[stats.heightTrend.length - 1] || null
-  const previousHeightRecord = stats && stats.heightTrend.length > 1 ? stats.heightTrend[stats.heightTrend.length - 2] : null
+  const latestWeightRecord = weightRecords[weightRecords.length - 1] || null
+  const previousWeightRecord = weightRecords.length > 1 ? weightRecords[weightRecords.length - 2] : null
+  const latestHeightRecord = heightRecords[heightRecords.length - 1] || null
+  const previousHeightRecord = heightRecords.length > 1 ? heightRecords[heightRecords.length - 2] : null
   const latestVaccineRecord = stats?.vaccineRecords[0] || null
   const totalMilkAmount = (stats?.totalStats.totalBreastMilkAmount || 0) + (stats?.totalStats.totalFormulaAmount || 0)
   const activeFeedingDays = stats?.lastDays.filter(day => (
@@ -598,14 +811,14 @@ export default function StatsComponent({
   }, null) || null
   const temperatureRecordCount = stats?.lastDays.filter(day => typeof day.temperature === 'number').length || 0
   const adGivenDays = stats?.lastDays.filter(day => day.adGiven).length || 0
-  const overallWeightChange = latestWeightRecord && stats && stats.weightTrend.length > 1
-    ? Number((latestWeightRecord.weight - stats.weightTrend[0].weight).toFixed(2))
+  const overallWeightChange = latestWeightRecord && weightRecords.length > 1
+    ? Number((latestWeightRecord.weight - weightRecords[0].weight).toFixed(2))
     : null
   const latestWeightChange = latestWeightRecord && previousWeightRecord
     ? Number((latestWeightRecord.weight - previousWeightRecord.weight).toFixed(2))
     : null
-  const overallHeightChange = latestHeightRecord && stats && stats.heightTrend.length > 1
-    ? Number((latestHeightRecord.height - stats.heightTrend[0].height).toFixed(1))
+  const overallHeightChange = latestHeightRecord && heightRecords.length > 1
+    ? Number((latestHeightRecord.height - heightRecords[0].height).toFixed(1))
     : null
   const latestHeightChange = latestHeightRecord && previousHeightRecord
     ? Number((latestHeightRecord.height - previousHeightRecord.height).toFixed(1))
@@ -889,9 +1102,24 @@ export default function StatsComponent({
   return (
     <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 space-y-4">
 
+      {statsError && !stats ? (
+        <StatsPanel className="text-center">
+          <AlertTriangle size={24} className="mx-auto text-amber-600" aria-hidden="true" />
+          <p className="mt-2 text-sm font-semibold text-slate-900">统计数据暂时无法加载</p>
+          <p className="mt-1 text-xs text-slate-500" role="alert">{statsError}</p>
+          <button
+            type="button"
+            onClick={() => void fetchStats()}
+            className="mt-4 min-h-11 rounded-button bg-blue-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+          >
+            重新加载
+          </button>
+        </StatsPanel>
+      ) : null}
+
       {stats && (
         <>
-          <StatsPanel className="p-2 sm:p-3">
+          <StatsPanel padding="toolbar">
             <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-3">
               <StatsSegmentedTabs
                 items={subpageTabs}
@@ -902,8 +1130,15 @@ export default function StatsComponent({
               {activeSubpage !== 'memos' ? (
                 <div className="border-t border-slate-100 px-1 pt-2 lg:ml-auto lg:w-auto lg:shrink-0 lg:border-l lg:border-t-0 lg:pl-3 lg:pt-0">
                   <StatsRangePicker
-                    value={days}
-                    onChange={setDays}
+                    value={rangeSelection.kind === 'preset' ? rangeSelection.days : 'custom'}
+                    onChange={(days) => setRangeSelection({ kind: 'preset', days })}
+                    customStartDate={customRange.startDate}
+                    customEndDate={customRange.endDate}
+                    maxDate={today}
+                    onApplyCustomRange={(startDate, endDate) => {
+                      setCustomRange({ startDate, endDate })
+                      setRangeSelection({ kind: 'custom', startDate, endDate })
+                    }}
                     loading={statsRefreshing}
                   />
                 </div>
@@ -913,19 +1148,19 @@ export default function StatsComponent({
 
           {activeSubpage === 'dashboard' && (
             <>
-              <StatsPanel>
+              <section className="py-1">
                 <div>
                   <div className="flex items-center gap-2">
                     <ChartColumn size={18} className="text-blue-600" />
                     <h3 className="text-base font-bold text-slate-900">趋势工作台</h3>
                   </div>
                   <p className="mt-1 text-sm text-slate-500">
-                    当前周期内的母乳、奶粉、喂养热力图、体重、身高、大小便、喂养结构、BMI、左右乳时长、睡眠数据。
+                    喂养、大小便与睡眠按所选周期统计；体重、身高、BMI 与疫苗展示全部历史记录。
                   </p>
                 </div>
 
                 <div className="mt-4 grid gap-4 xl:grid-cols-2">
-                  <div className="min-w-0 rounded-card border border-pink-100 bg-gradient-to-br from-pink-50/30 to-blue-50/30 p-3 xl:col-span-2">
+                  <div className="min-w-0 rounded-card border border-slate-200 bg-white p-3 shadow-card xl:col-span-2">
                     <div className="mb-3 flex items-center justify-between gap-2">
                       <div>
                         <p className="text-sm font-semibold text-slate-900">喂养趋势</p>
@@ -933,10 +1168,10 @@ export default function StatsComponent({
                       </div>
                     </div>
                     <StableResponsiveChart className="min-w-0 h-56 sm:h-72 -ml-2">
-                      <BarChart data={chartData} margin={{ top: 25, right: 5, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                        <YAxis tick={{ fontSize: 11 }} />
+                      <ComposedChart data={chartData} margin={{ top: 25, right: 5, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                        <XAxis dataKey="date" interval={dailyTickInterval} minTickGap={24} tick={{ fontSize: 11, fill: '#64748b' }} axisLine={{ stroke: '#cbd5e1' }} tickLine={false} />
+                        <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
                         <Tooltip content={(props) => renderTooltipWithAge(props as unknown as Parameters<typeof renderTooltipWithAge>[0], (items) => (
                           <>
                             {items.map(({ name, value }) => {
@@ -955,21 +1190,31 @@ export default function StatsComponent({
                           </>
                         ))} />
                         <Legend wrapperStyle={{ fontSize: 12 }} />
-                        <Bar dataKey="母乳时长" fill="#ec4899" name="亲喂时长(分钟)" radius={[2, 2, 0, 0]}>
-                          <LabelList dataKey="母乳时长" position="top" fill="#ec4899" fontSize={10} fontWeight={600} />
-                        </Bar>
-                        <Bar dataKey="母乳瓶喂量" fill="#a855f7" name="瓶喂量(ml)" radius={[2, 2, 0, 0]}>
-                          <LabelList dataKey="母乳瓶喂量" position="top" fill="#a855f7" fontSize={10} fontWeight={600} />
-                        </Bar>
-                        <Bar dataKey="奶粉量" fill={palette.blue} name="奶粉量(ml)" radius={[2, 2, 0, 0]}>
-                          <LabelList dataKey="奶粉量" position="top" fill={palette.blue} fontSize={10} fontWeight={600} />
-                        </Bar>
-                      </BarChart>
+                        {isDenseRange ? (
+                          <>
+                            <Line type="monotone" dataKey="母乳时长" stroke="#db2777" strokeWidth={2} dot={false} activeDot={{ r: 5 }} name="亲喂时长(分钟)" />
+                            <Line type="monotone" dataKey="母乳瓶喂量" stroke="#7c3aed" strokeWidth={2} dot={false} activeDot={{ r: 5 }} name="瓶喂量(ml)" />
+                            <Line type="monotone" dataKey="奶粉量" stroke={palette.blue} strokeWidth={2} dot={false} activeDot={{ r: 5 }} name="奶粉量(ml)" />
+                          </>
+                        ) : (
+                          <>
+                            <Bar dataKey="母乳时长" fill="#db2777" name="亲喂时长(分钟)" radius={[2, 2, 0, 0]}>
+                              <LabelList dataKey="母乳时长" position="top" fill="#be185d" fontSize={10} fontWeight={600} />
+                            </Bar>
+                            <Bar dataKey="母乳瓶喂量" fill="#7c3aed" name="瓶喂量(ml)" radius={[2, 2, 0, 0]}>
+                              <LabelList dataKey="母乳瓶喂量" position="top" fill="#6d28d9" fontSize={10} fontWeight={600} />
+                            </Bar>
+                            <Bar dataKey="奶粉量" fill={palette.blue} name="奶粉量(ml)" radius={[2, 2, 0, 0]}>
+                              <LabelList dataKey="奶粉量" position="top" fill={palette.blue} fontSize={10} fontWeight={600} />
+                            </Bar>
+                          </>
+                        )}
+                      </ComposedChart>
                     </StableResponsiveChart>
                   </div>
 
                   {/* Feeding heatmap */}
-                  <div className="min-w-0 rounded-card border border-orange-100 bg-gradient-to-br from-orange-50/40 to-amber-50/30 p-3">
+                  <div className="min-w-0 rounded-card border border-slate-200 bg-white p-3 shadow-card">
                     <div className="mb-3">
                       <p className="text-sm font-semibold text-slate-900">喂养时刻热力图</p>
                       <p className="mt-1 text-xs text-orange-700">颜色越深代表该时段喂养次数越多</p>
@@ -1060,7 +1305,17 @@ export default function StatsComponent({
                             <div className="text-[8px] text-slate-400 text-center">合计</div>
                           </div>
                           {/* Data rows */}
-                          <div className="space-y-[3px]">
+                          <div
+                            ref={heatmapScrollRef}
+                            className={`grid ${dates.length > HEATMAP_VISIBLE_ROWS ? 'stats-heatmap-scroll overflow-y-auto pr-1' : ''}`}
+                            style={{
+                              rowGap: HEATMAP_ROW_GAP_PX,
+                              maxHeight: dates.length > HEATMAP_VISIBLE_ROWS ? HEATMAP_MAX_HEIGHT_PX : undefined,
+                            }}
+                            tabIndex={dates.length > HEATMAP_VISIBLE_ROWS ? 0 : undefined}
+                            role={dates.length > HEATMAP_VISIBLE_ROWS ? 'region' : undefined}
+                            aria-label={dates.length > HEATMAP_VISIBLE_ROWS ? `喂养时刻热力图，共 ${dates.length} 天，当前显示最多 ${HEATMAP_VISIBLE_ROWS} 天` : undefined}
+                          >
                             {dates.map(date => {
                               const dayTotal = rowTotals.get(date) || 0
                               return (
@@ -1073,7 +1328,8 @@ export default function StatsComponent({
                                     return (
                                       <div
                                         key={slotIdx}
-                                        className={`h-6 rounded-[4px] flex items-center justify-center text-[11px] font-bold transition-colors ${getCellStyle(count)} ${getCellText(count)}`}
+                                        className={`flex items-center justify-center rounded-[4px] text-[11px] font-bold transition-colors ${getCellStyle(count)} ${getCellText(count)}`}
+                                        style={{ height: HEATMAP_ROW_HEIGHT_PX }}
                                         title={`${formatDateLabel(date)} ${slot.label}(${slot.time}时) — ${count}次`}
                                       >
                                         {count > 0 ? count : <span className="text-[8px] text-slate-300">·</span>}
@@ -1106,7 +1362,7 @@ export default function StatsComponent({
                   </div>
 
                   {/* Sleep duration trend - side by side with heatmap on PC */}
-                  <div className="min-w-0 rounded-card border border-indigo-100 bg-indigo-50/30 p-3">
+                  <div className="min-w-0 rounded-card border border-slate-200 bg-white p-3 shadow-card">
                     <div className="mb-3 flex items-center justify-between gap-2">
                       <div>
                         <p className="text-sm font-semibold text-slate-900">每日睡眠趋势</p>
@@ -1137,10 +1393,10 @@ export default function StatsComponent({
                           </div>
                         </div>
                         <StableResponsiveChart className="min-w-0 h-56 sm:h-64 -ml-2">
-                          <BarChart data={sleepChartData} margin={{ top: 22, right: 5, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
-                            <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#475569' }} axisLine={{ stroke: '#a5b4fc' }} tickLine={{ stroke: '#a5b4fc' }} />
-                            <YAxis tick={{ fontSize: 11, fill: '#475569' }} tickFormatter={(v) => `${v}h`} axisLine={{ stroke: '#a5b4fc' }} tickLine={{ stroke: '#a5b4fc' }} domain={[0, (dataMax: number) => Math.ceil(dataMax) + 1]} />
+                          <ComposedChart data={sleepChartData} margin={{ top: 22, right: 5, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                            <XAxis dataKey="date" interval={dailyTickInterval} minTickGap={24} tick={{ fontSize: 11, fill: '#64748b' }} axisLine={{ stroke: '#cbd5e1' }} tickLine={false} />
+                            <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickFormatter={(v) => `${v}h`} axisLine={false} tickLine={false} domain={[0, (dataMax: number) => Math.ceil(dataMax) + 1]} />
                             <Tooltip content={({ active, payload, label }) => {
                               if (!active || !payload?.length) return null
                               const d = payload[0].payload as typeof sleepChartData[number]
@@ -1156,10 +1412,14 @@ export default function StatsComponent({
                                 </div>
                               )
                             }} />
-                            <Bar dataKey="睡眠时长" fill="#818cf8" name="睡眠时长(小时)" radius={[3, 3, 0, 0]} barSize={18}>
-                              <LabelList dataKey="sleepLabel" position="top" fill="#4f46e5" fontSize={10} fontWeight={600} />
-                            </Bar>
-                          </BarChart>
+                            {isDenseRange ? (
+                              <Line type="monotone" dataKey="睡眠时长" stroke="#4f46e5" strokeWidth={2.25} dot={false} activeDot={{ r: 5 }} name="睡眠时长(小时)" />
+                            ) : (
+                              <Bar dataKey="睡眠时长" fill="#6366f1" name="睡眠时长(小时)" radius={[3, 3, 0, 0]} barSize={18}>
+                                <LabelList dataKey="sleepLabel" position="top" fill="#4338ca" fontSize={10} fontWeight={600} />
+                              </Bar>
+                            )}
+                          </ComposedChart>
                         </StableResponsiveChart>
                       </>
                     ) : (
@@ -1171,204 +1431,67 @@ export default function StatsComponent({
                     )}
                   </div>
 
-                  <div className="min-w-0 rounded-card border border-teal-100 bg-teal-50/40 p-3">
-                    <div className="mb-3 flex items-center justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-900">体重趋势</p>
-                        <p className="mt-1 text-xs text-teal-700">按记录时间查看增长轨迹</p>
-                      </div>
-                    </div>
-                    {weightData.length > 0 ? (
-                      <StableResponsiveChart className="min-w-0 h-56 sm:h-64 -ml-2">
-                        <LineChart data={weightData} margin={{ top: 30, right: 15, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#ccfbf1" />
-                          <XAxis
-                            dataKey="timestamp"
-                            type="number"
-                            domain={['dataMin', 'dataMax']}
-                            scale="time"
-                            tick={{ fontSize: 11, fill: '#475569' }}
-                            tickFormatter={formatTrendAxisDate}
-                            axisLine={{ stroke: '#99f6e4' }}
-                            tickLine={{ stroke: '#99f6e4' }}
-                          />
-                          <YAxis
-                            domain={['dataMin - 0.3', 'dataMax + 0.3']}
-                            tick={{ fontSize: 11, fill: '#475569' }}
-                            tickFormatter={(v) => `${v}kg`}
-                            axisLine={{ stroke: '#99f6e4' }}
-                            tickLine={{ stroke: '#99f6e4' }}
-                          />
-                          <Tooltip content={(props) => {
-                            const p = props as unknown as Parameters<typeof renderTooltipWithAge>[0]
-                            if (!p.active || !p.payload?.length) return null
-                            const ts = (p.payload[0].payload as Record<string, unknown>)?.timestamp as number
-                            const ageStr = ts ? formatBabyAge(ts) : null
-                            return (
-                              <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs shadow-md">
-                                <p className="font-semibold text-slate-900">{formatTrendTooltipLabel(ts)}{ageStr ? <span className="ml-1.5 font-normal text-slate-400">({ageStr})</span> : null}</p>
-                                <p className="mt-0.5 text-teal-600">体重：{p.payload[0].value} kg</p>
-                              </div>
-                            )
-                          }} />
-                          <Line
-                            type="monotone"
-                            dataKey="体重"
-                            stroke={palette.teal}
-                            strokeWidth={2.5}
-                            dot={{ fill: palette.teal, r: 4 }}
-                            activeDot={{ r: 6 }}
-                          >
-                            <LabelList
-                              dataKey="体重"
-                              content={makeSparseLabel('体重', palette.teal, 'kg', weightData.length)}
-                            />
-                          </Line>
-                        </LineChart>
-                      </StableResponsiveChart>
-                    ) : (
-                      <StatsEmptyState
-                        icon={Scale}
-                        title="暂无体重记录"
-                        description="在添加记录中记录宝宝体重后，这里将展示体重变化趋势"
-                      />
-                    )}
-                  </div>
+                  <GrowthTrendCard
+                    title="体重趋势"
+                    description="全部体重记录的增长轨迹"
+                    descriptionClassName="text-teal-700"
+                    data={weightData}
+                    dataKey="体重"
+                    unit="kg"
+                    color={palette.teal}
+                    axisColor="#99f6e4"
+                    yPadding={0.3}
+                    emptyIcon={Scale}
+                    emptyTitle="暂无体重记录"
+                    emptyDescription="在添加记录中记录宝宝体重后，这里将展示体重变化趋势"
+                    formatAxisDate={formatTrendAxisDate}
+                    formatTooltipDate={formatTrendTooltipLabel}
+                    formatAge={formatBabyAge}
+                  />
 
-                  <div className="min-w-0 rounded-card border border-indigo-100 bg-indigo-50/40 p-3">
-                    <div className="mb-3 flex items-center justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-900">身高趋势</p>
-                        <p className="mt-1 text-xs text-indigo-700">按记录时间查看身高变化</p>
-                      </div>
-                    </div>
-                    {heightData.length > 0 ? (
-                      <StableResponsiveChart className="min-w-0 h-56 sm:h-64 -ml-2">
-                        <LineChart data={heightData} margin={{ top: 30, right: 15, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
-                          <XAxis
-                            dataKey="timestamp"
-                            type="number"
-                            domain={['dataMin', 'dataMax']}
-                            scale="time"
-                            tick={{ fontSize: 11, fill: '#475569' }}
-                            tickFormatter={formatTrendAxisDate}
-                            axisLine={{ stroke: '#c7d2fe' }}
-                            tickLine={{ stroke: '#c7d2fe' }}
-                          />
-                          <YAxis
-                            domain={['dataMin - 1', 'dataMax + 1']}
-                            tick={{ fontSize: 11, fill: '#475569' }}
-                            tickFormatter={(v) => `${v}cm`}
-                            axisLine={{ stroke: '#c7d2fe' }}
-                            tickLine={{ stroke: '#c7d2fe' }}
-                          />
-                          <Tooltip content={(props) => {
-                            const p = props as unknown as Parameters<typeof renderTooltipWithAge>[0]
-                            if (!p.active || !p.payload?.length) return null
-                            const ts = (p.payload[0].payload as Record<string, unknown>)?.timestamp as number
-                            const ageStr = ts ? formatBabyAge(ts) : null
-                            return (
-                              <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs shadow-md">
-                                <p className="font-semibold text-slate-900">{formatTrendTooltipLabel(ts)}{ageStr ? <span className="ml-1.5 font-normal text-slate-400">({ageStr})</span> : null}</p>
-                                <p className="mt-0.5 text-indigo-600">身高：{p.payload[0].value} cm</p>
-                              </div>
-                            )
-                          }} />
-                          <Line
-                            type="monotone"
-                            dataKey="身高"
-                            stroke={palette.indigo}
-                            strokeWidth={2.5}
-                            dot={{ fill: palette.indigo, r: 4 }}
-                            activeDot={{ r: 6 }}
-                          >
-                            <LabelList
-                              dataKey="身高"
-                              content={makeSparseLabel('身高', palette.indigo, 'cm', heightData.length)}
-                            />
-                          </Line>
-                        </LineChart>
-                      </StableResponsiveChart>
-                    ) : (
-                      <StatsEmptyState
-                        icon={Ruler}
-                        title="暂无身高记录"
-                        description="在添加记录中记录宝宝身高后，这里将展示身高变化趋势"
-                      />
-                    )}
-                  </div>
+                  <GrowthTrendCard
+                    title="身高趋势"
+                    description="全部身高记录的变化趋势"
+                    descriptionClassName="text-indigo-700"
+                    data={heightData}
+                    dataKey="身高"
+                    unit="cm"
+                    color={palette.indigo}
+                    axisColor="#c7d2fe"
+                    yPadding={1}
+                    emptyIcon={Ruler}
+                    emptyTitle="暂无身高记录"
+                    emptyDescription="在添加记录中记录宝宝身高后，这里将展示身高变化趋势"
+                    formatAxisDate={formatTrendAxisDate}
+                    formatTooltipDate={formatTrendTooltipLabel}
+                    formatAge={formatBabyAge}
+                  />
 
-                  {/* BMI trend */}
-                  <div className="min-w-0 rounded-card border border-emerald-100 bg-emerald-50/30 p-3">
-                    <div className="mb-3 flex items-center justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-900">BMI 趋势</p>
-                        <p className="mt-1 text-xs text-emerald-700">体重(kg) ÷ 身高(m)² 综合评估</p>
-                      </div>
-                    </div>
-                    {bmiData.length > 0 ? (
-                      <StableResponsiveChart className="min-w-0 h-56 sm:h-64 -ml-2">
-                        <LineChart data={bmiData} margin={{ top: 30, right: 15, left: -10, bottom: 0 }} style={{ outline: 'none' }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#d1fae5" />
-                          <XAxis
-                            dataKey="timestamp"
-                            type="number"
-                            domain={['dataMin', 'dataMax']}
-                            scale="time"
-                            tick={{ fontSize: 11, fill: '#475569' }}
-                            tickFormatter={formatTrendAxisDate}
-                            axisLine={{ stroke: '#6ee7b7' }}
-                            tickLine={{ stroke: '#6ee7b7' }}
-                          />
-                          <YAxis
-                            domain={['dataMin - 1', 'dataMax + 1']}
-                            tick={{ fontSize: 11, fill: '#475569' }}
-                            axisLine={{ stroke: '#6ee7b7' }}
-                            tickLine={{ stroke: '#6ee7b7' }}
-                          />
-                          <Tooltip
-                            content={({ active, payload }) => {
-                              if (!active || !payload?.length) return null
-                              const data = payload[0].payload as { timestamp: number; BMI: number; weight: number; height: number }
-                              const ageStr = formatBabyAge(data.timestamp)
-                              return (
-                                <div className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs shadow-md">
-                                  <p className="mb-1 font-medium text-slate-700">{formatTrendTooltipLabel(data.timestamp)}{ageStr ? <span className="ml-1.5 font-normal text-slate-400">({ageStr})</span> : null}</p>
-                                  <p className="text-emerald-600">BMI: <span className="font-semibold">{data.BMI}</span></p>
-                                  <p className="mt-0.5 text-slate-500">体重: {data.weight}kg · 身高: {data.height}cm</p>
-                                </div>
-                              )
-                            }}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="BMI"
-                            stroke={palette.emerald}
-                            strokeWidth={2.5}
-                            dot={{ fill: palette.emerald, r: 4 }}
-                            activeDot={{ r: 6 }}
-                          >
-                            <LabelList
-                              dataKey="BMI"
-                              content={makeSparseLabel('BMI', palette.emerald, '', bmiData.length)}
-                            />
-                          </Line>
-                        </LineChart>
-                      </StableResponsiveChart>
-                    ) : (
-                      <StatsEmptyState
-                        icon={Scale}
-                        title="暂无 BMI 数据"
-                        description="需要同时有体重和身高记录才能计算 BMI"
-                      />
+                  <GrowthTrendCard
+                    title="BMI 趋势"
+                    description="根据全部身高与体重记录综合评估"
+                    descriptionClassName="text-emerald-700"
+                    data={bmiData}
+                    dataKey="BMI"
+                    unit=""
+                    color={palette.emerald}
+                    axisColor="#6ee7b7"
+                    yPadding={1}
+                    emptyIcon={Scale}
+                    emptyTitle="暂无 BMI 数据"
+                    emptyDescription="需要同时有体重和身高记录才能计算 BMI"
+                    formatAxisDate={formatTrendAxisDate}
+                    formatTooltipDate={formatTrendTooltipLabel}
+                    formatAge={formatBabyAge}
+                    renderTooltipDetails={data => (
+                      <p className="mt-0.5 text-slate-500">体重: {data.weight}kg · 身高: {data.height}cm</p>
                     )}
-                  </div>
+                  />
 
                 </div>
-              </StatsPanel>
+              </section>
 
-              <StatsPanel className="p-3">
+              <StatsPanel padding="compact">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5">
                     <Syringe size={15} className="text-teal-500" />
@@ -1530,61 +1653,83 @@ export default function StatsComponent({
           )}
 
           {activeSubpage === 'insights' && (
-            <div className="space-y-2.5">
+            <div className="space-y-3">
 
-              {/* Baby age banner */}
-              {babyAgeLabel && (
-                <div className="flex items-center gap-2.5 rounded-card bg-gradient-to-r from-pink-50 to-purple-50 border border-pink-100 px-3.5 py-2.5">
-                  <BabyIcon size={16} className="shrink-0 text-pink-500" />
-                  <p className="text-sm font-medium text-slate-700">
-                    <span className="font-bold text-pink-600">{stats.baby.name}</span>
-                    {' · '}当前月龄 <span className="font-bold text-purple-600">{babyAgeLabel}</span>
-                    {babyAgeDays !== null && <span className="text-slate-400"> ({babyAgeDays}天)</span>}
-                  </p>
+              {/* Period overview */}
+              <section className="rounded-card border border-slate-200 bg-white p-3 shadow-card sm:p-4" aria-labelledby="period-overview-title">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
+                      <BabyIcon size={18} aria-hidden="true" />
+                    </span>
+                    <div>
+                      <h2 id="period-overview-title" className="text-sm font-bold text-slate-900">{stats.baby.name}的周期概览</h2>
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        {babyAgeLabel ? `当前月龄 ${babyAgeLabel}` : '当前统计数据'}
+                        {babyAgeDays !== null ? ` · ${babyAgeDays}天` : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">{rangeLabel}</span>
                 </div>
-              )}
+                <div className="mt-3 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-slate-200 bg-slate-200 sm:grid-cols-4">
+                  {[
+                    { label: '喂养总次数', value: `${stats.totalStats.totalFeedings}`, unit: '次' },
+                    { label: '奶量总计', value: `${totalMilkAmount}`, unit: 'ml' },
+                    { label: '日均睡眠', value: avgSleepMinutes > 0 ? `${avgSleepHours}h${avgSleepMins > 0 ? `${avgSleepMins}m` : ''}` : '-', unit: '' },
+                    { label: '尿布记录', value: `${totalPeeCount + totalPoopCount}`, unit: '次' },
+                  ].map(item => (
+                    <div key={item.label} className="min-w-0 bg-white px-3 py-3">
+                      <p className="text-[11px] font-medium text-slate-500">{item.label}</p>
+                      <p className="mt-1 truncate text-lg font-bold tabular-nums text-slate-900">
+                        {item.value}<span className="ml-0.5 text-xs font-semibold text-slate-500">{item.unit}</span>
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-2 text-[11px] text-slate-500">喂养记录覆盖 {activeFeedingDays}/{rangeDayCount} 天 · 睡眠记录覆盖 {sleepActiveDays}/{rangeDayCount} 天</p>
+              </section>
 
               {/* Feeding insights */}
-              <div className="rounded-card border border-blue-100 bg-gradient-to-br from-white via-blue-50/40 to-sky-50/60 p-3 shadow-card">
+              <section className="rounded-card border border-slate-200 bg-white p-3 shadow-card sm:p-4" aria-labelledby="feeding-insights-title">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 text-blue-700">
-                    <Milk size={15} />
-                    <p className="text-sm font-bold">喂养洞察</p>
+                    <Milk size={16} aria-hidden="true" />
+                    <h2 id="feeding-insights-title" className="text-sm font-bold">喂养洞察</h2>
                   </div>
-                  <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-bold text-blue-700">近{days}天</span>
+                  <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700">{rangeLabel}</span>
                 </div>
 
-                {/* Core metrics - 4 col grid, compact */}
-                <div className="mt-2.5 grid grid-cols-4 gap-1.5">
-                  <div className="rounded-lg bg-white/80 border border-blue-50 px-2 py-2 text-center">
+                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <div className="rounded-lg bg-slate-50 px-2.5 py-2.5">
                     <p className="text-[11px] text-slate-500">喂养次数</p>
                     <p className="text-base font-bold text-slate-900">{stats.totalStats.totalFeedings}</p>
                   </div>
-                  <div className="rounded-lg bg-white/80 border border-blue-50 px-2 py-2 text-center">
+                  <div className="rounded-lg bg-slate-50 px-2.5 py-2.5">
                     <p className="text-[11px] text-slate-500">亲喂时长</p>
                     <p className="text-base font-bold text-slate-900">{formatMinutes(stats.totalStats.totalBreastDuration)}</p>
                   </div>
-                  <div className="rounded-lg bg-white/80 border border-blue-50 px-2 py-2 text-center">
+                  <div className="rounded-lg bg-slate-50 px-2.5 py-2.5">
                     <p className="text-[11px] text-slate-500">奶量总计</p>
                     <p className="text-base font-bold text-slate-900">{totalMilkAmount}<span className="text-xs font-medium">ml</span></p>
                   </div>
-                  <div className="rounded-lg bg-white/80 border border-blue-50 px-2 py-2 text-center">
+                  <div className="rounded-lg bg-slate-50 px-2.5 py-2.5">
                     <p className="text-[11px] text-slate-500">记录天数</p>
-                    <p className="text-base font-bold text-slate-900">{activeFeedingDays}<span className="text-xs font-medium">/{days}</span></p>
+                    <p className="text-base font-bold text-slate-900">{activeFeedingDays}<span className="text-xs font-medium">/{rangeDayCount}</span></p>
                   </div>
                 </div>
 
                 {/* Secondary metrics row */}
                 <div className="mt-1.5 grid grid-cols-3 gap-1.5">
-                  <div className="rounded-lg bg-blue-50/80 px-2 py-2 text-center">
+                  <div className="rounded-lg border border-slate-200 px-2 py-2 text-center">
                     <p className="text-[11px] text-blue-600">日均奶量</p>
                     <p className="text-sm font-bold text-slate-900">{averageMilkPerActiveDay}<span className="text-[11px] font-medium">ml</span></p>
                   </div>
-                  <div className="rounded-lg bg-sky-50/80 px-2 py-2 text-center">
+                  <div className="rounded-lg border border-slate-200 px-2 py-2 text-center">
                     <p className="text-[11px] text-sky-600">日均频次</p>
                     <p className="text-sm font-bold text-slate-900">{averageFeedingsPerActiveDay > 0 ? averageFeedingsPerActiveDay.toFixed(1) : '-'}<span className="text-[11px] font-medium">次</span></p>
                   </div>
-                  <div className="rounded-lg bg-indigo-50/80 px-2 py-2 text-center">
+                  <div className="rounded-lg border border-slate-200 px-2 py-2 text-center">
                     <p className="text-[11px] text-indigo-600">喂养规律</p>
                     <p className="text-sm font-bold text-slate-900">{feedingRegularity || '-'}</p>
                   </div>
@@ -1613,8 +1758,8 @@ export default function StatsComponent({
                     </div>
                   )}
                   {totalNightFeedings > 0 && (
-                    <div className="flex items-center gap-2 rounded-lg border border-violet-100 bg-white px-2.5 py-2">
-                      <Moon size={14} className="shrink-0 text-violet-500" />
+                    <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-2">
+                      <Moon size={14} className="shrink-0 text-blue-600" />
                       <div className="min-w-0">
                         <p className="text-[11px] text-slate-500">夜间喂养(22-06时)</p>
                         <p className="text-sm font-bold text-slate-900">{totalNightFeedings}次 / {nightFeedingActiveDays}天</p>
@@ -1623,48 +1768,51 @@ export default function StatsComponent({
                     </div>
                   )}
                   {totalBreastTime > 0 && (
-                    <div className="col-span-2 rounded-lg border border-pink-100 bg-white px-2.5 py-2">
+                    <div className="col-span-2 rounded-lg border border-slate-200 bg-white px-2.5 py-2">
                       <div className="flex items-center justify-between gap-2">
                         <p className="text-[11px] text-slate-500">左右乳喂养比例</p>
                         <p className="text-xs font-bold text-slate-600">{formatMinutes(totalLeftBreast)} / {formatMinutes(totalRightBreast)}</p>
                       </div>
                       <div className="mt-1.5 flex h-2.5 overflow-hidden rounded-full bg-slate-100">
-                        <div className="bg-pink-400 transition-all" style={{ width: `${leftBreastPct}%` }} />
-                        <div className="bg-rose-200 transition-all" style={{ width: `${rightBreastPct}%` }} />
+                        <div className="bg-blue-600 transition-all" style={{ width: `${leftBreastPct}%` }} />
+                        <div className="bg-teal-500 transition-all" style={{ width: `${rightBreastPct}%` }} />
                       </div>
                       <div className="mt-1 flex justify-between text-[11px]">
-                        <span className="text-pink-600 font-medium">左 {leftBreastPct}%</span>
-                        <span className="text-rose-400 font-medium">右 {rightBreastPct}%</span>
+                        <span className="font-medium text-blue-700">左 {leftBreastPct}%</span>
+                        <span className="font-medium text-teal-700">右 {rightBreastPct}%</span>
                       </div>
                     </div>
                   )}
                 </div>
 
                 {/* Peak days summary - compact text */}
-                <div className="mt-2 space-y-1 text-xs leading-[18px] text-slate-500">
+                <div className="mt-2 space-y-1.5 border-t border-slate-100 pt-2 text-xs leading-[18px] text-slate-500">
                   {peakMilkIntakeDay && (peakMilkIntakeDay.totalBreastMilkAmount + peakMilkIntakeDay.totalFormulaAmount > 0) && (
-                    <p>📈 {peakMilkIntakeDay.date} 奶量最高 <span className="font-semibold text-blue-700">{peakMilkIntakeDay.totalBreastMilkAmount + peakMilkIntakeDay.totalFormulaAmount}ml</span></p>
+                    <p className="flex items-start gap-1.5"><TrendingUp size={13} className="mt-0.5 shrink-0 text-blue-600" aria-hidden="true" /><span>{peakMilkIntakeDay.date} 奶量最高 <strong className="font-semibold text-blue-700">{peakMilkIntakeDay.totalBreastMilkAmount + peakMilkIntakeDay.totalFormulaAmount}ml</strong></span></p>
                   )}
                   {maxBreastfeedingDay && maxBreastfeedingDay.totalBreastDuration > 0 && (
-                    <p>🤱 {maxBreastfeedingDay.date} 亲喂最长 <span className="font-semibold text-pink-600">{formatMinutes(maxBreastfeedingDay.totalBreastDuration)}</span></p>
+                    <p className="flex items-start gap-1.5"><Clock size={13} className="mt-0.5 shrink-0 text-teal-600" aria-hidden="true" /><span>{maxBreastfeedingDay.date} 亲喂最长 <strong className="font-semibold text-teal-700">{formatMinutes(maxBreastfeedingDay.totalBreastDuration)}</strong></span></p>
                   )}
                   {milkAmountStdDev !== null && averageMilkPerActiveDay > 0 && (
-                    <p>📊 日奶量波动 ±{milkAmountStdDev}ml（均值 {averageMilkPerActiveDay}ml）</p>
+                    <p className="flex items-start gap-1.5"><Activity size={13} className="mt-0.5 shrink-0 text-slate-500" aria-hidden="true" /><span>日奶量波动 ±{milkAmountStdDev}ml（均值 {averageMilkPerActiveDay}ml）</span></p>
                   )}
                 </div>
-              </div>
+              </section>
 
-              {/* Growth + Diaper + Health - 2 columns on mobile, 3 on desktop */}
-              <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
+              {/* Growth + Diaper + Health */}
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
 
                 {/* Growth insight */}
-                <div className="col-span-2 lg:col-span-1 rounded-card border border-emerald-100 bg-white p-2.5 shadow-card">
-                  <div className="flex items-center gap-1.5 text-emerald-600">
-                    <TrendingUp size={14} />
-                    <p className="text-sm font-bold">成长洞察</p>
+                <section className="rounded-card border border-slate-200 bg-white p-3 shadow-card" aria-labelledby="growth-insight-title">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 text-blue-700">
+                      <TrendingUp size={14} />
+                      <h2 id="growth-insight-title" className="text-sm font-bold">成长洞察</h2>
+                    </div>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">全部记录</span>
                   </div>
                   <div className="mt-2 grid grid-cols-2 gap-1.5">
-                    <div className="rounded-xl bg-teal-50/80 px-2.5 py-2">
+                    <div className="rounded-lg bg-slate-50 px-2.5 py-2">
                       <p className="text-[11px] font-medium text-teal-600">体重</p>
                       <p className="mt-0.5 text-lg font-bold text-slate-900">
                         {latestWeightRecord ? `${latestWeightRecord.weight}kg` : '-'}
@@ -1679,7 +1827,7 @@ export default function StatsComponent({
                         <p className="mt-1 text-[11px] text-slate-400">整体 {overallWeightChange >= 0 ? '+' : ''}{overallWeightChange}kg</p>
                       )}
                     </div>
-                    <div className="rounded-xl bg-blue-50/80 px-2.5 py-2">
+                    <div className="rounded-lg bg-slate-50 px-2.5 py-2">
                       <p className="text-[11px] font-medium text-blue-600">身高</p>
                       <p className="mt-0.5 text-lg font-bold text-slate-900">
                         {latestHeightRecord ? `${latestHeightRecord.height}cm` : '-'}
@@ -1701,13 +1849,13 @@ export default function StatsComponent({
                       {latestHeightRecord && <p>身高记录于 {formatRecordedSummaryTime(latestHeightRecord.recordedAt)}</p>}
                     </div>
                   )}
-                </div>
+                </section>
 
                 {/* Diaper insight */}
-                <div className="rounded-card border border-violet-100 bg-white p-2.5 shadow-card">
-                  <div className="flex items-center gap-1.5 text-violet-600">
+                <section className="rounded-card border border-slate-200 bg-white p-3 shadow-card" aria-labelledby="diaper-insight-title">
+                  <div className="flex items-center gap-1.5 text-blue-700">
                     <Droplets size={14} />
-                    <p className="text-sm font-bold">大小便</p>
+                    <h2 id="diaper-insight-title" className="text-sm font-bold">大小便</h2>
                   </div>
                   <div className="mt-2 space-y-1.5">
                     <div className="grid grid-cols-2 gap-1.5">
@@ -1724,27 +1872,27 @@ export default function StatsComponent({
                     </div>
                     {consecutiveNoPoopDays >= 2 && (
                       <div className="rounded-lg bg-red-50 border border-red-100 px-2.5 py-2">
-                        <p className="text-xs font-semibold text-red-600">⚠️ 已连续 {consecutiveNoPoopDays} 天未记录大便</p>
+                        <p className="flex items-start gap-1.5 text-xs font-semibold text-red-700"><AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden="true" /><span>已连续 {consecutiveNoPoopDays} 天未记录大便</span></p>
                       </div>
                     )}
                     {peakDiaperDay && (peakDiaperDay.peeCount > 0 || peakDiaperDay.poopCount > 0) && (
                       <p className="text-[11px] text-slate-400">高峰 {peakDiaperDay.date} 小便{peakDiaperDay.peeCount}+大便{peakDiaperDay.poopCount}</p>
                     )}
                   </div>
-                </div>
+                </section>
 
                 {/* Health reminder */}
-                <div className="rounded-card border border-amber-100 bg-white p-2.5 shadow-card">
-                  <div className="flex items-center gap-1.5 text-amber-600">
+                <section className="rounded-card border border-slate-200 bg-white p-3 shadow-card" aria-labelledby="health-insight-title">
+                  <div className="flex items-center gap-1.5 text-blue-700">
                     <Thermometer size={14} />
-                    <p className="text-sm font-bold">健康提醒</p>
+                    <h2 id="health-insight-title" className="text-sm font-bold">健康提醒</h2>
                   </div>
                   <div className="mt-2 space-y-1.5">
                     {/* Temperature */}
                     <div className="rounded-lg bg-amber-50 px-2.5 py-2">
                       <div className="flex items-center justify-between">
                         <p className="text-[11px] text-amber-600">体温覆盖</p>
-                        <p className="text-xs font-bold text-slate-700">{temperatureRecordCount}/{days}天</p>
+                        <p className="text-xs font-bold text-slate-700">{temperatureRecordCount}/{rangeDayCount}天</p>
                       </div>
                       {temperatureRecordCount > 0 && (
                         <div className="mt-1 flex gap-1.5">
@@ -1760,30 +1908,30 @@ export default function StatsComponent({
                         <p className="mt-1 text-[11px] text-slate-500">最近 <span className="font-semibold">{latestTemperatureDay.temperature}°C</span> ({latestTemperatureDay.date})</p>
                       )}
                       {maxTemperatureDay && typeof maxTemperatureDay.temperature === 'number' && maxTemperatureDay.temperature > 37.5 && (
-                        <p className="mt-0.5 text-[11px] text-red-500">⚠ 最高 {maxTemperatureDay.temperature}°C ({maxTemperatureDay.date})</p>
+                        <p className="mt-0.5 flex items-center gap-1 text-[11px] text-red-700"><AlertTriangle size={12} aria-hidden="true" />最高 {maxTemperatureDay.temperature}°C ({maxTemperatureDay.date})</p>
                       )}
                     </div>
                     {/* AD */}
                     <div className="rounded-lg bg-orange-50 px-2.5 py-2">
                       <div className="flex items-center justify-between">
                         <p className="text-[11px] text-orange-600">AD补充</p>
-                        <p className="text-xs font-bold text-slate-700">{adGivenDays}/{days}天</p>
+                        <p className="text-xs font-bold text-slate-700">{adGivenDays}/{rangeDayCount}天</p>
                       </div>
                       {adConsecutiveStreak > 0 && (
-                        <p className="mt-1 text-[11px] text-emerald-600 font-medium">✅ 已连续服用 {adConsecutiveStreak} 天</p>
+                        <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-emerald-700"><CheckCircle2 size={12} aria-hidden="true" />已连续服用 {adConsecutiveStreak} 天</p>
                       )}
                       {adConsecutiveStreak === 0 && adMissedRecently > 0 && (
-                        <p className="mt-1 text-[11px] text-amber-600 font-medium">💊 已 {adMissedRecently} 天未服用</p>
+                        <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-amber-700"><Pill size={12} aria-hidden="true" />已 {adMissedRecently} 天未服用</p>
                       )}
                     </div>
                   </div>
-                </div>
+                </section>
               </div>
 
               {/* Trend charts moved from dashboard */}
               <div className="grid gap-2.5 xl:grid-cols-2">
                 {/* Diaper trend */}
-                <div className="min-w-0 rounded-card border border-amber-100 bg-amber-50/30 p-3">
+                <div className="min-w-0 rounded-card border border-slate-200 bg-white p-3 shadow-card">
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <div>
                       <p className="text-sm font-semibold text-slate-900">大小便趋势</p>
@@ -1792,10 +1940,10 @@ export default function StatsComponent({
                   </div>
                   {hasDiaperData ? (
                     <StableResponsiveChart className="min-w-0 h-56 sm:h-72 -ml-2">
-                      <BarChart data={diaperChartData} margin={{ top: 25, right: 5, left: -10, bottom: 0 }} barCategoryGap="25%" style={{ outline: 'none' }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#fef3c7" />
-                        <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#475569' }} axisLine={{ stroke: '#fcd34d' }} tickLine={{ stroke: '#fcd34d' }} />
-                        <YAxis tick={{ fontSize: 11, fill: '#475569' }} axisLine={{ stroke: '#fcd34d' }} tickLine={{ stroke: '#fcd34d' }} />
+                      <ComposedChart data={diaperChartData} margin={{ top: 25, right: 5, left: -10, bottom: 0 }} barCategoryGap="25%" style={{ outline: 'none' }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                        <XAxis dataKey="date" interval={dailyTickInterval} minTickGap={24} tick={{ fontSize: 11, fill: '#64748b' }} axisLine={{ stroke: '#cbd5e1' }} tickLine={false} />
+                        <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
                         <Tooltip content={(props) => renderTooltipWithAge(props as unknown as Parameters<typeof renderTooltipWithAge>[0], (items) => (
                           <>
                             {items.map(({ name, value }) => (
@@ -1804,13 +1952,22 @@ export default function StatsComponent({
                           </>
                         ))} />
                         <Legend wrapperStyle={{ fontSize: 12 }} />
-                        <Bar dataKey="小便" fill="#60a5fa" name="小便" radius={[2, 2, 0, 0]} stackId="diaper" maxBarSize={32}>
-                          <LabelList dataKey="小便" position="inside" fill="#fff" fontSize={10} fontWeight={600} />
-                        </Bar>
-                        <Bar dataKey="大便" fill="#d97706" name="大便" radius={[2, 2, 0, 0]} stackId="diaper" maxBarSize={32}>
-                          <LabelList dataKey="大便" position="top" fill="#d97706" fontSize={10} fontWeight={600} />
-                        </Bar>
-                      </BarChart>
+                        {isDenseRange ? (
+                          <>
+                            <Line type="monotone" dataKey="小便" stroke="#2563eb" strokeWidth={2} dot={false} activeDot={{ r: 5 }} name="小便" />
+                            <Line type="monotone" dataKey="大便" stroke="#d97706" strokeWidth={2} dot={false} activeDot={{ r: 5 }} name="大便" />
+                          </>
+                        ) : (
+                          <>
+                            <Bar dataKey="小便" fill="#3b82f6" name="小便" radius={[2, 2, 0, 0]} stackId="diaper" maxBarSize={32}>
+                              <LabelList dataKey="小便" position="inside" fill="#fff" fontSize={10} fontWeight={600} />
+                            </Bar>
+                            <Bar dataKey="大便" fill="#d97706" name="大便" radius={[2, 2, 0, 0]} stackId="diaper" maxBarSize={32}>
+                              <LabelList dataKey="大便" position="top" fill="#b45309" fontSize={10} fontWeight={600} />
+                            </Bar>
+                          </>
+                        )}
+                      </ComposedChart>
                     </StableResponsiveChart>
                   ) : (
                     <StatsEmptyState
@@ -1822,19 +1979,19 @@ export default function StatsComponent({
                 </div>
 
                 {/* Feeding structure trend */}
-                <div className="min-w-0 rounded-card border border-purple-100 bg-purple-50/30 p-3">
+                <div className="min-w-0 rounded-card border border-slate-200 bg-white p-3 shadow-card">
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <div>
                       <p className="text-sm font-semibold text-slate-900">喂养结构趋势</p>
-                      <p className="mt-1 text-xs text-purple-700">亲喂 / 瓶喂 / 奶粉次数变化</p>
+                      <p className="mt-1 text-xs text-slate-500">亲喂 / 瓶喂 / 奶粉次数变化</p>
                     </div>
                   </div>
                   {hasFeedingStructureData ? (
                     <StableResponsiveChart className="min-w-0 h-56 sm:h-72 -ml-2">
-                      <BarChart data={feedingStructureData} margin={{ top: 20, right: 5, left: -10, bottom: 0 }} barCategoryGap="25%" style={{ outline: 'none' }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f3e8ff" />
-                        <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#475569' }} axisLine={{ stroke: '#d8b4fe' }} tickLine={{ stroke: '#d8b4fe' }} />
-                        <YAxis tick={{ fontSize: 11, fill: '#475569' }} axisLine={{ stroke: '#d8b4fe' }} tickLine={{ stroke: '#d8b4fe' }} />
+                      <ComposedChart data={feedingStructureData} margin={{ top: 20, right: 5, left: -10, bottom: 0 }} barCategoryGap="25%" style={{ outline: 'none' }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                        <XAxis dataKey="date" interval={dailyTickInterval} minTickGap={24} tick={{ fontSize: 11, fill: '#64748b' }} axisLine={{ stroke: '#cbd5e1' }} tickLine={false} />
+                        <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
                         <Tooltip content={(props) => renderTooltipWithAge(props as unknown as Parameters<typeof renderTooltipWithAge>[0], (items) => (
                           <>
                             {items.map(({ name, value }) => (
@@ -1843,25 +2000,35 @@ export default function StatsComponent({
                           </>
                         ))} />
                         <Legend wrapperStyle={{ fontSize: 12 }} />
-                        <Bar dataKey="亲喂" fill="#f472b6" name="亲喂" radius={[2, 2, 0, 0]} stackId="feed" maxBarSize={32}>
+                        {isDenseRange ? (
+                          <>
+                            <Line type="monotone" dataKey="亲喂" stroke="#db2777" strokeWidth={2} dot={false} activeDot={{ r: 5 }} name="亲喂" />
+                            <Line type="monotone" dataKey="瓶喂" stroke="#7c3aed" strokeWidth={2} dot={false} activeDot={{ r: 5 }} name="瓶喂" />
+                            <Line type="monotone" dataKey="奶粉" stroke="#2563eb" strokeWidth={2} dot={false} activeDot={{ r: 5 }} name="奶粉" />
+                          </>
+                        ) : (
+                          <>
+                        <Bar dataKey="亲喂" fill="#db2777" name="亲喂" radius={[2, 2, 0, 0]} stackId="feed" maxBarSize={32}>
                           <LabelList dataKey="亲喂" content={({ x, y, width, height, value }) => {
                             if (!value || Number(value) === 0 || !height || Number(height) < 16 || !width || Number(width) < 14) return null
                             return <text x={Number(x) + Number(width) / 2} y={Number(y) + Number(height) / 2} textAnchor="middle" dominantBaseline="central" fill="#fff" fontSize={9} fontWeight={600}>{value}</text>
                           }} />
                         </Bar>
-                        <Bar dataKey="瓶喂" fill="#a78bfa" name="瓶喂" radius={[2, 2, 0, 0]} stackId="feed" maxBarSize={32}>
+                        <Bar dataKey="瓶喂" fill="#7c3aed" name="瓶喂" radius={[2, 2, 0, 0]} stackId="feed" maxBarSize={32}>
                           <LabelList dataKey="瓶喂" content={({ x, y, width, height, value }) => {
                             if (!value || Number(value) === 0 || !height || Number(height) < 16 || !width || Number(width) < 14) return null
                             return <text x={Number(x) + Number(width) / 2} y={Number(y) + Number(height) / 2} textAnchor="middle" dominantBaseline="central" fill="#fff" fontSize={9} fontWeight={600}>{value}</text>
                           }} />
                         </Bar>
-                        <Bar dataKey="奶粉" fill="#60a5fa" name="奶粉" radius={[2, 2, 0, 0]} stackId="feed" maxBarSize={32}>
+                        <Bar dataKey="奶粉" fill="#2563eb" name="奶粉" radius={[2, 2, 0, 0]} stackId="feed" maxBarSize={32}>
                           <LabelList dataKey="奶粉" content={({ x, y, width, value }) => {
                             if (!value || Number(value) === 0 || !width || Number(width) < 14) return null
-                            return <text x={Number(x) + Number(width) / 2} y={Number(y) - 5} textAnchor="middle" fill="#60a5fa" fontSize={9} fontWeight={600}>{value}</text>
+                            return <text x={Number(x) + Number(width) / 2} y={Number(y) - 5} textAnchor="middle" fill="#2563eb" fontSize={9} fontWeight={600}>{value}</text>
                           }} />
                         </Bar>
-                      </BarChart>
+                          </>
+                        )}
+                      </ComposedChart>
                     </StableResponsiveChart>
                   ) : (
                     <StatsEmptyState
@@ -1873,19 +2040,19 @@ export default function StatsComponent({
                 </div>
 
                 {/* Left/right breast duration trend */}
-                <div className="min-w-0 rounded-card border border-rose-100 bg-rose-50/30 p-3">
+                <div className="min-w-0 rounded-card border border-slate-200 bg-white p-3 shadow-card">
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <div>
                       <p className="text-sm font-semibold text-slate-900">左右乳时长趋势</p>
-                      <p className="mt-1 text-xs text-rose-700">每日左右侧亲喂时长(分钟)</p>
+                      <p className="mt-1 text-xs text-slate-500">每日左右侧亲喂时长(分钟)</p>
                     </div>
                   </div>
                   {hasBreastSideData ? (
                     <StableResponsiveChart className="min-w-0 h-56 sm:h-72 -ml-2">
-                      <BarChart data={breastSideData} margin={{ top: 25, right: 5, left: -10, bottom: 0 }} barGap={4} barCategoryGap="30%" style={{ outline: 'none' }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#ffe4e6" />
-                        <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#475569' }} axisLine={{ stroke: '#fda4af' }} tickLine={{ stroke: '#fda4af' }} />
-                        <YAxis tick={{ fontSize: 11, fill: '#475569' }} tickFormatter={(v) => `${v}分`} axisLine={{ stroke: '#fda4af' }} tickLine={{ stroke: '#fda4af' }} />
+                      <ComposedChart data={breastSideData} margin={{ top: 25, right: 5, left: -10, bottom: 0 }} barGap={4} barCategoryGap="30%" style={{ outline: 'none' }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                        <XAxis dataKey="date" interval={dailyTickInterval} minTickGap={24} tick={{ fontSize: 11, fill: '#64748b' }} axisLine={{ stroke: '#cbd5e1' }} tickLine={false} />
+                        <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickFormatter={(v) => `${v}分`} axisLine={false} tickLine={false} />
                         <Tooltip content={(props) => renderTooltipWithAge(props as unknown as Parameters<typeof renderTooltipWithAge>[0], (items) => (
                           <>
                             {items.map(({ name, value }) => (
@@ -1894,13 +2061,22 @@ export default function StatsComponent({
                           </>
                         ))} />
                         <Legend wrapperStyle={{ fontSize: 12 }} />
-                        <Bar dataKey="左乳" fill="#fb7185" name="左乳(分钟)" radius={[3, 3, 0, 0]} maxBarSize={28}>
-                          <LabelList dataKey="左乳" position="top" fill="#e11d48" fontSize={10} fontWeight={600} />
-                        </Bar>
-                        <Bar dataKey="右乳" fill="#fb923c" name="右乳(分钟)" radius={[3, 3, 0, 0]} maxBarSize={28}>
-                          <LabelList dataKey="右乳" position="top" fill="#ea580c" fontSize={10} fontWeight={600} />
-                        </Bar>
-                      </BarChart>
+                        {isDenseRange ? (
+                          <>
+                            <Line type="monotone" dataKey="左乳" stroke="#db2777" strokeWidth={2} dot={false} activeDot={{ r: 5 }} name="左乳(分钟)" />
+                            <Line type="monotone" dataKey="右乳" stroke="#ea580c" strokeWidth={2} dot={false} activeDot={{ r: 5 }} name="右乳(分钟)" />
+                          </>
+                        ) : (
+                          <>
+                            <Bar dataKey="左乳" fill="#db2777" name="左乳(分钟)" radius={[3, 3, 0, 0]} maxBarSize={28}>
+                              <LabelList dataKey="左乳" position="top" fill="#be185d" fontSize={10} fontWeight={600} />
+                            </Bar>
+                            <Bar dataKey="右乳" fill="#ea580c" name="右乳(分钟)" radius={[3, 3, 0, 0]} maxBarSize={28}>
+                              <LabelList dataKey="右乳" position="top" fill="#c2410c" fontSize={10} fontWeight={600} />
+                            </Bar>
+                          </>
+                        )}
+                      </ComposedChart>
                     </StableResponsiveChart>
                   ) : (
                     <StatsEmptyState
@@ -1914,19 +2090,19 @@ export default function StatsComponent({
 
               {/* Medication records - only show if there are records */}
               {medicationRecords.length > 0 && (
-                <div className="rounded-card border border-purple-100 bg-white p-2.5 shadow-card">
+                <div className="rounded-card border border-slate-200 bg-white p-3 shadow-card">
                   <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 text-purple-600">
+                    <div className="flex items-center gap-1.5 text-blue-700">
                       <Pill size={14} />
                       <p className="text-sm font-bold">用药记录</p>
                     </div>
-                    <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[11px] font-bold text-purple-700">{medicationRecords.length}条</span>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">{medicationRecords.length}条</span>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {uniqueMedications.map(name => {
                       const count = medicationRecords.filter(r => r.medicationName === name).length
                       return (
-                        <span key={name} className="rounded-full bg-purple-50 border border-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-700">
+                        <span key={name} className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
                           {name} ×{count}
                         </span>
                       )
@@ -1935,7 +2111,7 @@ export default function StatsComponent({
                   <div className="mt-2 space-y-1.5">
                     {medicationRecords.slice(0, 5).map(record => (
                       <div key={record.id} className="flex items-start gap-1.5 text-xs text-slate-600">
-                        <span className="shrink-0 text-purple-300">•</span>
+                        <span className="shrink-0 text-slate-300">•</span>
                         <p className="min-w-0">
                           <span className="font-semibold text-slate-700">{record.medicationName}</span>
                           {record.medicationDose && <span className="text-slate-400"> {record.medicationDose}</span>}
@@ -2026,9 +2202,9 @@ export default function StatsComponent({
                   const genderLabel = gender === 'FEMALE' ? '女' : '男'
 
                   return (
-                    <div className="min-w-0 rounded-card border border-cyan-100 bg-gradient-to-br from-cyan-50/40 to-teal-50/30 p-3">
+                    <div className="min-w-0 rounded-card border border-slate-200 bg-white p-3 shadow-card">
                       <div className="mb-3">
-                        <p className="text-sm font-semibold text-slate-900">📏 体重-月龄 WHO 成长曲线（{genderLabel}）</p>
+                        <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-900"><Scale size={15} className="text-teal-700" aria-hidden="true" />体重-月龄 WHO 成长曲线（{genderLabel}）</p>
                         <p className="mt-1 text-xs text-cyan-700">宝宝体重与 WHO 标准百分位（P3–P97）对比</p>
                       </div>
                       <StableResponsiveChart className="min-w-0 h-64 sm:h-80 -ml-2">
@@ -2192,10 +2368,10 @@ export default function StatsComponent({
                   const genderLabel = gender === 'FEMALE' ? '女' : '男'
 
                   return (
-                    <div className="min-w-0 rounded-card border border-violet-100 bg-gradient-to-br from-violet-50/40 to-indigo-50/30 p-3">
+                    <div className="min-w-0 rounded-card border border-slate-200 bg-white p-3 shadow-card">
                       <div className="mb-3">
-                        <p className="text-sm font-semibold text-slate-900">📏 身高-月龄 WHO 成长曲线（{genderLabel}）</p>
-                        <p className="mt-1 text-xs text-violet-700">宝宝身高与 WHO 标准百分位（P3–P97）对比</p>
+                        <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-900"><Ruler size={15} className="text-blue-700" aria-hidden="true" />身高-月龄 WHO 成长曲线（{genderLabel}）</p>
+                        <p className="mt-1 text-xs text-slate-500">宝宝身高与 WHO 标准百分位（P3–P97）对比</p>
                       </div>
                       <StableResponsiveChart className="min-w-0 h-64 sm:h-80 -ml-2">
                         <ComposedChart data={mergedData} margin={{ top: 10, right: 15, left: -5, bottom: 0 }} style={{ outline: 'none' }}>

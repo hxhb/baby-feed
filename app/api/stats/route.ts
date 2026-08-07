@@ -31,9 +31,43 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const babyId = searchParams.get('babyId')
     const daysRaw = searchParams.get('days')
+    const startDateRaw = searchParams.get('startDate')
+    const endDateRaw = searchParams.get('endDate')
+    const todayStr = getBeijingTodayStr()
 
     let days = 7
-    if (daysRaw !== null) {
+    let startDateStr = getBeijingDaysAgoStr(days - 1)
+    let endDateStr = todayStr
+
+    if (startDateRaw !== null || endDateRaw !== null) {
+      if (!startDateRaw || !endDateRaw) {
+        return NextResponse.json({ error: '自定义日期范围需要同时提供开始和结束日期' }, { status: 400, headers: noStoreHeaders })
+      }
+
+      const datePattern = /^\d{4}-\d{2}-\d{2}$/
+      const startDate = new Date(`${startDateRaw}T00:00:00Z`)
+      const endDate = new Date(`${endDateRaw}T00:00:00Z`)
+      const validStart = datePattern.test(startDateRaw) && !Number.isNaN(startDate.getTime()) && startDate.toISOString().slice(0, 10) === startDateRaw
+      const validEnd = datePattern.test(endDateRaw) && !Number.isNaN(endDate.getTime()) && endDate.toISOString().slice(0, 10) === endDateRaw
+
+      if (!validStart || !validEnd) {
+        return NextResponse.json({ error: '日期范围格式无效' }, { status: 400, headers: noStoreHeaders })
+      }
+      if (startDate > endDate) {
+        return NextResponse.json({ error: '开始日期不能晚于结束日期' }, { status: 400, headers: noStoreHeaders })
+      }
+      if (endDateRaw > todayStr) {
+        return NextResponse.json({ error: '结束日期不能晚于今天' }, { status: 400, headers: noStoreHeaders })
+      }
+
+      days = Math.floor((endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000)) + 1
+      if (days > 365) {
+        return NextResponse.json({ error: '日期范围不能超过365天' }, { status: 400, headers: noStoreHeaders })
+      }
+
+      startDateStr = startDateRaw
+      endDateStr = endDateRaw
+    } else if (daysRaw !== null) {
       if (!/^\d{1,3}$/.test(daysRaw)) {
         return NextResponse.json({ error: 'days 参数无效' }, { status: 400, headers: noStoreHeaders })
       }
@@ -43,6 +77,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'days 参数超出范围 (1-365)' }, { status: 400, headers: noStoreHeaders })
       }
       days = parsedDays
+      startDateStr = getBeijingDaysAgoStr(days - 1)
     }
 
     if (!babyId) {
@@ -74,10 +109,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: '婴儿不存在' }, { status: 404, headers: noStoreHeaders })
     }
 
-    const todayStr = getBeijingTodayStr()
-    const startDateStr = getBeijingDaysAgoStr(days - 1)
     const { start: rangeStart } = getBeijingDayRange(startDateStr)
-    const { end: rangeEnd } = getBeijingDayRange(todayStr)
+    const { end: rangeEnd } = getBeijingDayRange(endDateStr)
 
     const [feedingRecords, healthRecords] = await Promise.all([
       prisma.feedingRecord.findMany({
@@ -102,9 +135,10 @@ export async function GET(request: NextRequest) {
     ])
 
     const statsMap = new Map()
+    const endDateUtc = new Date(`${endDateStr}T00:00:00Z`)
 
     for (let i = 0; i < days; i++) {
-      const date = getBeijingDaysAgoStr(i)
+      const date = new Date(endDateUtc.getTime() - i * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
       statsMap.set(date, {
         date,
         breastFeedingCount: 0,
@@ -373,6 +407,7 @@ export async function GET(request: NextRequest) {
         })
       })(),
       babyBirthDate: baby.birthDate ? getBeijingDateStr(new Date(baby.birthDate)) : null,
+      babyGender: baby.gender || null,
       memoRecords: memoRecords.map(record => ({
         id: record.id,
         title: record.title,
