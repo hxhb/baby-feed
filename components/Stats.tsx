@@ -16,10 +16,10 @@ import {
   LabelList,
 } from 'recharts'
 import type { Props as LabelProps } from 'recharts/types/component/Label'
-import { Baby as BabyIcon, ChartColumn, ChevronDown, ChevronUp, Clock, Droplets, Milk, Moon, Pill, Ruler, Scale, Syringe, Thermometer, TrendingUp } from 'lucide-react'
+import { Baby as BabyIcon, ChartColumn, ChevronDown, ChevronUp, ClipboardList, Clock, Droplets, Lightbulb, Milk, Moon, Pill, Ruler, Scale, Syringe, Thermometer, TrendingUp } from 'lucide-react'
 import { dedupeRequest, invalidateRequestCache } from '@/lib/client-request-cache'
 import type { PreloadedStatsData } from '@/lib/server-stats'
-import { StatsEmptyState, StatsPanel, StatsSegmentedTabs } from '@/components/StatsUi'
+import { StatsEmptyState, StatsPanel, StatsRangePicker, StatsSegmentedTabs } from '@/components/StatsUi'
 import MemoSection from '@/components/MemoSection'
 import { generateWHOCurve } from '@/lib/who-growth-standards'
 
@@ -35,8 +35,10 @@ interface Props {
   onSelectBaby: (id: string | null) => void
   initialBabies?: Baby[]
   initialStats?: PreloadedStatsData | null
-  defaultTab?: 'dashboard' | 'insights' | 'memos'
+  defaultTab?: StatsSubpage
 }
+
+type StatsSubpage = 'dashboard' | 'insights' | 'memos'
 
 type MeasuredChartElement = ReactElement<{
   width?: number
@@ -283,8 +285,9 @@ export default function StatsComponent({
   const [babies, setBabies] = useState<Baby[]>(initialBabies)
   const [stats, setStats] = useState<StatsData | null>(initialStats)
   const [loading, setLoading] = useState(initialBabies.length === 0)
+  const [statsRefreshing, setStatsRefreshing] = useState(false)
   const [days, setDays] = useState(7)
-  const [activeSubpage, setActiveSubpage] = useState<'dashboard' | 'insights' | 'memos'>(defaultTab)
+  const [activeSubpage, setActiveSubpage] = useState<StatsSubpage>(defaultTab)
   const [freshFetch] = useState(() => {
     if (typeof window !== 'undefined') {
       const savedTs = window.sessionStorage.getItem('record_saved_ts')
@@ -344,7 +347,8 @@ export default function StatsComponent({
       setStats(initialStats)
       return
     }
-    
+
+    setStatsRefreshing(true)
     try {
       const cacheKey = `stats:${selectedBabyId}:${days}`
       const data = await dedupeRequest(cacheKey, async () => {
@@ -357,6 +361,8 @@ export default function StatsComponent({
       setStats(data)
     } catch (error) {
       console.error('获取统计数据失败:', error)
+    } finally {
+      setStatsRefreshing(false)
     }
   }, [selectedBabyId, days, hasInitialStats, initialStats])
 
@@ -725,18 +731,36 @@ export default function StatsComponent({
       key: 'dashboard',
       label: '趋势与疫苗',
       description: '查看趋势工作台与疫苗记录',
+      icon: TrendingUp,
     },
     {
       key: 'insights',
       label: '数据洞察',
       description: '查看喂养、成长与健康洞察',
+      icon: Lightbulb,
     },
     {
       key: 'memos',
       label: '备忘列表',
       description: '查看备忘录与待办事项',
+      icon: ClipboardList,
     },
   ]
+
+  const handleSubpageChange = (value: string) => {
+    const nextSubpage = value as StatsSubpage
+    setActiveSubpage(nextSubpage)
+
+    if (typeof window === 'undefined') return
+
+    const url = new URL(window.location.href)
+    if (nextSubpage === 'dashboard') {
+      url.searchParams.delete('tab')
+    } else {
+      url.searchParams.set('tab', nextSubpage)
+    }
+    window.history.pushState({}, '', `${url.pathname}${url.search}${url.hash}`)
+  }
   const vaccineProgressSummary = Object.values(
     (stats?.vaccineRecords || []).reduce<Record<string, {
       vaccineName: string
@@ -868,30 +892,22 @@ export default function StatsComponent({
       {stats && (
         <>
           <StatsPanel className="p-2 sm:p-3">
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:gap-3">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-3">
               <StatsSegmentedTabs
                 items={subpageTabs}
                 value={activeSubpage}
-                onChange={(value) => setActiveSubpage(value as 'dashboard' | 'insights' | 'memos')}
-                className="w-full sm:flex-1"
+                onChange={handleSubpageChange}
+                className="w-full lg:flex-1"
               />
-              <div className="w-full sm:ml-auto sm:w-auto sm:shrink-0">
-                <div className="grid grid-cols-3 gap-2 rounded-card bg-slate-100 p-1">
-                  {[7, 14, 30].map(d => (
-                    <button
-                      key={d}
-                      onClick={() => setDays(d)}
-                      className={`rounded-card px-2 py-2 text-sm font-medium transition sm:px-4 ${
-                        days === d
-                          ? 'bg-white text-blue-600 shadow-card'
-                          : 'text-slate-500 hover:bg-white/60'
-                      }`}
-                    >
-                      {d}天
-                    </button>
-                  ))}
+              {activeSubpage !== 'memos' ? (
+                <div className="border-t border-slate-100 px-1 pt-2 lg:ml-auto lg:w-auto lg:shrink-0 lg:border-l lg:border-t-0 lg:pl-3 lg:pt-0">
+                  <StatsRangePicker
+                    value={days}
+                    onChange={setDays}
+                    loading={statsRefreshing}
+                  />
                 </div>
-              </div>
+              ) : null}
             </div>
           </StatsPanel>
 
