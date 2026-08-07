@@ -1,6 +1,6 @@
 {
   "name": "baby-feed",
-  "version": "0.1.0",
+  "version": "0.22.0",
   "private": true,
   "scripts": {
     "dev": "prisma db push && next dev",

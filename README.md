@@ -109,7 +109,6 @@ docker-compose up -d
 | `TRUST_PROXY` | 否 | 设为 `true` 时信任反向代理传递的 `X-Forwarded-For` 头（用于正确识别客户端 IP 以实施速率限制）。使用 Nginx/Traefik 等反向代理时**必须设为 `true`**，默认 `true` |
 | `REMINDER_ENABLED` | 是（使用提醒时） | 仅值为 `true` 时启动调度器。只能在持有生产数据库的实例启用，测试、预发布和旧部署必须保持 `false` |
 | `INSTANCE_ID` | 否 | 调度实例标识，会写入提醒事件上下文，建议设置为部署名称以便定位事件来源 |
-| `APP_VERSION` | 否 | 应用版本，会写入提醒事件上下文以便定位旧版本实例 |
 
 > **注意**：如果使用 HTTPS 反向代理，`NEXTAUTH_URL` 必须以 `https://` 开头。
 
@@ -184,6 +183,16 @@ docker-compose up -d
 
 数据库迁移会在容器启动时自动执行。
 
+### 版本发布
+
+`package.json` 的 `version` 是应用版本的唯一来源。设置页、更新检查接口和提醒事件中的 `buildVersion` 都从该字段读取。发布新版本时使用语义版本号同步更新 `package.json` 与锁文件，例如：
+
+```bash
+npm version 0.23.0 --no-git-tag-version
+```
+
+然后在 GitHub 创建对应的稳定 Release（标签可使用 `v0.23.0` 或 `v0.23`）。设置页每小时最多向 GitHub 刷新一次最新稳定版本；GitHub 暂时不可用时不影响应用正常运行。
+
 ## 本地开发
 
 ```bash
@@ -240,6 +249,7 @@ npm run dev
 | `/api/reminders` | GET/POST | 提醒规则列表 / 创建规则 |
 | `/api/reminders/[id]` | PUT/DELETE | 更新 / 删除提醒规则 |
 | `/api/reminders/logs` | GET/DELETE | 提醒执行日志 |
+| `/api/system/version` | GET | 当前版本与最新 GitHub Release |
 | `/api/admin/*` | GET/PUT/DELETE | 管理员接口 |
 
 完整的请求示例和参数说明见 [HTTP API 文档](docs/HTTP_REQUESTS.md)。

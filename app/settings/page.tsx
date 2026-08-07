@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server'
 import Settings from '@/components/Settings'
 import { auth } from '@/lib/auth'
 import { getPreloadedBabies } from '@/lib/server-babies'
+import { CURRENT_VERSION } from '@/lib/version'
 
 async function getServerSession() {
   const headerStore = await headers()
@@ -27,6 +28,7 @@ export default async function SettingsPage() {
     <Settings
       userName={session.user.name}
       userEmail={session.user.email}
+      currentVersion={CURRENT_VERSION}
       initialBabies={babiesResult.babies}
       activeBabyId={babiesResult.activeBabyId}
     />

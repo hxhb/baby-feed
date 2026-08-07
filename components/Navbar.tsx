@@ -14,6 +14,7 @@ import {
   LogOut
 } from 'lucide-react'
 import { useRecordComposer } from '@/components/RecordComposerProvider'
+import { clearServiceWorkerCache } from '@/lib/client-cache'
 
 const navItems = [
   { href: '/', label: '首页', icon: Home },
@@ -70,17 +71,7 @@ export default function Navbar() {
     try {
       setIsSigningOut(true)
       // 登出时清除 Service Worker 缓存，防止敏感数据残留在共享设备上
-      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-        const mc = new MessageChannel()
-        navigator.serviceWorker.controller.postMessage(
-          { type: 'CLEAR_CACHE' },
-          [mc.port2]
-        )
-        await new Promise<void>((resolve) => {
-          mc.port1.onmessage = () => resolve()
-          setTimeout(resolve, 1000) // 超时 1 秒后继续登出
-        })
-      }
+      await clearServiceWorkerCache()
       await signOut({ callbackUrl: '/login' })
     } catch (error) {
       console.error('Sign out failed:', error)

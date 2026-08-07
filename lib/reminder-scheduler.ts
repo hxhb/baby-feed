@@ -15,6 +15,7 @@ import { logError } from './logger'
 import { Prisma } from '@/app/generated/prisma/client'
 import { createHash, randomBytes } from 'crypto'
 import { buildReminderConfigFingerprint } from './reminder-core'
+import { CURRENT_VERSION } from './version'
 
 const schedulerInstanceId = process.env.INSTANCE_ID || randomBytes(6).toString('hex')
 const databaseFingerprint = createHash('sha256')
@@ -325,7 +326,7 @@ class ReminderScheduler {
         ),
         schedulerInstanceId,
         databaseFingerprint,
-        buildVersion: process.env.APP_VERSION || null,
+        buildVersion: CURRENT_VERSION,
       }
       const execution = await this.claimReminderFire(rule, result.fireKey, dispatchContext, now, nextCheckAt)
       if (!execution) {

@@ -25,7 +25,6 @@ services:
       - TRUST_PROXY=${TRUST_PROXY:-true}
       - REMINDER_ENABLED=${REMINDER_ENABLED:-true}
       - INSTANCE_ID=${INSTANCE_ID:-baby-feed-main}
-      - APP_VERSION=${APP_VERSION:-unknown}
     volumes:
       - ${DATA_PATH:-./data}:/app/data
     healthcheck:

@@ -17,7 +17,6 @@ import {
   Key,
   KeyRound,
   UserPen,
-  AlertTriangle,
   Check,
   Eye,
   EyeOff,
@@ -32,6 +31,9 @@ import {
   Venus,
 } from 'lucide-react'
 import AdaptiveDialog from '@/components/AdaptiveDialog'
+import AccountDangerZone from '@/components/AccountDangerZone'
+import SystemVersion from '@/components/SystemVersion'
+import { clearServiceWorkerCache } from '@/lib/client-cache'
 
 interface BabyInfo {
   id: string
@@ -44,13 +46,14 @@ interface BabyInfo {
 interface Props {
   userName: string
   userEmail: string
+  currentVersion: string
   initialBabies?: BabyInfo[]
   activeBabyId?: string | null
 }
 
-type ModalType = 'addBaby' | 'editBaby' | 'editName' | 'changePassword' | 'deleteAccount' | null
+type ModalType = 'addBaby' | 'editBaby' | 'editName' | 'changePassword' | null
 
-export default function SettingsComponent({ userName, userEmail, initialBabies = [], activeBabyId: initialActiveBabyId }: Props) {
+export default function SettingsComponent({ userName, userEmail, currentVersion, initialBabies = [], activeBabyId: initialActiveBabyId }: Props) {
   const router = useRouter()
   const [babies, setBabies] = useState<BabyInfo[]>(initialBabies)
   const [loading, setLoading] = useState(initialBabies.length === 0)
@@ -89,12 +92,6 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
   const [passwordSuccess, setPasswordSuccess] = useState(false)
   const [passwordError, setPasswordError] = useState('')
 
-  // 注销账户表单
-  const [deletePassword, setDeletePassword] = useState('')
-  const [deleteConfirmText, setDeleteConfirmText] = useState('')
-  const [deleteLoading, setDeleteLoading] = useState(false)
-  const [deleteError, setDeleteError] = useState('')
-
   // 当前显示的用户名（修改后即时更新）
   const [displayName, setDisplayName] = useState(userName)
 
@@ -123,21 +120,6 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
       document.body.style.overflow = overflow
     }
   }, [activeModal])
-
-  // 清除 Service Worker 缓存（登出时调用，防止敏感数据残留）
-  const clearServiceWorkerCache = async () => {
-    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-      const mc = new MessageChannel()
-      navigator.serviceWorker.controller.postMessage(
-        { type: 'CLEAR_CACHE' },
-        [mc.port2]
-      )
-      await new Promise<void>((resolve) => {
-        mc.port1.onmessage = () => resolve()
-        setTimeout(resolve, 1000)
-      })
-    }
-  }
 
   const handleLogout = async () => {
     await clearServiceWorkerCache()
@@ -350,44 +332,6 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
     }
   }
 
-  // =============== 注销账户 ===============
-  const handleDeleteAccount = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setDeleteError('')
-
-    if (!deletePassword) {
-      setDeleteError('请输入密码')
-      return
-    }
-    if (deleteConfirmText !== '确认注销') {
-      setDeleteError('请输入"确认注销"以确认操作')
-      return
-    }
-
-    setDeleteLoading(true)
-    try {
-      const response = await fetch('/api/user/delete', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: deletePassword })
-      })
-
-      if (response.ok) {
-        // 注销成功，清除缓存后退出登录
-        await clearServiceWorkerCache()
-        await signOut({ callbackUrl: '/login' })
-      } else {
-        const data = await response.json()
-        setDeleteError(data.error || '注销失败')
-      }
-    } catch (error) {
-      console.error('注销账户失败:', error)
-      setDeleteError('注销失败，请重试')
-    } finally {
-      setDeleteLoading(false)
-    }
-  }
-
   // =============== 通用 ===============
   const closeModal = useCallback(() => {
     setActiveModal(null)
@@ -409,10 +353,6 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
     setShowNewPassword(false)
     setPasswordError('')
     setPasswordSuccess(false)
-    // 重置注销表单
-    setDeletePassword('')
-    setDeleteConfirmText('')
-    setDeleteError('')
   }, [displayName])
 
   const babyDialogOpen = activeModal === 'addBaby' || activeModal === 'editBaby'
@@ -473,7 +413,7 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 space-y-4 sm:space-y-5">
+    <div className="max-w-4xl mx-auto space-y-4 px-3 pb-[calc(6rem+env(safe-area-inset-bottom,0px))] pt-4 sm:space-y-5 sm:px-4 md:pb-4">
       {/* 用户信息卡片 */}
       <div className="bg-white rounded-card p-5 shadow-card border border-blue-50 sm:p-6 lg:p-7">
         <h2 className="text-lg font-bold text-slate-900 mb-4">账户信息</h2>
@@ -702,20 +642,9 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
         )}
       </div>
 
-      {/* 危险区域 */}
-      <div className="bg-white rounded-card p-5 shadow-card border border-red-100 sm:p-6 lg:p-7">
-        <h2 className="text-lg font-bold text-red-600 mb-2">危险操作</h2>
-        <p className="text-sm text-slate-500 mb-4">
-          注销账户后，所有数据将被永久删除且无法恢复。
-        </p>
-        <button
-          onClick={() => setActiveModal('deleteAccount')}
-          className="mobile-touch-target inline-flex items-center space-x-2 rounded-xl border border-red-300 px-4 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50"
-        >
-          <AlertTriangle size={16} />
-          <span>注销账户</span>
-        </button>
-      </div>
+      <AccountDangerZone />
+
+      <SystemVersion currentVersion={currentVersion} />
 
       {/* ========== 弹窗区域 ========== */}
 
@@ -987,81 +916,6 @@ export default function SettingsComponent({ userName, userEmail, initialBabies =
         </div>
       )}
 
-      {/* 注销账户弹窗 */}
-      {activeModal === 'deleteAccount' && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={closeModal}>
-          <div
-            className="w-full max-w-md rounded-t-3xl bg-white p-5 pb-safe shadow-2xl sm:rounded-2xl sm:p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-gray-200 sm:hidden" />
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-red-600">注销账户</h3>
-              <button onClick={closeModal} className="mobile-touch-target inline-flex items-center justify-center rounded-full p-2 text-slate-400 transition hover:bg-gray-100 hover:text-slate-600">
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
-              <div className="flex items-start space-x-3">
-                <AlertTriangle size={20} className="text-red-500 mt-0.5 flex-shrink-0" />
-                <div className="text-sm text-red-700">
-                  <p className="font-medium mb-1">此操作不可撤销！</p>
-                  <p>注销账户将永久删除以下所有数据：</p>
-                  <ul className="list-disc list-inside mt-1 space-y-0.5">
-                    <li>您的账户信息</li>
-                    <li>所有宝宝信息</li>
-                    <li>所有喂养记录</li>
-                    <li>所有健康记录</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            <form onSubmit={handleDeleteAccount} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  输入密码以确认身份
-                </label>
-                <input
-                  type="password"
-                  value={deletePassword}
-                  onChange={(e) => setDeletePassword(e.target.value)}
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
-                  placeholder="请输入您的密码"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  输入 <span className="font-bold text-red-600">确认注销</span> 以确认操作
-                </label>
-                <input
-                  type="text"
-                  value={deleteConfirmText}
-                  onChange={(e) => setDeleteConfirmText(e.target.value)}
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
-                  placeholder={'请输入"确认注销"'}
-                />
-              </div>
-
-              {deleteError && (
-                <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{deleteError}</p>
-              )}
-
-              <button
-                type="submit"
-                disabled={deleteLoading || deleteConfirmText !== '确认注销'}
-                className="mobile-touch-target w-full py-3 px-4 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 disabled:text-slate-500 text-white font-medium rounded-xl transition"
-              >
-                {deleteLoading ? '正在注销...' : '确认注销账户'}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
