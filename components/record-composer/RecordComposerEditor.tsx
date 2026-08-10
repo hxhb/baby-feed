@@ -136,7 +136,7 @@ export default function RecordComposerEditor({
   const [submitError, setSubmitError] = useState('')
   const [timeOpen, setTimeOpen] = useState(false)
   const [notesOpen, setNotesOpen] = useState(Boolean(draft.notes))
-  const [timerMode, setTimerMode] = useState<'timer' | 'manual'>('timer')
+  const [timerMode, setTimerMode] = useState<'timer' | 'manual'>('manual')
   const [vaccineSuggestions, setVaccineSuggestions] = useState<VaccineSuggestion[]>([])
   const [vaccineSuggestionsLoading, setVaccineSuggestionsLoading] = useState(false)
   const [selectedVaccineSuggestionKey, setSelectedVaccineSuggestionKey] = useState('')
@@ -149,14 +149,7 @@ export default function RecordComposerEditor({
     setSubmitError('')
     setNotesOpen(type === 'CUSTOM' || Boolean(draft.notes))
     setTimeOpen(type === 'MEMO' || type === 'CUSTOM')
-    if (type !== 'BREAST_MILK' && type !== 'SLEEP') {
-      setTimerMode('manual')
-    } else if ((type === 'BREAST_MILK' && (draft.leftBreastDuration || draft.rightBreastDuration))
-      || (type === 'SLEEP' && draft.sleepStartTime)) {
-      setTimerMode('manual')
-    } else {
-      setTimerMode('timer')
-    }
+    setTimerMode('manual')
     // Draft values are intentionally sampled only when entering a record type.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [type])
@@ -455,7 +448,7 @@ export default function RecordComposerEditor({
 
   const renderFields = () => {
     if (kind === 'feeding') {
-      if (type === 'BREAST_MILK' && timerMode === 'timer') return renderBreastTimer()
+      if (type === 'BREAST_MILK' && (activeBreastTimer || timerMode === 'timer')) return renderBreastTimer()
       return (
         <FeedingRecordFields
           type={type as FeedingType}
@@ -477,7 +470,7 @@ export default function RecordComposerEditor({
     }
 
     if (kind === 'health') {
-      if (type === 'SLEEP' && timerMode === 'timer') return renderSleepTimer()
+      if (type === 'SLEEP' && (activeSleepTimer || timerMode === 'timer')) return renderSleepTimer()
       return (
         <HealthRecordFields
           type={type as HealthType}
