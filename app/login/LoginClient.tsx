@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 
 type LoginClientProps = {
   allowRegistration: boolean
@@ -83,16 +84,8 @@ export default function LoginClient({ allowRegistration }: LoginClientProps) {
     <div className="flex items-center justify-center auth-bg px-6 py-10">
       <div className="w-full max-w-sm space-y-10">
         {/* Logo */}
-        <div className="text-center splash-logo">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-card gradient-icon shadow-elevated mb-3">
-            <svg width="36" height="36" viewBox="0 0 56 56" fill="none">
-              <rect x="15" y="18" width="24" height="32" rx="8" fill="white" opacity="0.95"/>
-              <rect x="20" y="9" width="14" height="10" rx="5" fill="white" opacity="0.95"/>
-              <path d="M23 9 Q27 3.5 31 9" fill="white" opacity="0.95" stroke="white" strokeWidth="1.5"/>
-              <rect x="17" y="30" width="20" height="18" rx="6.5" fill="rgba(244,114,182,0.25)"/>
-              <path d="M27 33 C25 31 22.5 31.8 22.5 33.8 C22.5 35.8 27 38.5 27 38.5 C27 38.5 31.5 35.8 31.5 33.8 C31.5 31.8 29 31 27 33Z" fill="rgba(59,130,246,0.5)"/>
-            </svg>
-          </div>
+        <div className="text-center">
+          <Image className="mx-auto mb-3 h-16 w-16" src="/icon.svg" alt="" width={64} height={64} priority />
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Baby Feed</h1>
           <p className="text-slate-500 mt-1 text-sm mb-4">宝宝喂养记录</p>
         </div>

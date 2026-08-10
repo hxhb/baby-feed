@@ -1,7 +1,7 @@
 {
-  "name": "Baby Feed - 新生儿喂养记录",
+  "name": "Baby Feed - 婴儿科学喂养与成长记录",
   "short_name": "Baby Feed",
-  "description": "记录新生儿的喂养状态，包括母乳、奶粉、AD服用等",
+  "description": "记录婴儿喂养、睡眠与成长数据，帮助家庭更科学地了解宝宝的日常状态",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f0f9ff",
@@ -12,57 +12,57 @@
   "categories": ["health", "lifestyle"],
   "icons": [
     {
-      "src": "/icons/icon-72x72.svg?v=4",
+      "src": "/icons/icon-72x72.png?v=7",
       "sizes": "72x72",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icons/icon-96x96.svg?v=4",
+      "src": "/icons/icon-96x96.png?v=7",
       "sizes": "96x96",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icons/icon-128x128.svg?v=4",
+      "src": "/icons/icon-128x128.png?v=7",
       "sizes": "128x128",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icons/icon-144x144.svg?v=4",
+      "src": "/icons/icon-144x144.png?v=7",
       "sizes": "144x144",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icons/icon-152x152.svg?v=4",
+      "src": "/icons/icon-152x152.png?v=7",
       "sizes": "152x152",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icons/icon-192x192.svg?v=4",
+      "src": "/icons/icon-192x192.png?v=7",
       "sizes": "192x192",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icons/icon-384x384.svg?v=4",
+      "src": "/icons/icon-384x384.png?v=7",
       "sizes": "384x384",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icons/icon-512x512.svg?v=4",
+      "src": "/icons/icon-512x512.png?v=7",
       "sizes": "512x512",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icons/icon-maskable.svg?v=4",
+      "src": "/icons/icon-maskable.png?v=7",
       "sizes": "512x512",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "maskable"
     }
   ]

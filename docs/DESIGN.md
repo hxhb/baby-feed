@@ -132,7 +132,7 @@
 
 - 默认过渡：`200ms ease`
 - 加载动画：渐变色边框旋转（`border-brand-100 border-t-brand-500`）
-- 页面淡入：`splash-fade-in 0.6s ease`
+- 开屏品牌淡入：`splash-enter 0.5s ease-out`
 - Toast 弹入：`toast-in 0.3s ease`
 
 ---
@@ -147,16 +147,16 @@
   - 大圆角瓶身 + 瓶颈 + 奶嘴弧线
   - 下半部粉色半透明奶液填充
   - 中心蓝色半透明爱心
-- **填充比例**：~75%（几乎无留白）
-- **尺寸**：72/96/128/144/152/192/384/512（均为 SVG）
-- **Maskable 变体**：额外安全区域内边距
+- **填充比例**：约 75%，兼顾小尺寸识别与图标留白
+- **尺寸**：72/96/128/144/152/192/384/512（PNG）
+- **Maskable 变体**：主体位于中央安全区域，背景满版填充
 
 ### 开屏画面
 
-- **背景**：垂直渐变 `#f0f9ff` → `#e0f2fe` → `#bae6fd`
-- **内容**：居中 Logo(80px) + "Baby Feed"(22px/800) + "宝宝喂养记录"(13px)
-- **动画**：CSS `splash-fade-in`，React 水合后 300ms 淡出
-- **装饰**：2-3 个大透明圆形（6-8% 不透明度）
+- **背景**：站点浅蓝到淡粉渐变 `#f0f9ff` → `#e0f2fe` → `#fce7f3`
+- **内容**：居中 Logo(76px) + "Baby Feed"(22px/700) + 底部轻量进度条
+- **动画**：CSS 轻微上移淡入，React 水合后 300ms 淡出
+- **无装饰图形**：保持简洁，并提供 `prefers-reduced-motion` 降级
 
 ### Manifest
 
@@ -292,5 +292,5 @@ theme: {
 - `.gradient-primary` — 蓝→青主渐变
 - `.gradient-icon` — 蓝→粉图标渐变
 - `.gradient-breast/.formula/.ad/.health/.sleep/.diaper` — 分类渐变
-- `.splash-screen` / `.splash-logo` — 开屏动画
+- `.splash-screen` / `.splash-brand` — 开屏画面与品牌淡入动画
 - `@keyframes toast-in` — Toast 弹入动画

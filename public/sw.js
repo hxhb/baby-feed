@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-const CACHE_NAME = 'baby-feed-v4'
+const CACHE_NAME = 'baby-feed-v7'
 const OFFLINE_URL = '/offline'
 
 // 预缓存的静态资源
@@ -8,8 +8,9 @@ const PRECACHE_URLS = [
   '/',
   '/offline',
   '/manifest.json',
-  '/icons/icon-192x192.svg',
-  '/icons/icon-512x512.svg',
+  '/icon.svg',
+  '/icons/icon-192x192.png?v=7',
+  '/icons/icon-512x512.png?v=7',
 ]
 
 // 安装事件：预缓存核心资源

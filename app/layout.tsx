@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from 'next/headers'
 import { NextRequest } from 'next/server'
+import Image from 'next/image'
 import localFont from "next/font/local";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
@@ -25,14 +26,14 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Baby Feed - 新生儿喂养记录系统",
-  description: "记录新生儿的喂养状态，包括母乳、奶粉、AD服用等",
+  title: "Baby Feed - 婴儿科学喂养与成长记录",
+  description: "记录婴儿喂养、睡眠与成长数据，帮助家庭更科学地了解宝宝的日常状态",
   manifest: "/manifest.json",
   icons: {
     icon: [
-      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/icon.svg?v=7", type: "image/svg+xml" },
     ],
-    apple: "/icons/icon-192x192.svg",
+    apple: "/icons/icon-192x192.png?v=7",
   },
   appleWebApp: {
     capable: true,
@@ -70,26 +71,13 @@ export default async function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {/* Splash screen — hidden after React hydrates */}
+        {/* Splash screen - hidden after React hydrates */}
         <div id="splash" className="splash-screen" suppressHydrationWarning>
-          <div className="splash-logo">
-            <svg width="80" height="80" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ borderRadius: '20px', boxShadow: '0 8px 32px rgba(59,130,246,0.3)' }}>
-              <defs>
-                <linearGradient id="splash-bg" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" style={{ stopColor: '#3b82f6' }} />
-                  <stop offset="100%" style={{ stopColor: '#f472b6' }} />
-                </linearGradient>
-              </defs>
-              <rect width="56" height="56" rx="12" ry="12" fill="url(#splash-bg)" />
-              <rect x="15" y="18" width="24" height="32" rx="8" fill="white" opacity="0.95" />
-              <rect x="20" y="9" width="14" height="10" rx="5" fill="white" opacity="0.95" />
-              <path d="M23 9 Q27 3.5 31 9" fill="white" opacity="0.95" stroke="white" strokeWidth="1.5" />
-              <rect x="17" y="30" width="20" height="18" rx="6.5" fill="rgba(244,114,182,0.25)" />
-              <path d="M27 33 C25 31 22.5 31.8 22.5 33.8 C22.5 35.8 27 38.5 27 38.5 C27 38.5 31.5 35.8 31.5 33.8 C31.5 31.8 29 31 27 33Z" fill="rgba(59,130,246,0.5)" />
-            </svg>
+          <div className="splash-brand">
+            <Image className="splash-mark" src="/icon.svg" alt="" width={76} height={76} priority />
+            <p className="splash-name">Baby Feed</p>
           </div>
-          <p style={{ marginTop: '20px', fontSize: '22px', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.5px' }}>Baby Feed</p>
-          <p style={{ marginTop: '4px', fontSize: '13px', color: '#475569' }}>宝宝喂养记录</p>
+          <span className="splash-progress" aria-hidden="true" />
         </div>
         <Providers session={session}>
           {children}
