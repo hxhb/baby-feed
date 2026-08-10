@@ -37,6 +37,24 @@ export function formatBeijingTimeWithSeconds(isoString: string): string {
 }
 
 /**
+ * 格式化为包含年份和星期的北京时间，适合记录列表展示
+ */
+export function formatBeijingDateTimeLabel(isoString: string): string {
+  const bj = toBeijingDate(new Date(isoString))
+  const year = bj.getUTCFullYear()
+  const month = bj.getUTCMonth() + 1
+  const day = bj.getUTCDate()
+  const hours = String(bj.getUTCHours()).padStart(2, '0')
+  const minutes = String(bj.getUTCMinutes()).padStart(2, '0')
+  const weekday = new Intl.DateTimeFormat('zh-CN', {
+    weekday: 'short',
+    timeZone: 'UTC',
+  }).format(bj)
+
+  return `${year}年${month}月${day}日 ${weekday} ${hours}:${minutes}`
+}
+
+/**
  * 获取当前北京时间的 yyyy-MM-dd 字符串
  */
 export function getBeijingToday(): string {

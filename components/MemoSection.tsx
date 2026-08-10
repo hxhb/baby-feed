@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { AlertCircle, CalendarClock, Check, CheckCircle2, ClipboardList, Clock3, MoreVertical, Pencil, Plus, Trash2 } from 'lucide-react'
-import { toBeijingDatetimeLocal } from '@/lib/time'
+import { formatBeijingDateTimeLabel, toBeijingDatetimeLocal } from '@/lib/time'
 import { invalidateRequestCache } from '@/lib/client-request-cache'
 import { StatsPanel, StatsEmptyState } from '@/components/StatsUi'
 import MemoFormModal, { type MemoRecord } from '@/components/MemoFormModal'
@@ -59,17 +59,6 @@ async function requestJson(url: string, init: RequestInit, fallbackError: string
 function formatActionError(error: unknown, fallback: string) {
   const message = error instanceof Error ? error.message : fallback
   return /重试|稍后再试/.test(message) ? message : `${message}，请重试`
-}
-
-function formatMemoDate(isoString: string): string {
-  const dtLocal = toBeijingDatetimeLocal(isoString)
-  const [datePart, timePart] = dtLocal.split('T')
-  const [, month, day] = datePart.split('-').map(Number)
-  const weekday = new Intl.DateTimeFormat('zh-CN', {
-    weekday: 'short',
-    timeZone: 'Asia/Shanghai',
-  }).format(new Date(isoString))
-  return `${month}月${day}日 ${weekday} ${timePart}`
 }
 
 function isOverdue(scheduledAt: string): boolean {
@@ -631,7 +620,7 @@ function MemoItem({ memo, onToggle, onEdit, onDelete, toggling, deleting, menuOp
         </div>
         <div className={`mt-1 flex items-center gap-1.5 text-[11px] ${memo.completed ? 'text-slate-400' : overdue ? 'text-red-600' : 'text-slate-500'}`}>
           <CalendarClock size={13} aria-hidden="true" />
-          <time dateTime={memo.scheduledAt}>{formatMemoDate(memo.scheduledAt)}</time>
+          <time dateTime={memo.scheduledAt}>{formatBeijingDateTimeLabel(memo.scheduledAt)}</time>
         </div>
         {memo.content ? (
           <p className={`mt-1.5 text-xs leading-5 ${memo.completed ? 'text-slate-400' : 'text-slate-600'}`}>
