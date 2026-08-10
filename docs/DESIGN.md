@@ -149,13 +149,15 @@
   - 中心蓝色半透明爱心
 - **填充比例**：约 75%，兼顾小尺寸识别与图标留白
 - **尺寸**：72/96/128/144/152/192/384/512（PNG）
-- **Maskable 变体**：主体位于中央安全区域，背景满版填充
+- **普通图标**：从对应圆角 SVG 导出，保留透明四角，供 `purpose: any` 与 Apple Touch Icon 使用
+- **Maskable 变体**：单独从满版 SVG 导出，主体位于中央安全区域，仅用于 `purpose: maskable`
 
 ### 开屏画面
 
 - **背景**：站点浅蓝到淡粉渐变 `#f0f9ff` → `#e0f2fe` → `#fce7f3`
-- **内容**：居中 Logo(76px) + "Baby Feed"(22px/700) + 底部轻量进度条
-- **动画**：CSS 轻微上移淡入，React 水合后 300ms 淡出
+- **浏览器模式**：居中 Logo(76px) + "Baby Feed"(22px/700) + 底部轻量进度条
+- **独立 PWA 模式**：只使用系统原生开屏，在首次页面绘制前隐藏网页开屏，避免重复图标与闪烁
+- **浏览器动画**：CSS 轻微上移淡入，React 水合后 300ms 淡出
 - **无装饰图形**：保持简洁，并提供 `prefers-reduced-motion` 降级
 
 ### Manifest
@@ -292,5 +294,6 @@ theme: {
 - `.gradient-primary` — 蓝→青主渐变
 - `.gradient-icon` — 蓝→粉图标渐变
 - `.gradient-breast/.formula/.ad/.health/.sleep/.diaper` — 分类渐变
-- `.splash-screen` / `.splash-brand` — 开屏画面与品牌淡入动画
+- `.splash-screen` / `.splash-brand` — 浏览器开屏画面与品牌淡入动画
+- `@media (display-mode: standalone)` — 独立 PWA 首帧跳过网页开屏
 - `@keyframes toast-in` — Toast 弹入动画

@@ -234,6 +234,12 @@ textarea {
   pointer-events: none;
 }
 
+@media (display-mode: standalone) {
+  .splash-screen {
+    display: none;
+  }
+}
+
 .splash-brand {
   display: flex;
   flex-direction: column;

@@ -31,9 +31,9 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   icons: {
     icon: [
-      { url: "/icon.svg?v=7", type: "image/svg+xml" },
+      { url: "/icon.svg?v=8", type: "image/svg+xml" },
     ],
-    apple: "/icons/icon-192x192.png?v=7",
+    apple: "/icons/icon-192x192.png?v=8",
   },
   appleWebApp: {
     capable: true,
@@ -71,7 +71,7 @@ export default async function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {/* Splash screen - hidden after React hydrates */}
+        {/* Browser splash; installed PWAs use the platform launch screen only. */}
         <div id="splash" className="splash-screen" suppressHydrationWarning>
           <div className="splash-brand">
             <Image className="splash-mark" src="/icon.svg" alt="" width={76} height={76} priority />
