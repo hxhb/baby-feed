@@ -256,7 +256,7 @@ export async function GET(request: NextRequest) {
 
     const todayStats = statsMap.get(todayStr)
 
-    const [allWeightRecords, allHeightRecords, vaccineRecords, medicationRecords, memoRecords] = await Promise.all([
+    const [allWeightRecords, allHeightRecords, vaccineRecords, toothEruptionRecords, medicationRecords, memoRecords] = await Promise.all([
       prisma.healthRecord.findMany({
         where: {
           babyId,
@@ -293,6 +293,21 @@ export async function GET(request: NextRequest) {
           vaccineDoseNumber: true,
           vaccineTotalDoses: true
         }
+      }),
+      prisma.healthRecord.findMany({
+        where: {
+          babyId,
+          createdBy: session.user.id,
+          type: 'TOOTH_ERUPTION',
+        },
+        orderBy: [{ recordedAt: 'asc' }, { createdAt: 'asc' }],
+        select: {
+          id: true,
+          recordedAt: true,
+          createdAt: true,
+          notes: true,
+          toothEruptions: { select: { toothCode: true } },
+        },
       }),
       prisma.healthRecord.findMany({
         where: {
@@ -377,6 +392,14 @@ export async function GET(request: NextRequest) {
           vaccineTotalDoses: record.vaccineTotalDoses
         }
       }),
+      toothEruptionRecords: toothEruptionRecords.map(record => ({
+        id: record.id,
+        date: getBeijingDateStr(new Date(record.recordedAt)),
+        recordedAt: record.recordedAt.toISOString(),
+        createdAt: record.createdAt.toISOString(),
+        notes: record.notes,
+        toothEruptions: record.toothEruptions,
+      })),
       medicationRecords: medicationRecords.flatMap(record => {
         if (!record.medicationName) {
           return []

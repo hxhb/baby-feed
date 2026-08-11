@@ -61,6 +61,7 @@ model Baby {
   user           User            @relation(fields: [createdBy], references: [id], onDelete: Cascade)
   feedingRecords FeedingRecord[]
   healthRecords  HealthRecord[]
+  toothEruptions ToothEruption[]
   memos          Memo[]
   reminderRules  ReminderRule[]
 
@@ -92,7 +93,7 @@ model FeedingRecord {
 }
 
 model HealthRecord {
-  id                  String    @id @default(cuid())
+  id                  String          @id @default(cuid())
   babyId              String
   type                String
   weight              Float?
@@ -114,14 +115,28 @@ model HealthRecord {
   sleepQuality        String?
   recordedAt          DateTime
   notes               String?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
   createdBy           String
-  baby                Baby      @relation(fields: [babyId], references: [id], onDelete: Cascade)
-  user                User      @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  baby                Baby            @relation(fields: [babyId], references: [id], onDelete: Cascade)
+  user                User            @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  toothEruptions      ToothEruption[]
 
   @@index([createdBy, babyId, recordedAt])
   @@index([babyId, type, recordedAt])
+}
+
+model ToothEruption {
+  id             String       @id @default(cuid())
+  healthRecordId String
+  babyId         String
+  toothCode      String
+  healthRecord   HealthRecord @relation(fields: [healthRecordId], references: [id], onDelete: Cascade)
+  baby           Baby         @relation(fields: [babyId], references: [id], onDelete: Cascade)
+
+  @@unique([babyId, toothCode])
+  @@index([healthRecordId])
+  @@index([babyId])
 }
 
 model Memo {

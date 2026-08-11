@@ -8,6 +8,7 @@ import { formatBeijingTime, getBeijingHour } from '@/lib/time'
 import { splitDurationByBeijingDay } from '@/lib/api-helpers'
 import { dedupeRequest, invalidateRequestCache } from '@/lib/client-request-cache'
 import type { PreloadedTimelineRecord } from '@/lib/server-timeline'
+import type { PrimaryToothCode } from '@/lib/tooth-eruptions'
 import Link from 'next/link'
 import {
   ChevronLeft,
@@ -63,6 +64,7 @@ interface HealthRecord {
   sleepStartTime?: string | null
   sleepEndTime?: string | null
   sleepQuality?: string | null
+  toothEruptions?: { toothCode: PrimaryToothCode }[]
   notes?: string | null
   babyId: string
   baby?: Baby

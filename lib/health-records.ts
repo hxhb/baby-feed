@@ -1,6 +1,7 @@
 import { toBeijingISO } from '@/lib/time'
+import type { PrimaryToothCode } from '@/lib/tooth-eruptions'
 
-export const HEALTH_TYPES = ['WEIGHT', 'HEIGHT', 'TEMPERATURE', 'MEDICATION', 'VACCINE', 'DIAPER', 'AD_VITAMIN', 'SLEEP', 'CUSTOM'] as const
+export const HEALTH_TYPES = ['WEIGHT', 'HEIGHT', 'TEMPERATURE', 'MEDICATION', 'VACCINE', 'DIAPER', 'AD_VITAMIN', 'SLEEP', 'TOOTH_ERUPTION', 'CUSTOM'] as const
 export type HealthType = typeof HEALTH_TYPES[number]
 export type DiaperType = 'PEE' | 'POOP' | 'BOTH'
 
@@ -22,6 +23,7 @@ export interface HealthFieldValues {
   sleepStartTime: string
   sleepEndTime: string
   sleepQuality: string
+  toothCodes: PrimaryToothCode[]
 }
 
 export interface VaccineSuggestion {
@@ -74,6 +76,7 @@ export function buildHealthRecordPayload(type: HealthType, values: HealthFieldVa
     sleepStartTime: null,
     sleepEndTime: null,
     sleepQuality: null,
+    toothCodes: null,
   }
 
   if (type === 'WEIGHT') {
@@ -135,6 +138,13 @@ export function buildHealthRecordPayload(type: HealthType, values: HealthFieldVa
     return {
       ...basePayload,
       customName: normalizeOptionalText(values.customName),
+    }
+  }
+
+  if (type === 'TOOTH_ERUPTION') {
+    return {
+      ...basePayload,
+      toothCodes: values.toothCodes,
     }
   }
 

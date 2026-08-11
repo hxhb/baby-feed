@@ -11,6 +11,7 @@ import RecordTabBar, { type ActiveTab } from '@/components/RecordTabBar'
 import CategorySelector, { type CategoryOption } from '@/components/CategorySelector'
 import { getCategoryColorClasses } from '@/lib/category-colors'
 import { RecordNotesField, RecordTimeField } from '@/components/RecordMetaFields'
+import type { PrimaryToothCode } from '@/lib/tooth-eruptions'
 import {
   Scale,
   Thermometer,
@@ -19,7 +20,8 @@ import {
   Syringe,
   Baby as BabyIcon,
   FilePenLine,
-  Moon
+  Moon,
+  SmilePlus,
 } from 'lucide-react'
 
 interface BabyInfo {
@@ -52,6 +54,7 @@ interface HealthDraft {
   sleepStartTime: string
   sleepEndTime: string
   sleepQuality: string
+  toothCodes: PrimaryToothCode[]
 }
 
 interface Props {
@@ -83,7 +86,8 @@ const emptyHealthDraft: HealthDraft = {
   customName: '',
   sleepStartTime: '',
   sleepEndTime: '',
-  sleepQuality: ''
+  sleepQuality: '',
+  toothCodes: [],
 }
 
 
@@ -123,6 +127,7 @@ export default function HealthForm({
   const [sleepStartTime, setSleepStartTime] = useState('')
   const [sleepEndTime, setSleepEndTime] = useState('')
   const [sleepQuality, setSleepQuality] = useState('')
+  const [toothCodes, setToothCodes] = useState<PrimaryToothCode[]>([])
   const [recordedAt, setRecordedAt] = useState(initialSharedDraft?.eventTime || getBeijingNow())
 
   // When type is SLEEP, bind recordedAt to sleepEndTime
@@ -248,6 +253,9 @@ export default function HealthForm({
       if (typeof parsedDraft.sleepQuality === 'string') {
         setSleepQuality(parsedDraft.sleepQuality)
       }
+      if (Array.isArray(parsedDraft.toothCodes)) {
+        setToothCodes(parsedDraft.toothCodes)
+      }
     } catch (error) {
       console.error('读取健康草稿失败:', error)
     }
@@ -273,7 +281,8 @@ export default function HealthForm({
         customName,
         sleepStartTime,
         sleepEndTime,
-        sleepQuality
+        sleepQuality,
+        toothCodes,
       }
 
       const isEmptyDraft =
@@ -294,7 +303,8 @@ export default function HealthForm({
         !nextDraft.customName &&
         !nextDraft.sleepStartTime &&
         !nextDraft.sleepEndTime &&
-        !nextDraft.sleepQuality
+        !nextDraft.sleepQuality &&
+        nextDraft.toothCodes.length === 0
 
       if (isEmptyDraft) {
         window.sessionStorage.removeItem(HEALTH_DRAFT_STORAGE_KEY)
@@ -305,7 +315,7 @@ export default function HealthForm({
     } catch (error) {
       console.error('保存健康草稿失败:', error)
     }
-  }, [type, weight, height, temperature, medicationName, medicationDose, vaccineName, vaccineManufacturer, vaccineDoseNumber, vaccineTotalDoses, diaperType, diaperStatus, adGiven, vitaminDGiven, customName, sleepStartTime, sleepEndTime, sleepQuality])
+  }, [type, weight, height, temperature, medicationName, medicationDose, vaccineName, vaccineManufacturer, vaccineDoseNumber, vaccineTotalDoses, diaperType, diaperStatus, adGiven, vitaminDGiven, customName, sleepStartTime, sleepEndTime, sleepQuality, toothCodes])
 
   useEffect(() => {
     if (!submitError) {
@@ -314,7 +324,7 @@ export default function HealthForm({
 
     setSubmitError('')
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [babyId, type, weight, height, temperature, medicationName, medicationDose, vaccineName, vaccineManufacturer, vaccineDoseNumber, vaccineTotalDoses, diaperType, diaperStatus, adGiven, vitaminDGiven, customName, sleepStartTime, sleepEndTime, sleepQuality, recordedAt, notes])
+  }, [babyId, type, weight, height, temperature, medicationName, medicationDose, vaccineName, vaccineManufacturer, vaccineDoseNumber, vaccineTotalDoses, diaperType, diaperStatus, adGiven, vitaminDGiven, customName, sleepStartTime, sleepEndTime, sleepQuality, toothCodes, recordedAt, notes])
 
   useEffect(() => {
     if (type !== 'VACCINE' || !babyId) {
@@ -410,6 +420,7 @@ export default function HealthForm({
       sleepStartTime,
       sleepEndTime,
       sleepQuality,
+      toothCodes,
     })
   }
 
@@ -431,6 +442,7 @@ export default function HealthForm({
     sleepStartTime,
     sleepEndTime,
     sleepQuality,
+    toothCodes,
   }
 
   const handleApplyVaccineSuggestion = (suggestion: VaccineSuggestion) => {
@@ -508,6 +520,7 @@ export default function HealthForm({
     { key: 'VACCINE', label: '疫苗', icon: Syringe, color: 'teal' },
     { key: 'DIAPER', label: '大小便', icon: BabyIcon, color: 'amber' },
     { key: 'SLEEP', label: '睡眠', icon: Moon, color: 'indigo' },
+    { key: 'TOOTH_ERUPTION', label: '长牙', icon: SmilePlus, color: 'green' },
     { key: 'CUSTOM', label: '自定义', icon: FilePenLine, color: 'indigo' },
   ]
 
@@ -524,6 +537,7 @@ export default function HealthForm({
     VACCINE: '记录疫苗名称和针次进度，方便以后核对接种情况。',
     DIAPER: '记录排便状态，方便观察宝宝日常情况。',
     SLEEP: '记录宝宝入睡和醒来时间，追踪睡眠规律。',
+    TOOTH_ERUPTION: '选择本次长出的乳牙，可同时记录多颗。',
     CUSTOM: '为其他健康事项添加名称和说明。',
   }
 
@@ -570,6 +584,8 @@ export default function HealthForm({
         <HealthRecordFields
           type={type}
           mode="create"
+          babyId={babyId}
+          recordedAt={recordedAt}
           validationMessage={validationMessage}
           vaccineSuggestions={vaccineSuggestions}
           vaccineSuggestionsLoading={vaccineSuggestionsLoading}
@@ -594,6 +610,7 @@ export default function HealthForm({
             setSleepStartTime,
             setSleepEndTime: handleSleepEndTimeChange,
             setSleepQuality,
+            setToothCodes,
           }}
         />
       </div>

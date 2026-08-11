@@ -9,6 +9,7 @@ import FeedingRecordFields from '@/components/FeedingRecordFields'
 import HealthRecordFields, { getHealthFieldValidationMessage } from '@/components/HealthRecordFields'
 import RecordActionBar from '@/components/RecordActionBar'
 import { RecordNotesField, RecordTimeField } from '@/components/RecordMetaFields'
+import type { PrimaryToothCode } from '@/lib/tooth-eruptions'
 
 interface FeedingRecord {
   id: string
@@ -48,6 +49,7 @@ interface HealthRecord {
   sleepStartTime?: string | null
   sleepEndTime?: string | null
   sleepQuality?: string | null
+  toothEruptions?: { toothCode: PrimaryToothCode }[]
   notes?: string | null
   babyId: string
   recordType: 'health'
@@ -105,6 +107,7 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
   const [sleepStartTime, setSleepStartTime] = useState(healthRecord?.sleepStartTime ? toBeijingDatetimeLocal(healthRecord.sleepStartTime) : '')
   const [sleepEndTime, setSleepEndTime] = useState(healthRecord?.sleepEndTime ? toBeijingDatetimeLocal(healthRecord.sleepEndTime) : '')
   const [sleepQuality, setSleepQuality] = useState(healthRecord?.sleepQuality || '')
+  const [toothCodes, setToothCodes] = useState<PrimaryToothCode[]>(healthRecord?.toothEruptions?.map(item => item.toothCode) || [])
 
   // When type is SLEEP, bind editTime to sleepEndTime
   const handleSleepEndTimeChange = (value: string) => {
@@ -132,6 +135,7 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
     sleepStartTime,
     sleepEndTime,
     sleepQuality,
+    toothCodes,
   }
 
   const feedingFieldValues: FeedingFieldValues = {
@@ -265,6 +269,8 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
         return '服药'
       case 'VACCINE':
         return '疫苗'
+      case 'TOOTH_ERUPTION':
+        return '长牙'
       case 'DIAPER':
         return '大小便'
       case 'SLEEP':
@@ -326,6 +332,9 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
             <HealthRecordFields
               type={currentHealthType}
               mode="edit"
+              babyId={record.babyId}
+              recordedAt={editTime}
+              currentRecordId={record.id}
               validationMessage={validationMessage}
               vaccineSuggestions={vaccineSuggestions}
               vaccineSuggestionsLoading={vaccineSuggestionsLoading}
@@ -350,6 +359,7 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
                 setSleepStartTime,
                 setSleepEndTime: handleSleepEndTimeChange,
                 setSleepQuality,
+                setToothCodes,
               }}
             />
           )}

@@ -3,6 +3,7 @@ import { getPreloadedBabies, type PreloadedBaby } from '@/lib/server-babies'
 import { getServerSession } from '@/lib/server-auth'
 import { getBeijingToday } from '@/lib/time'
 import { getBeijingDateStr, getBeijingDayRange, buildSleepAwareOrClause } from '@/lib/api-helpers'
+import type { PrimaryToothCode } from '@/lib/tooth-eruptions'
 
 export interface PreloadedTimelineBaby {
   id: string
@@ -48,6 +49,7 @@ export interface PreloadedTimelineHealthRecord {
   sleepStartTime: string | null
   sleepEndTime: string | null
   sleepQuality: string | null
+  toothEruptions: { toothCode: PrimaryToothCode }[]
   notes: string | null
   babyId: string
   baby?: PreloadedTimelineBaby
@@ -164,6 +166,7 @@ async function getPreloadedTimelineRecords(userId: string, babyId: string, dateS
         sleepStartTime: true,
         sleepEndTime: true,
         sleepQuality: true,
+        toothEruptions: { select: { toothCode: true } },
         notes: true,
         babyId: true,
       },
@@ -186,6 +189,9 @@ async function getPreloadedTimelineRecords(userId: string, babyId: string, dateS
       recordedAt: record.recordedAt.toISOString(),
       sleepStartTime: record.sleepStartTime?.toISOString() ?? null,
       sleepEndTime: record.sleepEndTime?.toISOString() ?? null,
+      toothEruptions: record.toothEruptions.map(item => ({
+        toothCode: item.toothCode as PrimaryToothCode,
+      })),
       recordType: 'health' as const,
     })),
   ].sort((a, b) => {

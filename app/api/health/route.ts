@@ -10,6 +10,7 @@ import { logError } from '@/lib/logger'
 import { emitHealthCreated } from '@/lib/webhook-service'
 import { rescheduleIntervalRulesForRecordChange } from '@/lib/reminder-rescheduler'
 import { syncAutoVaccineReminders } from '@/lib/reminder-auto-vaccine'
+import { formatToothNames, type PrimaryToothCode } from '@/lib/tooth-eruptions'
 
 export async function GET(request: NextRequest) {
   try {
@@ -80,7 +81,7 @@ export async function GET(request: NextRequest) {
 
     const records = await prisma.healthRecord.findMany({
       where: whereClause,
-      include: { baby: true },
+      include: { baby: true, toothEruptions: true },
       orderBy: { recordedAt: 'desc' }
     })
 
@@ -139,6 +140,7 @@ export async function POST(request: NextRequest) {
       adGiven,
       vitaminDGiven,
       customName,
+      toothCodes,
       recordedAt,
       notes
     } = body
@@ -184,6 +186,7 @@ export async function POST(request: NextRequest) {
     const typedSleepEndTime = typeof body.sleepEndTime === 'string' ? body.sleepEndTime : undefined
     const typedSleepQuality = typeof body.sleepQuality === 'string' ? body.sleepQuality : undefined
     const typedNotes = typeof notes === 'string' ? notes : undefined
+    const typedToothCodes = Array.isArray(toothCodes) ? toothCodes as PrimaryToothCode[] : []
 
     if (typedType === 'VACCINE') {
       if (!typedVaccineName?.trim()) {
@@ -204,6 +207,21 @@ export async function POST(request: NextRequest) {
 
     if (!baby) {
       return NextResponse.json({ error: '婴儿不存在' }, { status: 404, headers: noStoreHeaders })
+    }
+
+    if (typedType === 'TOOTH_ERUPTION') {
+      if (new Date(recordedAt).getTime() < baby.birthDate.getTime()) {
+        return NextResponse.json({ error: '萌出时间不能早于宝宝出生时间' }, { status: 400, headers: noStoreHeaders })
+      }
+      const existingTeeth = await prisma.toothEruption.findMany({
+        where: { babyId, toothCode: { in: typedToothCodes } },
+        select: { toothCode: true },
+      })
+      if (existingTeeth.length > 0) {
+        return NextResponse.json({
+          error: `${formatToothNames(existingTeeth.map(item => item.toothCode))}已经记录过萌出时间`,
+        }, { status: 409, headers: noStoreHeaders })
+      }
     }
 
     const record = await prisma.$transaction(async tx => {
@@ -231,8 +249,11 @@ export async function POST(request: NextRequest) {
           recordedAt: new Date(recordedAt),
           notes: typedNotes,
           createdBy: session.user.id,
+          toothEruptions: typedType === 'TOOTH_ERUPTION'
+            ? { create: typedToothCodes.map(toothCode => ({ babyId, toothCode })) }
+            : undefined,
         },
-        include: { baby: true },
+        include: { baby: true, toothEruptions: true },
       })
       await rescheduleIntervalRulesForRecordChange({
         userId: session.user.id,
@@ -262,6 +283,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(record, { status: 201, headers: noStoreHeaders })
   } catch (error) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
+      return NextResponse.json({ error: '所选牙齿中有牙位已经记录，请刷新后重试' }, { status: 409, headers: noStoreHeaders })
+    }
     logError('创建健康记录失败', error)
     return NextResponse.json({ error: '创建失败' }, { status: 500, headers: noStoreHeaders })
   }

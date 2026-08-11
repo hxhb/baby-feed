@@ -113,6 +113,7 @@ function buildSummary(type: ComposerRecordType, draft: ComposerDraft) {
     case 'TEMPERATURE': return `体温 · ${draft.temperature}°C`
     case 'MEDICATION': return `服药 · ${draft.medicationName}`
     case 'VACCINE': return `疫苗 · ${draft.vaccineName}`
+    case 'TOOTH_ERUPTION': return `长牙 · ${draft.toothCodes.length}颗`
     case 'CUSTOM': return `自定义 · ${draft.customName}`
     case 'MEMO': return `备忘 · ${draft.memoTitle}`
   }
@@ -217,6 +218,7 @@ export default function RecordComposerEditor({
     sleepStartTime: draft.sleepStartTime,
     sleepEndTime: draft.sleepEndTime,
     sleepQuality: draft.sleepQuality,
+    toothCodes: draft.toothCodes,
   }), [draft])
 
   const validationMessage = useMemo(() => {
@@ -475,6 +477,8 @@ export default function RecordComposerEditor({
         <HealthRecordFields
           type={type as HealthType}
           mode="edit"
+          babyId={draft.babyId}
+          recordedAt={draft.eventTime}
           values={healthValues}
           validationMessage={submitAttempted ? validationMessage : ''}
           vaccineSuggestions={vaccineSuggestions}
@@ -499,6 +503,7 @@ export default function RecordComposerEditor({
             setSleepStartTime: value => update({ sleepStartTime: value }),
             setSleepEndTime: value => update({ sleepEndTime: value }),
             setSleepQuality: value => update({ sleepQuality: value }),
+            setToothCodes: value => update({ toothCodes: value }),
           }}
         />
       )

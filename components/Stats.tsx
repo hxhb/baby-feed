@@ -21,6 +21,7 @@ import { dedupeRequest, invalidateRequestCache } from '@/lib/client-request-cach
 import type { PreloadedStatsData } from '@/lib/server-stats'
 import { StatsEmptyState, StatsPanel, StatsRangePicker, StatsSegmentedTabs } from '@/components/StatsUi'
 import MemoSection from '@/components/MemoSection'
+import ToothGrowthStats from '@/components/ToothGrowthStats'
 import { generateWHOCurve } from '@/lib/who-growth-standards'
 import { getBeijingToday } from '@/lib/time'
 
@@ -1155,7 +1156,7 @@ export default function StatsComponent({
                     <h3 className="text-base font-bold text-slate-900">趋势工作台</h3>
                   </div>
                   <p className="mt-1 text-sm text-slate-500">
-                    喂养、大小便与睡眠按所选周期统计；体重、身高、BMI 与疫苗展示全部历史记录。
+                    喂养、大小便与睡眠按所选周期统计；体重、身高、BMI、疫苗与牙齿展示全部历史记录。
                   </p>
                 </div>
 
@@ -1638,6 +1639,8 @@ export default function StatsComponent({
                   />
                 )}
               </StatsPanel>
+
+              <ToothGrowthStats records={stats.toothEruptionRecords || []} />
             </>
           )}
 

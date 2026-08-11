@@ -19,7 +19,7 @@ type AddRecordSharedDraft = {
   notes: string
 }
 
-type HealthInitialType = 'WEIGHT' | 'HEIGHT' | 'TEMPERATURE' | 'MEDICATION' | 'VACCINE' | 'DIAPER' | 'AD_VITAMIN' | 'SLEEP' | 'CUSTOM'
+type HealthInitialType = 'WEIGHT' | 'HEIGHT' | 'TEMPERATURE' | 'MEDICATION' | 'VACCINE' | 'DIAPER' | 'AD_VITAMIN' | 'SLEEP' | 'TOOTH_ERUPTION' | 'CUSTOM'
 
 const SHARED_DRAFT_STORAGE_KEY = 'baby-feed:add-record-shared-draft'
 const emptySharedDraft: AddRecordSharedDraft = {
@@ -38,6 +38,7 @@ function getHealthInitialType(type: string | null): HealthInitialType | undefine
     case 'diaper': return 'DIAPER'
     case 'ad': return 'AD_VITAMIN'
     case 'sleep': return 'SLEEP'
+    case 'teething': return 'TOOTH_ERUPTION'
     case 'custom': return 'CUSTOM'
     default: return undefined
   }

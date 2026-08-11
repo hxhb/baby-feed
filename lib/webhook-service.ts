@@ -72,6 +72,7 @@ const RECORD_TYPE_LABELS: Record<string, string> = {
   AD_VITAMIN: 'AD滴剂',
   SLEEP: '睡眠',
   CUSTOM: '自定义健康记录',
+  TOOTH_ERUPTION: '长牙',
 }
 
 const EVENT_LABELS: Record<string, string> = {
@@ -110,6 +111,29 @@ function detectChanges(
     if (oldCompare !== newCompare) {
       changes[field] = { old: oldCompare, new: newCompare }
     }
+  }
+
+  return changes
+}
+
+function getToothCodes(record: Record<string, any>): string[] {
+  if (!Array.isArray(record.toothEruptions)) return []
+  return record.toothEruptions
+    .map((item: { toothCode?: unknown }) => item.toothCode)
+    .filter((code: unknown): code is string => typeof code === 'string')
+    .sort()
+}
+
+function detectHealthChanges(
+  oldRecord: Record<string, any>,
+  newRecord: Record<string, any>,
+): Record<string, { old: unknown; new: unknown }> {
+  const changes = detectChanges(oldRecord, newRecord, HEALTH_FIELDS)
+  const oldToothCodes = getToothCodes(oldRecord)
+  const newToothCodes = getToothCodes(newRecord)
+
+  if (oldToothCodes.join(',') !== newToothCodes.join(',')) {
+    changes.toothCodes = { old: oldToothCodes, new: newToothCodes }
   }
 
   return changes
@@ -374,6 +398,7 @@ export async function emitHealthCreated(
         sleepStartTime: record.sleepStartTime?.toISOString(),
         sleepEndTime: record.sleepEndTime?.toISOString(),
         sleepQuality: record.sleepQuality,
+        toothCodes: getToothCodes(record),
         recordedAt: record.recordedAt.toISOString(),
         notes: record.notes,
         createdAt: record.createdAt.toISOString(),
@@ -389,7 +414,7 @@ export async function emitHealthUpdated(
   newRecord: any,
   baby: any
 ): Promise<void> {
-  const changes = detectChanges(oldRecord, newRecord, HEALTH_FIELDS)
+  const changes = detectHealthChanges(oldRecord, newRecord)
 
   await emitWebhookEvent(
     userId,
@@ -419,6 +444,7 @@ export async function emitHealthUpdated(
         sleepStartTime: newRecord.sleepStartTime?.toISOString(),
         sleepEndTime: newRecord.sleepEndTime?.toISOString(),
         sleepQuality: newRecord.sleepQuality,
+        toothCodes: getToothCodes(newRecord),
         recordedAt: newRecord.recordedAt.toISOString(),
         notes: newRecord.notes,
         updatedAt: newRecord.updatedAt.toISOString(),
@@ -442,6 +468,7 @@ export async function emitHealthDeleted(
         recordId: record.id,
         babyId: record.babyId,
         type: record.type,
+        toothCodes: getToothCodes(record),
         recordedAt: record.recordedAt.toISOString(),
         deletedAt: new Date().toISOString(),
       },

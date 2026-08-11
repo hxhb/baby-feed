@@ -10,6 +10,7 @@ import {
   FilePenLine,
   Moon,
   UtensilsCrossed,
+  SmilePlus,
 } from 'lucide-react'
 import { formatBeijingTime } from '@/lib/time'
 
@@ -51,6 +52,7 @@ export interface HealthRecordDisplay {
   sleepStartTime?: string | null
   sleepEndTime?: string | null
   sleepQuality?: string | null
+  toothEruptions?: { toothCode: string }[]
   notes?: string | null
   recordType: 'health'
 }
@@ -98,6 +100,8 @@ export function getRecordIcon(type: string, size: number = 20) {
       return <Pill size={size} className="text-violet-500" />
     case 'VACCINE':
       return <Syringe size={size} className="text-teal-500" />
+    case 'TOOTH_ERUPTION':
+      return <SmilePlus size={size} className="text-emerald-500" />
     case 'DIAPER':
       return <BabyIcon size={size} className="text-amber-500" />
     case 'SLEEP':
@@ -150,6 +154,11 @@ export function getRecordTitle(record: DisplayRecord): string {
     case 'VACCINE': {
       const health = record as HealthRecordDisplay
       return `疫苗 ${health.vaccineName}`
+    }
+    case 'TOOTH_ERUPTION': {
+      const health = record as HealthRecordDisplay
+      const count = health.toothEruptions?.length || 0
+      return count > 0 ? `长牙 · ${count}颗` : '长牙记录'
     }
     case 'DIAPER': {
       const health = record as HealthRecordDisplay

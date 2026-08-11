@@ -5,6 +5,7 @@
 
 import { FEEDING_TYPES, type FeedingType } from '@/lib/feeding-records'
 import { HEALTH_TYPES, type HealthType } from '@/lib/health-records'
+import { getPrimaryToothCodesValidationError } from '@/lib/tooth-eruptions'
 
 export { FEEDING_TYPES, HEALTH_TYPES }
 export type { FeedingType, HealthType }
@@ -113,6 +114,11 @@ export function validateString(value: unknown, fieldName: string, maxLength: num
     return { valid: false, error: `${fieldName} 超出最大长度 (${maxLength})` }
   }
   return { valid: true }
+}
+
+export function validatePrimaryToothCodes(value: unknown): ValidationResult {
+  const error = getPrimaryToothCodesValidationError(value)
+  return error ? { valid: false, error } : { valid: true }
 }
 
 // 验证日期字符串
@@ -286,6 +292,7 @@ export function validateHealthInput(body: Record<string, unknown>) {
     validateDateString(body.sleepEndTime, '醒来时间'),
     validateDateOrder(body.sleepStartTime, body.sleepEndTime, '入睡时间', '醒来时间'),
     validateString(body.sleepQuality, '睡眠质量', 200),
+    validatePrimaryToothCodes(body.toothCodes),
     validateDateString(body.recordedAt, '记录时间'),
     validateString(body.notes, '备注', 1000)
   )
@@ -368,6 +375,10 @@ function validateHealthBusinessRules(body: Record<string, unknown>): ValidationR
 
   if (type === 'CUSTOM' && (typeof body.customName !== 'string' || !body.customName.trim())) {
     return { valid: false, error: '自定义记录需要填写名称' }
+  }
+
+  if (type === 'TOOTH_ERUPTION' && (!Array.isArray(body.toothCodes) || body.toothCodes.length === 0)) {
+    return { valid: false, error: '长牙记录至少需要选择一颗牙齿' }
   }
 
   return { valid: true }

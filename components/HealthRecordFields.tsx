@@ -1,6 +1,8 @@
 'use client'
 
 import type { HealthFieldValues, HealthType, DiaperType, VaccineSuggestion } from '@/lib/health-records'
+import ToothEruptionFields from '@/components/ToothEruptionFields'
+import type { PrimaryToothCode } from '@/lib/tooth-eruptions'
 
 interface HealthFieldSetters {
   setWeight: (value: string) => void
@@ -20,6 +22,7 @@ interface HealthFieldSetters {
   setSleepStartTime: (value: string) => void
   setSleepEndTime: (value: string) => void
   setSleepQuality: (value: string) => void
+  setToothCodes: (value: PrimaryToothCode[]) => void
 }
 
 interface Props {
@@ -32,6 +35,9 @@ interface Props {
   selectedVaccineSuggestionKey?: string
   onApplyVaccineSuggestion?: (suggestion: VaccineSuggestion) => void
   mode?: 'create' | 'edit'
+  babyId?: string
+  recordedAt?: string
+  currentRecordId?: string
 }
 
 export function getHealthFieldValidationMessage(type: HealthType, values: HealthFieldValues) {
@@ -95,6 +101,10 @@ export function getHealthFieldValidationMessage(type: HealthType, values: Health
     }
   }
 
+  if (type === 'TOOTH_ERUPTION' && values.toothCodes.length === 0) {
+    return '请至少选择一颗长出的牙齿'
+  }
+
   return ''
 }
 
@@ -113,6 +123,9 @@ export default function HealthRecordFields({
   selectedVaccineSuggestionKey = '',
   onApplyVaccineSuggestion,
   mode = 'create',
+  babyId,
+  recordedAt,
+  currentRecordId,
 }: Props) {
   const showWeightError = type === 'WEIGHT' && !!validationMessage
   const showHeightError = type === 'HEIGHT' && !!validationMessage
@@ -121,6 +134,19 @@ export default function HealthRecordFields({
   const showVaccineNameError = type === 'VACCINE' && !!validationMessage
   const showVaccineSuggestions = (vaccineSuggestionsLoading || vaccineSuggestions.length > 0) && !!onApplyVaccineSuggestion
   const cardClassName = mode === 'create' ? 'rounded-2xl bg-gray-50/70 p-3' : 'space-y-3'
+
+  if (type === 'TOOTH_ERUPTION') {
+    return (
+      <ToothEruptionFields
+        babyId={babyId}
+        recordedAt={recordedAt}
+        selectedCodes={values.toothCodes}
+        onChange={setters.setToothCodes}
+        currentRecordId={currentRecordId}
+        validationMessage={validationMessage}
+      />
+    )
+  }
 
   if (type === 'WEIGHT') {
     return (

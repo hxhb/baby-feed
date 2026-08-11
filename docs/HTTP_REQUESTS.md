@@ -765,6 +765,7 @@
     "sleepStartTime": null,
     "sleepEndTime": null,
     "sleepQuality": null,
+    "toothEruptions": [],
     "recordedAt": "2024-01-01T02:00:00.000Z",
     "notes": null,
     "createdBy": "cxxxxxxxxxxxxxxxxxxxxxxxx",
@@ -791,7 +792,7 @@
 | 字段 | 类型 | 必填 | 说明 |
 |---|---|---|---|
 | `babyId` | string | 是 | 婴儿 ID（CUID 格式） |
-| `type` | string | 是 | 记录类型：`WEIGHT`, `HEIGHT`, `TEMPERATURE`, `MEDICATION`, `VACCINE`, `DIAPER`, `AD_VITAMIN`, `SLEEP` |
+| `type` | string | 是 | 记录类型：`WEIGHT`, `HEIGHT`, `TEMPERATURE`, `MEDICATION`, `VACCINE`, `DIAPER`, `AD_VITAMIN`, `SLEEP`, `TOOTH_ERUPTION`, `CUSTOM` |
 | `recordedAt` | string | 是 | 记录时间，ISO 8601 格式 |
 | `notes` | string | 否 | 备注 |
 
@@ -814,6 +815,9 @@
 | `SLEEP` | `sleepStartTime` | string | 否 | 睡眠开始时间，ISO 8601 格式 |
 | `SLEEP` | `sleepEndTime` | string | 否 | 睡眠结束时间，ISO 8601 格式 |
 | `SLEEP` | `sleepQuality` | string | 否 | 睡眠质量 |
+| `TOOTH_ERUPTION` | `toothCodes` | string[] | 是 | 本次同时萌出的乳牙 FDI 编码，1-20 个且不可重复 |
+
+乳牙编码使用 FDI 两位编号：上颌右侧 `51`-`55`、上颌左侧 `61`-`65`、下颌左侧 `71`-`75`、下颌右侧 `81`-`85`。同一次请求中的牙齿视为同时萌出；同一宝宝的同一牙位只能记录一次。
 
 **成功响应** (`201`): 返回创建的记录（含 `baby` 关联对象）。
 
@@ -855,6 +859,7 @@
 | `sleepStartTime` | string | 睡眠开始时间 |
 | `sleepEndTime` | string | 睡眠结束时间 |
 | `sleepQuality` | string | 睡眠质量 |
+| `toothCodes` | string[] | 长牙记录的乳牙 FDI 编码；提交时会替换该记录的全部牙位 |
 | `notes` | string | 备注 |
 
 **成功响应** (`200`): 返回更新后的记录（含 `baby` 关联对象）。
@@ -1715,6 +1720,8 @@ GET /api/memo?babyId=cxxx&date=2024-02-01&rangeDays=14
 | `DIAPER` | 尿布 |
 | `AD_VITAMIN` | AD 维生素 |
 | `SLEEP` | 睡眠 |
+| `TOOTH_ERUPTION` | 长牙 |
+| `CUSTOM` | 自定义健康记录 |
 
 ### 性别 (Gender)
 

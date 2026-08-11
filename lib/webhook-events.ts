@@ -128,7 +128,7 @@ export interface HealthCreatedEventPayload extends WebhookEventPayload {
   data: {
     recordId: string
     babyId: string
-    type: string // 'WEIGHT' | 'HEIGHT' | 'TEMPERATURE' | 'MEDICATION' | 'VACCINE' | 'DIAPER' | 'AD_VITAMIN' | 'SLEEP' | 'CUSTOM'
+    type: string // 'WEIGHT' | 'HEIGHT' | 'TEMPERATURE' | 'MEDICATION' | 'VACCINE' | 'DIAPER' | 'AD_VITAMIN' | 'SLEEP' | 'TOOTH_ERUPTION' | 'CUSTOM'
     weight?: number
     height?: number
     temperature?: number
@@ -146,6 +146,7 @@ export interface HealthCreatedEventPayload extends WebhookEventPayload {
     sleepStartTime?: string
     sleepEndTime?: string
     sleepQuality?: string
+    toothCodes?: string[]
     recordedAt: string
     notes?: string
     createdAt: string
@@ -188,6 +189,7 @@ export interface HealthUpdatedEventPayload extends WebhookEventPayload {
     sleepStartTime?: string
     sleepEndTime?: string
     sleepQuality?: string
+    toothCodes?: string[]
     recordedAt: string
     notes?: string
     updatedAt: string
@@ -207,6 +209,7 @@ export interface HealthDeletedEventPayload extends WebhookEventPayload {
     recordId: string
     babyId: string
     type: string
+    toothCodes?: string[]
     recordedAt: string
     deletedAt: string
   }

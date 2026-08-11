@@ -1,5 +1,6 @@
 import type { FeedingType } from '@/lib/feeding-records'
 import type { HealthType } from '@/lib/health-records'
+import type { PrimaryToothCode } from '@/lib/tooth-eruptions'
 
 export type { FeedingType } from '@/lib/feeding-records'
 
@@ -61,6 +62,7 @@ export interface HealthRecord {
   sleepStartTime?: string
   sleepEndTime?: string
   sleepQuality?: string
+  toothEruptions?: { toothCode: PrimaryToothCode }[]
   recordedAt: string
   notes?: string
   createdAt: string

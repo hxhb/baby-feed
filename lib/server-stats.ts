@@ -59,6 +59,14 @@ export interface PreloadedStatsData {
     vaccineDoseNumber: number | null
     vaccineTotalDoses: number | null
   }[]
+  toothEruptionRecords: {
+    id: string
+    date: string
+    recordedAt: string
+    createdAt: string
+    notes: string | null
+    toothEruptions: { toothCode: string }[]
+  }[]
   medicationRecords: {
     id: string
     medicationName: string
@@ -134,7 +142,7 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
   const { start: rangeStart } = getBeijingDayRange(startDateStr)
   const { end: rangeEnd } = getBeijingDayRange(todayStr)
 
-  const [feedingRecords, healthRecords, allWeightRecords, allHeightRecords, vaccineRecords, medicationRecords, memoRecords] = await Promise.all([
+  const [feedingRecords, healthRecords, allWeightRecords, allHeightRecords, vaccineRecords, toothEruptionRecords, medicationRecords, memoRecords] = await Promise.all([
     prisma.feedingRecord.findMany({
       where: {
         babyId,
@@ -191,6 +199,21 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
         notes: true,
         vaccineDoseNumber: true,
         vaccineTotalDoses: true,
+      },
+    }),
+    prisma.healthRecord.findMany({
+      where: {
+        babyId,
+        createdBy: userId,
+        type: 'TOOTH_ERUPTION',
+      },
+      orderBy: [{ recordedAt: 'asc' }, { createdAt: 'asc' }],
+      select: {
+        id: true,
+        recordedAt: true,
+        createdAt: true,
+        notes: true,
+        toothEruptions: { select: { toothCode: true } },
       },
     }),
     prisma.healthRecord.findMany({
@@ -379,6 +402,14 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
         vaccineTotalDoses: record.vaccineTotalDoses,
       }
     }),
+    toothEruptionRecords: toothEruptionRecords.map((record) => ({
+      id: record.id,
+      date: getBeijingDateStr(new Date(record.recordedAt)),
+      recordedAt: record.recordedAt.toISOString(),
+      createdAt: record.createdAt.toISOString(),
+      notes: record.notes,
+      toothEruptions: record.toothEruptions,
+    })),
     medicationRecords: medicationRecords.flatMap((record) => {
       if (!record.medicationName) {
         return []

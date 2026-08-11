@@ -9,6 +9,7 @@ import {
   Pill,
   Ruler,
   Scale,
+  SmilePlus,
   Syringe,
   Thermometer,
   UtensilsCrossed,
@@ -16,6 +17,7 @@ import {
 import type { FeedingType } from '@/lib/feeding-records'
 import type { DiaperType, HealthType } from '@/lib/health-records'
 import type { QuickRecordKey } from '@/lib/quick-records'
+import type { PrimaryToothCode } from '@/lib/tooth-eruptions'
 
 export type ComposerRecordType = FeedingType | HealthType | 'MEMO'
 export type ComposerRecordKind = 'feeding' | 'health' | 'memo'
@@ -52,6 +54,7 @@ export interface ComposerDraft {
   sleepStartTime: string
   sleepEndTime: string
   sleepQuality: string
+  toothCodes: PrimaryToothCode[]
   memoTitle: string
   memoContent: string
   dirty: boolean
@@ -126,6 +129,7 @@ export const recordTypeGroups: RecordTypeGroup[] = [
       { type: 'HEIGHT', label: '身高', description: '记录厘米数', icon: Ruler, tone: 'blue' },
       { type: 'MEDICATION', label: '服药', description: '记录药物和剂量', icon: Pill, tone: 'violet' },
       { type: 'VACCINE', label: '疫苗', description: '记录疫苗和针次', icon: Syringe, tone: 'teal' },
+      { type: 'TOOTH_ERUPTION', label: '长牙', description: '选择牙位并记录萌出时间', icon: SmilePlus, tone: 'emerald' },
       { type: 'CUSTOM', label: '自定义', description: '记录其他健康事项', icon: FilePenLine, tone: 'indigo' },
     ],
   },
@@ -183,6 +187,7 @@ export function getComposerTypeFromQuery(value: string | null): ComposerRecordTy
     case 'diaper': return 'DIAPER'
     case 'ad': return 'AD_VITAMIN'
     case 'sleep': return 'SLEEP'
+    case 'teething': return 'TOOTH_ERUPTION'
     case 'custom': return 'CUSTOM'
     case 'memo': return 'MEMO'
     default: return null
@@ -217,6 +222,7 @@ export function createComposerDraft(babyId: string, eventTime: string): Composer
     sleepStartTime: '',
     sleepEndTime: '',
     sleepQuality: '',
+    toothCodes: [],
     memoTitle: '',
     memoContent: '',
     dirty: false,

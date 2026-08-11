@@ -9,6 +9,7 @@ import { logError } from '@/lib/logger'
 import { emitHealthUpdated, emitHealthDeleted } from '@/lib/webhook-service'
 import { rescheduleIntervalRulesForRecordChange } from '@/lib/reminder-rescheduler'
 import { syncAutoVaccineReminders } from '@/lib/reminder-auto-vaccine'
+import { formatToothNames, type PrimaryToothCode } from '@/lib/tooth-eruptions'
 
 export async function PUT(
   request: NextRequest,
@@ -66,6 +67,7 @@ export async function PUT(
       adGiven,
       vitaminDGiven,
       customName,
+      toothCodes,
       recordedAt,
       notes
     } = body
@@ -75,7 +77,7 @@ export async function PUT(
         id,
         createdBy: session.user.id
       },
-      include: { baby: true }
+      include: { baby: true, toothEruptions: true }
     })
 
     if (!existingRecord) {
@@ -112,6 +114,7 @@ export async function PUT(
       adGiven: adGiven === undefined ? existingRecord.adGiven : adGiven,
       vitaminDGiven: vitaminDGiven === undefined ? existingRecord.vitaminDGiven : vitaminDGiven,
       customName: customName === undefined ? existingRecord.customName : customName,
+      toothCodes: toothCodes === undefined ? existingRecord.toothEruptions.map(item => item.toothCode) : toothCodes,
       sleepStartTime: body.sleepStartTime === undefined ? (existingRecord.sleepStartTime ? existingRecord.sleepStartTime.toISOString() : null) : body.sleepStartTime,
       sleepEndTime: body.sleepEndTime === undefined ? (existingRecord.sleepEndTime ? existingRecord.sleepEndTime.toISOString() : null) : body.sleepEndTime,
       sleepQuality: body.sleepQuality === undefined ? existingRecord.sleepQuality : body.sleepQuality,
@@ -122,6 +125,29 @@ export async function PUT(
     const mergedValidation = validateHealthInput(normalizedBody)
     if (!mergedValidation.valid) {
       return NextResponse.json({ error: mergedValidation.error }, { status: 400, headers: noStoreHeaders })
+    }
+
+    const normalizedToothCodes = Array.isArray(normalizedBody.toothCodes)
+      ? normalizedBody.toothCodes as PrimaryToothCode[]
+      : []
+
+    if (nextType === 'TOOTH_ERUPTION') {
+      if (new Date(nextRecordedAt).getTime() < existingRecord.baby.birthDate.getTime()) {
+        return NextResponse.json({ error: '萌出时间不能早于宝宝出生时间' }, { status: 400, headers: noStoreHeaders })
+      }
+      const conflictingTeeth = await prisma.toothEruption.findMany({
+        where: {
+          babyId: existingRecord.babyId,
+          toothCode: { in: normalizedToothCodes },
+          healthRecordId: { not: id },
+        },
+        select: { toothCode: true },
+      })
+      if (conflictingTeeth.length > 0) {
+        return NextResponse.json({
+          error: `${formatToothNames(conflictingTeeth.map(item => item.toothCode))}已经记录过萌出时间`,
+        }, { status: 409, headers: noStoreHeaders })
+      }
     }
 
     const normalizedData = {
@@ -181,7 +207,20 @@ export async function PUT(
         data: normalizedData,
       })
       if (claimed.count !== 1) throw new Error('RECORD_UPDATE_CONFLICT')
-      const updated = await tx.healthRecord.findUnique({ where: { id }, include: { baby: true } })
+      await tx.toothEruption.deleteMany({ where: { healthRecordId: id } })
+      if (nextType === 'TOOTH_ERUPTION') {
+        await tx.toothEruption.createMany({
+          data: normalizedToothCodes.map(toothCode => ({
+            healthRecordId: id,
+            babyId: existingRecord.babyId,
+            toothCode,
+          })),
+        })
+      }
+      const updated = await tx.healthRecord.findUnique({
+        where: { id },
+        include: { baby: true, toothEruptions: true },
+      })
       if (!updated) throw new Error('RECORD_UPDATE_CONFLICT')
       await rescheduleIntervalRulesForRecordChange({
         userId: session.user.id,
@@ -209,6 +248,9 @@ export async function PUT(
   } catch (error) {
     if (error instanceof Error && error.message === 'RECORD_UPDATE_CONFLICT') {
       return NextResponse.json({ error: '记录已被其他请求修改，请刷新后重试' }, { status: 409, headers: noStoreHeaders })
+    }
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
+      return NextResponse.json({ error: '所选牙齿中有牙位已经记录，请刷新后重试' }, { status: 409, headers: noStoreHeaders })
     }
     logError('更新健康记录失败', error)
     return NextResponse.json({ error: '更新失败' }, { status: 500, headers: noStoreHeaders })
@@ -254,7 +296,8 @@ export async function DELETE(
       where: {
         id,
         createdBy: session.user.id
-      }
+      },
+      include: { toothEruptions: true },
     })
 
     if (!existingRecord) {
