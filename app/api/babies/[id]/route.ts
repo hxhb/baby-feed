@@ -149,7 +149,9 @@ export async function PUT(
       data: updateData,
     })
     if (updated.count !== 1) throw new Error('BABY_UPDATE_CONFLICT')
-    const baby = await prisma.baby.findUnique({ where: { id } })
+    const baby = await prisma.baby.findFirst({
+      where: { id, createdBy: session.user.id },
+    })
     if (!baby) throw new Error('BABY_UPDATE_CONFLICT')
 
     return NextResponse.json(baby, { headers: noStoreHeaders })

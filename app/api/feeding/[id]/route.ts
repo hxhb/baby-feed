@@ -43,6 +43,14 @@ export async function PUT(
     if (!idCheck.valid) {
       return NextResponse.json({ error: idCheck.error }, { status: 400, headers: noStoreHeaders })
     }
+    const babyId = request.nextUrl.searchParams.get('babyId')
+    if (!babyId) {
+      return NextResponse.json({ error: '缺少babyId参数' }, { status: 400, headers: noStoreHeaders })
+    }
+    const babyIdCheck = validateId(babyId, 'babyId')
+    if (!babyIdCheck.valid) {
+      return NextResponse.json({ error: babyIdCheck.error }, { status: 400, headers: noStoreHeaders })
+    }
 
     const { data: body, error: parseError } = await safeParseBody(request)
     if (parseError || !body) {
@@ -64,6 +72,7 @@ export async function PUT(
     const existingRecord = await prisma.feedingRecord.findFirst({
       where: {
         id,
+        babyId,
         createdBy: session.user.id
       },
       include: { baby: true }
@@ -145,11 +154,14 @@ export async function PUT(
 
     const record = await prisma.$transaction(async tx => {
       const claimed = await tx.feedingRecord.updateMany({
-        where: { id, updatedAt: existingRecord.updatedAt },
+        where: { id, babyId, createdBy: session.user.id, updatedAt: existingRecord.updatedAt },
         data: normalizedData,
       })
       if (claimed.count !== 1) throw new Error('RECORD_UPDATE_CONFLICT')
-      const updated = await tx.feedingRecord.findUnique({ where: { id }, include: { baby: true } })
+      const updated = await tx.feedingRecord.findFirst({
+        where: { id, babyId, createdBy: session.user.id },
+        include: { baby: true },
+      })
       if (!updated) throw new Error('RECORD_UPDATE_CONFLICT')
       await rescheduleIntervalRulesForRecordChange({
         userId: session.user.id,
@@ -210,10 +222,19 @@ export async function DELETE(
     if (!idCheck.valid) {
       return NextResponse.json({ error: idCheck.error }, { status: 400, headers: noStoreHeaders })
     }
+    const babyId = request.nextUrl.searchParams.get('babyId')
+    if (!babyId) {
+      return NextResponse.json({ error: '缺少babyId参数' }, { status: 400, headers: noStoreHeaders })
+    }
+    const babyIdCheck = validateId(babyId, 'babyId')
+    if (!babyIdCheck.valid) {
+      return NextResponse.json({ error: babyIdCheck.error }, { status: 400, headers: noStoreHeaders })
+    }
 
     const existingRecord = await prisma.feedingRecord.findFirst({
       where: {
         id,
+        babyId,
         createdBy: session.user.id
       }
     })
@@ -224,7 +245,7 @@ export async function DELETE(
 
     await prisma.$transaction(async tx => {
       const deleted = await tx.feedingRecord.deleteMany({
-        where: { id, updatedAt: existingRecord.updatedAt },
+        where: { id, babyId, createdBy: session.user.id, updatedAt: existingRecord.updatedAt },
       })
       if (deleted.count !== 1) throw new Error('RECORD_UPDATE_CONFLICT')
       await rescheduleIntervalRulesForRecordChange({

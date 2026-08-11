@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { signOut } from 'next-auth/react'
 import { AlertTriangle, ChevronDown, Loader2, Trash2, X } from 'lucide-react'
 import AdaptiveDialog from '@/components/AdaptiveDialog'
-import { clearServiceWorkerCache } from '@/lib/client-cache'
+import { clearPrivateClientState } from '@/lib/client-cache'
 
 export default function AccountDangerZone() {
   const [expanded, setExpanded] = useState(false)
@@ -98,7 +98,7 @@ export default function AccountDangerZone() {
       const result = await response.json().catch(() => null) as { error?: string } | null
       if (!response.ok) throw new Error(result?.error || '注销失败')
 
-      await clearServiceWorkerCache()
+      await clearPrivateClientState()
       await signOut({ callbackUrl: '/login' })
     } catch (deleteError) {
       console.error('注销账户失败:', deleteError)

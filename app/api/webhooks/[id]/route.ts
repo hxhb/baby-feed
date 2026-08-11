@@ -120,9 +120,13 @@ export async function PUT(
       updateData.active = active
     }
 
-    const updated = await prisma.webhookEndpoint.update({
-      where: { id },
+    const claimed = await prisma.webhookEndpoint.updateMany({
+      where: { id, userId: session.user.id, updatedAt: existing.updatedAt },
       data: updateData,
+    })
+    if (claimed.count !== 1) throw new Error('WEBHOOK_UPDATE_CONFLICT')
+    const updated = await prisma.webhookEndpoint.findFirst({
+      where: { id, userId: session.user.id },
       select: {
         id: true,
         url: true,
@@ -135,6 +139,7 @@ export async function PUT(
         updatedAt: true,
       }
     })
+    if (!updated) throw new Error('WEBHOOK_UPDATE_CONFLICT')
 
     return NextResponse.json(
       {
@@ -144,6 +149,9 @@ export async function PUT(
       { headers: noStoreHeaders }
     )
   } catch (error) {
+    if (error instanceof Error && error.message === 'WEBHOOK_UPDATE_CONFLICT') {
+      return NextResponse.json({ error: 'webhook 端点已被其他请求修改，请刷新后重试' }, { status: 409, headers: noStoreHeaders })
+    }
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       return NextResponse.json(
         { error: '该 URL 已存在，请使用不同的 URL 或编辑现有端点' },
@@ -206,10 +214,16 @@ export async function DELETE(
       return NextResponse.json({ error: 'webhook 端点不存在' }, { status: 404, headers: noStoreHeaders })
     }
 
-    await prisma.webhookEndpoint.delete({ where: { id } })
+    const deleted = await prisma.webhookEndpoint.deleteMany({
+      where: { id, userId: session.user.id, updatedAt: existing.updatedAt },
+    })
+    if (deleted.count !== 1) throw new Error('WEBHOOK_UPDATE_CONFLICT')
 
     return NextResponse.json({ success: true }, { headers: noStoreHeaders })
   } catch (error) {
+    if (error instanceof Error && error.message === 'WEBHOOK_UPDATE_CONFLICT') {
+      return NextResponse.json({ error: 'webhook 端点已被其他请求修改，请刷新后重试' }, { status: 409, headers: noStoreHeaders })
+    }
     logError('删除 webhook 端点失败', error)
     return NextResponse.json({ error: '删除失败' }, { status: 500, headers: noStoreHeaders })
   }

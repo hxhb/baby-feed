@@ -38,14 +38,19 @@ export async function getPreloadedBabies(): Promise<PreloadedBabiesResult> {
     }),
   ])
 
+  const normalizedBabies = babies.map((baby) => ({
+    id: baby.id,
+    name: baby.name,
+    birthDate: baby.birthDate.toISOString(),
+    gender: baby.gender,
+    createdAt: baby.createdAt.toISOString(),
+  }))
+  const activeBabyId = normalizedBabies.some(baby => baby.id === user?.activeBabyId)
+    ? user?.activeBabyId ?? null
+    : null
+
   return {
-    babies: babies.map((baby) => ({
-      id: baby.id,
-      name: baby.name,
-      birthDate: baby.birthDate.toISOString(),
-      gender: baby.gender,
-      createdAt: baby.createdAt.toISOString(),
-    })),
-    activeBabyId: user?.activeBabyId ?? null,
+    babies: normalizedBabies,
+    activeBabyId,
   }
 }

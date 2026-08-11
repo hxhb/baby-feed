@@ -67,8 +67,8 @@ export async function fireReminder({ rule, context, now, eventId }: FireReminder
 }> {
   try {
     // Get baby name for template
-    const baby = await prisma.baby.findUnique({
-      where: { id: rule.babyId },
+    const baby = await prisma.baby.findFirst({
+      where: { id: rule.babyId, createdBy: rule.userId },
       select: { name: true },
     })
     const babyName = baby?.name ?? '宝宝'

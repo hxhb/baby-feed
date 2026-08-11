@@ -33,7 +33,7 @@ import {
 import AdaptiveDialog from '@/components/AdaptiveDialog'
 import AccountDangerZone from '@/components/AccountDangerZone'
 import SystemVersion from '@/components/SystemVersion'
-import { clearServiceWorkerCache } from '@/lib/client-cache'
+import { clearPrivateClientState } from '@/lib/client-cache'
 
 interface BabyInfo {
   id: string
@@ -122,7 +122,7 @@ export default function SettingsComponent({ userName, userEmail, currentVersion,
   }, [activeModal])
 
   const handleLogout = async () => {
-    await clearServiceWorkerCache()
+    await clearPrivateClientState()
     await signOut({ callbackUrl: '/login' })
   }
 

@@ -14,6 +14,7 @@ type ReminderDb = Pick<
 
 export interface IntervalRuleSnapshot {
   id: string
+  userId: string
   babyId: string
   triggerConfig: string
   advanceMinutes: number
@@ -48,7 +49,7 @@ export async function getIntervalSourceSnapshot(
 
   if (config.sourceType === 'feeding') {
     const record = await db.feedingRecord.findFirst({
-      where: { babyId: rule.babyId, ...(type ? { type } : {}) },
+      where: { babyId: rule.babyId, createdBy: rule.userId, ...(type ? { type } : {}) },
       orderBy: [{ startTime: 'desc' }, { id: 'desc' }],
       select: { id: true, type: true, startTime: true },
     })
@@ -63,7 +64,7 @@ export async function getIntervalSourceSnapshot(
   const isSleepOnly = config.filterCondition?.type?.length === 1 && config.filterCondition.type[0] === 'SLEEP'
   if (isSleepOnly) {
     const ongoing = await db.healthRecord.findFirst({
-      where: { babyId: rule.babyId, type: 'SLEEP', sleepEndTime: null },
+      where: { babyId: rule.babyId, createdBy: rule.userId, type: 'SLEEP', sleepEndTime: null },
       orderBy: [{ sleepStartTime: 'desc' }, { id: 'desc' }],
       select: { id: true, type: true, sleepStartTime: true, recordedAt: true },
     })
@@ -77,7 +78,7 @@ export async function getIntervalSourceSnapshot(
     }
 
     const completed = await db.healthRecord.findFirst({
-      where: { babyId: rule.babyId, type: 'SLEEP', sleepEndTime: { not: null } },
+      where: { babyId: rule.babyId, createdBy: rule.userId, type: 'SLEEP', sleepEndTime: { not: null } },
       orderBy: [{ sleepEndTime: 'desc' }, { id: 'desc' }],
       select: { id: true, type: true, sleepEndTime: true },
     })
@@ -90,7 +91,7 @@ export async function getIntervalSourceSnapshot(
   }
 
   const record = await db.healthRecord.findFirst({
-    where: { babyId: rule.babyId, ...(type ? { type } : {}) },
+    where: { babyId: rule.babyId, createdBy: rule.userId, ...(type ? { type } : {}) },
     orderBy: [{ recordedAt: 'desc' }, { id: 'desc' }],
     select: { id: true, type: true, recordedAt: true },
   })
@@ -120,7 +121,7 @@ export async function rescheduleIntervalRulesForRecordChange(params: {
       enabled: true,
       triggerType: 'interval',
     },
-    select: { id: true, babyId: true, triggerConfig: true, advanceMinutes: true },
+    select: { id: true, userId: true, babyId: true, triggerConfig: true, advanceMinutes: true },
   })
 
   for (const rule of rules) {
@@ -145,8 +146,8 @@ export async function rescheduleIntervalRulesForRecordChange(params: {
       nextCheckAt = timing.shouldFire ? now : timing.nextCheckAt
     }
 
-    await db.reminderRule.update({
-      where: { id: rule.id },
+    await db.reminderRule.updateMany({
+      where: { id: rule.id, userId: params.userId, babyId: params.babyId },
       data: { nextCheckAt },
     })
   }

@@ -1640,7 +1640,13 @@ export default function StatsComponent({
                 )}
               </StatsPanel>
 
-              <ToothGrowthStats records={stats.toothEruptionRecords || []} />
+              {selectedBabyId ? (
+                <ToothGrowthStats
+                  records={stats.toothEruptionRecords || []}
+                  babyId={selectedBabyId}
+                  onRecordsChanged={fetchStats}
+                />
+              ) : null}
             </>
           )}
 

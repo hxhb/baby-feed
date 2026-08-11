@@ -81,8 +81,8 @@ export async function syncAutoVaccineReminders(params: {
       },
     })
 
-    const managed = await db.reminderRule.findUnique({
-      where: { babyId_sourceKey: { babyId: params.babyId, sourceKey } },
+    const managed = await db.reminderRule.findFirst({
+      where: { userId: params.userId, babyId: params.babyId, sourceKey },
     })
     const legacy = managed ? null : await db.reminderRule.findFirst({
       where: {
@@ -99,8 +99,8 @@ export async function syncAutoVaccineReminders(params: {
 
     if (records.length === 0) {
       if (existing) {
-        await db.reminderRule.update({
-          where: { id: existing.id },
+        await db.reminderRule.updateMany({
+          where: { id: existing.id, userId: params.userId, babyId: params.babyId },
           data: { enabled: false, nextCheckAt: null, sourceKey },
         })
       }
@@ -145,7 +145,10 @@ export async function syncAutoVaccineReminders(params: {
     }
 
     if (existing) {
-      await db.reminderRule.update({ where: { id: existing.id }, data: values })
+      await db.reminderRule.updateMany({
+        where: { id: existing.id, userId: params.userId, babyId: params.babyId },
+        data: values,
+      })
     } else {
       await db.reminderRule.upsert({
         where: { babyId_sourceKey: { babyId: params.babyId, sourceKey } },

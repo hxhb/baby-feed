@@ -14,7 +14,7 @@ import {
   LogOut
 } from 'lucide-react'
 import { useRecordComposer } from '@/components/RecordComposerProvider'
-import { clearServiceWorkerCache } from '@/lib/client-cache'
+import { clearPrivateClientState } from '@/lib/client-cache'
 
 const navItems = [
   { href: '/', label: '首页', icon: Home },
@@ -70,8 +70,7 @@ export default function Navbar() {
   const handleSignOut = async () => {
     try {
       setIsSigningOut(true)
-      // 登出时清除 Service Worker 缓存，防止敏感数据残留在共享设备上
-      await clearServiceWorkerCache()
+      await clearPrivateClientState()
       await signOut({ callbackUrl: '/login' })
     } catch (error) {
       console.error('Sign out failed:', error)
@@ -148,7 +147,7 @@ export default function Navbar() {
         </div>
       </nav>
 
-      <nav className="md:hidden fixed inset-x-0 bottom-0 z-50 rounded-t-[28px] border-t border-blue-100/60 bg-white/98 backdrop-blur-xl shadow-nav supports-[backdrop-filter]:bg-white/92">
+      <nav data-mobile-bottom-navigation className="md:hidden fixed inset-x-0 bottom-0 z-50 rounded-t-[28px] border-t border-blue-100/60 bg-white/98 backdrop-blur-xl shadow-nav supports-[backdrop-filter]:bg-white/92">
         <div className="mx-auto flex max-w-md items-end justify-between gap-1 px-2 pt-2 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]">
           {navItems.map((item) => {
             const Icon = item.icon

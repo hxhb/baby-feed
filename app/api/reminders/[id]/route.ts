@@ -251,13 +251,18 @@ export async function PUT(
       updateData.nextCheckAt = null
     }
 
-    const updated = await prisma.reminderRule.update({
-      where: { id },
+    const claimed = await prisma.reminderRule.updateMany({
+      where: { id, userId: session.user.id, updatedAt: existing.updatedAt },
       data: updateData,
+    })
+    if (claimed.count !== 1) throw new Error('REMINDER_UPDATE_CONFLICT')
+    const updated = await prisma.reminderRule.findFirst({
+      where: { id, userId: session.user.id },
       include: {
         baby: { select: { name: true } },
       },
     })
+    if (!updated) throw new Error('REMINDER_UPDATE_CONFLICT')
 
     const response = {
       ...updated,
@@ -269,6 +274,9 @@ export async function PUT(
 
     return NextResponse.json(response, { headers: noStoreHeaders })
   } catch (error) {
+    if (error instanceof Error && error.message === 'REMINDER_UPDATE_CONFLICT') {
+      return NextResponse.json({ error: '提醒规则已被其他请求修改，请刷新后重试' }, { status: 409, headers: noStoreHeaders })
+    }
     logError('更新提醒规则失败', error)
     return NextResponse.json({ error: '更新失败' }, { status: 500, headers: noStoreHeaders })
   }
@@ -324,10 +332,16 @@ export async function DELETE(
       return NextResponse.json({ error: '提醒规则不存在' }, { status: 404, headers: noStoreHeaders })
     }
 
-    await prisma.reminderRule.delete({ where: { id } })
+    const deleted = await prisma.reminderRule.deleteMany({
+      where: { id, userId: session.user.id, updatedAt: existing.updatedAt },
+    })
+    if (deleted.count !== 1) throw new Error('REMINDER_UPDATE_CONFLICT')
 
     return NextResponse.json({ success: true }, { headers: noStoreHeaders })
   } catch (error) {
+    if (error instanceof Error && error.message === 'REMINDER_UPDATE_CONFLICT') {
+      return NextResponse.json({ error: '提醒规则已被其他请求修改，请刷新后重试' }, { status: 409, headers: noStoreHeaders })
+    }
     logError('删除提醒规则失败', error)
     return NextResponse.json({ error: '删除失败' }, { status: 500, headers: noStoreHeaders })
   }

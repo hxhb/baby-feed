@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
 
     const deliveryRows = await prisma.webhookDelivery.groupBy({
       by: ['endpointId'],
-      where: { event: { userId: session.user.id } },
+      where: { userId: session.user.id },
       _count: { _all: true },
     })
     const deliveryCounts = new Map(deliveryRows.map(row => [row.endpointId, row._count._all]))

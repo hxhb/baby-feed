@@ -1,12 +1,13 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { AlertCircle, CalendarClock, Check, CheckCircle2, ClipboardList, Clock3, MoreVertical, Pencil, Plus, Trash2 } from 'lucide-react'
+import { AlertCircle, CalendarClock, Check, CheckCircle2, ClipboardList, Clock3, Plus } from 'lucide-react'
 import { formatBeijingDateTimeLabel, toBeijingDatetimeLocal } from '@/lib/time'
 import { invalidateRequestCache } from '@/lib/client-request-cache'
 import { StatsPanel, StatsEmptyState } from '@/components/StatsUi'
 import MemoFormModal, { type MemoRecord } from '@/components/MemoFormModal'
 import ConfirmDialog from '@/components/ConfirmDialog'
+import RecordActionMenu from '@/components/RecordActionMenu'
 
 interface Props {
   memoRecords: MemoRecord[]
@@ -217,7 +218,7 @@ export default function MemoSection({ memoRecords: initialMemos, babyId }: Props
     setSaving(true)
     setFeedback(null)
     try {
-      const updatedMemo = parseMemoRecord(await requestJson(`/api/memo/${editingId}`, {
+      const updatedMemo = parseMemoRecord(await requestJson(`/api/memo/${editingId}?babyId=${encodeURIComponent(requestBabyId)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -248,7 +249,7 @@ export default function MemoSection({ memoRecords: initialMemos, babyId }: Props
     setItemBusy(setTogglingIds, memo.id, true)
     setFeedback(null)
     try {
-      const updatedMemo = parseMemoRecord(await requestJson(`/api/memo/${memo.id}`, {
+      const updatedMemo = parseMemoRecord(await requestJson(`/api/memo/${memo.id}?babyId=${encodeURIComponent(requestBabyId)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ completed: !memo.completed }),
@@ -276,7 +277,7 @@ export default function MemoSection({ memoRecords: initialMemos, babyId }: Props
     setItemBusy(setTogglingIds, memo.id, true)
     setFeedback(null)
     try {
-      const updatedMemo = parseMemoRecord(await requestJson(`/api/memo/${memo.id}`, {
+      const updatedMemo = parseMemoRecord(await requestJson(`/api/memo/${memo.id}?babyId=${encodeURIComponent(requestBabyId)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ completed: true }),
@@ -308,7 +309,7 @@ export default function MemoSection({ memoRecords: initialMemos, babyId }: Props
     setItemBusy(setDeletingIds, id, true)
     setFeedback(null)
     try {
-      await requestJson(`/api/memo/${id}`, {
+      await requestJson(`/api/memo/${id}?babyId=${encodeURIComponent(requestBabyId)}`, {
         method: 'DELETE',
       }, '删除备忘失败')
       if (activeBabyIdRef.current === requestBabyId) {
@@ -629,41 +630,14 @@ function MemoItem({ memo, onToggle, onEdit, onDelete, toggling, deleting, menuOp
         ) : null}
       </div>
 
-      <div className="relative shrink-0">
-        <button
-          type="button"
-          onClick={() => onMenuToggle(isMenuOpen ? null : memo.id)}
-          className="inline-flex h-11 w-11 items-center justify-center rounded-button text-slate-400 transition-colors duration-200 hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-          aria-label={`打开${memo.title}的操作菜单`}
-          aria-haspopup="menu"
-          aria-expanded={isMenuOpen}
-        >
-          <MoreVertical size={18} aria-hidden="true" />
-        </button>
-        {isMenuOpen ? (
-          <div className="absolute right-0 top-full z-20 mt-1 min-w-[128px] rounded-element border border-slate-200 bg-white py-1 shadow-elevated" role="menu">
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => { onMenuToggle(null); onEdit() }}
-              className="flex min-h-11 w-full items-center gap-2 px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:bg-blue-50"
-            >
-              <Pencil size={15} aria-hidden="true" />
-              编辑
-            </button>
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => { onMenuToggle(null); onDelete() }}
-              disabled={deleting}
-              className="flex min-h-11 w-full items-center gap-2 px-3 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <Trash2 size={15} aria-hidden="true" />
-              删除
-            </button>
-          </div>
-        ) : null}
-      </div>
+      <RecordActionMenu
+        open={isMenuOpen}
+        onOpenChange={(open) => onMenuToggle(open ? memo.id : null)}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        deleteDisabled={deleting}
+        ariaLabel={`打开${memo.title}的操作菜单`}
+      />
     </article>
   )
 }

@@ -38,11 +38,12 @@ export async function GET(request: NextRequest) {
     const date = searchParams.get('date')
     const type = searchParams.get('type')
 
-    if (babyId) {
-      const idCheck = validateId(babyId, 'babyId')
-      if (!idCheck.valid) {
-        return NextResponse.json({ error: idCheck.error }, { status: 400, headers: noStoreHeaders })
-      }
+    if (!babyId) {
+      return NextResponse.json({ error: '缺少babyId参数' }, { status: 400, headers: noStoreHeaders })
+    }
+    const idCheck = validateId(babyId, 'babyId')
+    if (!idCheck.valid) {
+      return NextResponse.json({ error: idCheck.error }, { status: 400, headers: noStoreHeaders })
     }
 
     if (date) {
@@ -59,12 +60,17 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const whereClause: Record<string, unknown> = {
-      createdBy: session.user.id
+    const baby = await prisma.baby.findFirst({
+      where: { id: babyId, createdBy: session.user.id },
+      select: { id: true },
+    })
+    if (!baby) {
+      return NextResponse.json({ error: '婴儿不存在' }, { status: 404, headers: noStoreHeaders })
     }
 
-    if (babyId) {
-      whereClause.babyId = babyId
+    const whereClause: Record<string, unknown> = {
+      createdBy: session.user.id,
+      babyId,
     }
 
     if (type) {
@@ -249,28 +255,44 @@ export async function POST(request: NextRequest) {
           recordedAt: new Date(recordedAt),
           notes: typedNotes,
           createdBy: session.user.id,
-          toothEruptions: typedType === 'TOOTH_ERUPTION'
-            ? { create: typedToothCodes.map(toothCode => ({ babyId, toothCode })) }
-            : undefined,
         },
         include: { baby: true, toothEruptions: true },
       })
+
+      if (typedType === 'TOOTH_ERUPTION') {
+        await tx.toothEruption.createMany({
+          data: typedToothCodes.map(toothCode => ({
+            healthRecordId: created.id,
+            babyId,
+            toothCode,
+          })),
+        })
+      }
+
+      const completed = typedType === 'TOOTH_ERUPTION'
+        ? await tx.healthRecord.findFirst({
+            where: { id: created.id, babyId, createdBy: session.user.id },
+            include: { baby: true, toothEruptions: true },
+          })
+        : created
+      if (!completed) throw new Error('RECORD_CREATE_CONFLICT')
+
       await rescheduleIntervalRulesForRecordChange({
         userId: session.user.id,
         babyId,
         sourceType: 'health',
-        newRecord: created,
+        newRecord: completed,
         db: tx,
       })
-      if (created.type === 'VACCINE') {
+      if (completed.type === 'VACCINE') {
         await syncAutoVaccineReminders({
           userId: session.user.id,
-          babyId: created.babyId,
-          recordedAtValues: [created.recordedAt],
+          babyId: completed.babyId,
+          recordedAtValues: [completed.recordedAt],
           db: tx,
         })
       }
-      return created
+      return completed
     })
 
     await emitHealthCreated(session.user.id, record, record.baby).catch(error => {

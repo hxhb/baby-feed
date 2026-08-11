@@ -265,14 +265,28 @@ export default function ToothChart({
                   position={definition.position}
                 />
               </span>
-              {erupted ? (
-                <span className="absolute right-0 top-0 flex min-h-4 min-w-4 items-center justify-center rounded-full border border-white bg-emerald-700 px-1 text-[9px] font-bold leading-4 text-white shadow-sm">
-                  {erupted.orderStart === erupted.orderEnd ? erupted.orderStart : `${erupted.orderStart}-${erupted.orderEnd}`}
-                </span>
-              ) : null}
             </button>
           )
         })}
+
+        <div className="pointer-events-none absolute inset-0 z-[40]" aria-hidden="true">
+          {TOOTH_PLACEMENTS.map(({ code, x, y }) => {
+            const erupted = eruptedByCode.get(code)
+            if (!erupted) return null
+
+            return (
+              <span
+                key={code}
+                className="absolute flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-start justify-end"
+                style={{ left: `${x}%`, top: `${y}%` }}
+              >
+                <span className="flex min-h-4 min-w-4 items-center justify-center rounded-full border border-white bg-emerald-700 px-1 text-[9px] font-bold leading-4 text-white shadow-sm">
+                  {erupted.orderStart === erupted.orderEnd ? erupted.orderStart : `${erupted.orderStart}-${erupted.orderEnd}`}
+                </span>
+              </span>
+            )
+          })}
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-2 text-xs text-slate-600" aria-label="牙位状态图例">

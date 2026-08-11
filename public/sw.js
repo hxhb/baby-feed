@@ -1,11 +1,10 @@
 /// <reference lib="webworker" />
 
-const CACHE_NAME = 'baby-feed-v8'
+const CACHE_NAME = 'baby-feed-v9'
 const OFFLINE_URL = '/offline'
 
 // 预缓存的静态资源
 const PRECACHE_URLS = [
-  '/',
   '/offline',
   '/manifest.json',
   '/icon.svg',
@@ -76,25 +75,14 @@ self.addEventListener('fetch', (event) => {
   // 跳过 Next.js data 请求
   if (url.pathname.startsWith('/_next/data/')) return
 
-  // 导航请求（页面跳转）：网络优先 + 超时竞速
+  // Authenticated pages contain user-specific server-rendered data. Never put
+  // navigation responses in CacheStorage; only the generic offline page is safe.
   if (request.mode === 'navigate') {
     event.respondWith(
       (async () => {
         try {
-          // 3秒内网络响应则使用网络版本
-          const response = await fetchWithTimeout(request, 3000)
-          if (response.ok) {
-            const clone = response.clone()
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(request, clone)
-            })
-          }
-          return response
+          return await fetchWithTimeout(request, 3000)
         } catch {
-          // 网络超时或失败，立即从缓存取
-          const cached = await caches.match(request)
-          if (cached) return cached
-          // 无缓存则显示离线页
           const offlinePage = await caches.match(OFFLINE_URL)
           return offlinePage || new Response('Offline', { status: 503 })
         }

@@ -62,9 +62,10 @@ interface Props {
   onSave: (data: Record<string, unknown>) => void
   onCancel: () => void
   saving: boolean
+  errorMessage?: string
 }
 
-export default function TimelineEditRecordModal({ record, onSave, onCancel, saving }: Props) {
+export default function TimelineEditRecordModal({ record, onSave, onCancel, saving, errorMessage }: Props) {
   const isFeeding = record.recordType === 'feeding'
   const feedingRecord = isFeeding ? (record as FeedingRecord) : null
   const healthRecord = !isFeeding ? (record as HealthRecord) : null
@@ -371,6 +372,12 @@ export default function TimelineEditRecordModal({ record, onSave, onCancel, savi
             onChange={setEditNotes}
             rows={3}
           />
+
+          {errorMessage ? (
+            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+              {errorMessage}
+            </p>
+          ) : null}
 
           <RecordActionBar
             mode="edit"

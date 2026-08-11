@@ -70,9 +70,10 @@ export async function sendWebhookDelivery(
   }
 }
 
-async function reminderEventIsCurrent(payloadText: string): Promise<boolean> {
+async function reminderEventIsCurrent(payloadText: string, userId: string): Promise<boolean> {
   try {
     const payload = JSON.parse(payloadText) as {
+      userId?: string
       type?: string
       data?: {
         ruleId?: string
@@ -85,6 +86,7 @@ async function reminderEventIsCurrent(payloadText: string): Promise<boolean> {
         }
       }
     }
+    if (payload.userId !== userId) return false
     if (payload.type !== 'reminder.fired') return true
 
     const data = payload.data
@@ -93,10 +95,11 @@ async function reminderEventIsCurrent(payloadText: string): Promise<boolean> {
     const context = data.context
     if (!ruleId) return false
 
-    const rule = await prisma.reminderRule.findUnique({
-      where: { id: ruleId },
+    const rule = await prisma.reminderRule.findFirst({
+      where: { id: ruleId, userId },
       select: {
         id: true,
+        userId: true,
         babyId: true,
         triggerType: true,
         triggerConfig: true,
@@ -126,9 +129,9 @@ async function reminderEventIsCurrent(payloadText: string): Promise<boolean> {
   }
 }
 
-async function refreshEventStatus(eventId: string): Promise<void> {
+async function refreshEventStatus(eventId: string, userId: string): Promise<void> {
   const deliveries = await prisma.webhookDelivery.findMany({
-    where: { eventId },
+    where: { eventId, userId },
     select: { status: true },
   })
   let status = 'PENDING'
@@ -136,7 +139,7 @@ async function refreshEventStatus(eventId: string): Promise<void> {
   else if (deliveries.every(item => item.status === 'CANCELLED')) status = 'CANCELLED'
   else if (deliveries.every(item => item.status === 'SUCCESS' || item.status === 'CANCELLED')) status = 'DELIVERED'
   else if (deliveries.every(item => ['SUCCESS', 'CANCELLED', 'FAILED'].includes(item.status))) status = 'FAILED'
-  await prisma.webhookEvent.update({ where: { id: eventId }, data: { status } })
+  await prisma.webhookEvent.updateMany({ where: { id: eventId, userId }, data: { status } })
 }
 
 function recordDeliveryActivity(params: {
@@ -193,18 +196,24 @@ export async function attemptWebhookDelivery(deliveryId: string): Promise<'proce
   if (!delivery || delivery.leaseToken !== leaseToken) return 'skipped'
 
   try {
-    if (!delivery.endpoint.active || !(await reminderEventIsCurrent(delivery.event.payload))) {
+    const ownershipMismatch = delivery.userId !== delivery.event.userId
+      || delivery.userId !== delivery.endpoint.userId
+    if (
+      ownershipMismatch
+      || !delivery.endpoint.active
+      || !(await reminderEventIsCurrent(delivery.event.payload, delivery.userId))
+    ) {
       const cancelled = await prisma.webhookDelivery.updateMany({
-        where: { id: delivery.id, status: 'PROCESSING', leaseToken },
+        where: { id: delivery.id, userId: delivery.userId, status: 'PROCESSING', leaseToken },
         data: {
           status: 'CANCELLED',
           leaseUntil: null,
           leaseToken: null,
-          errorMessage: 'Event is no longer current',
+          errorMessage: ownershipMismatch ? 'Tenant ownership mismatch' : 'Event is no longer current',
         },
       })
       if (cancelled.count !== 1) return 'skipped'
-      await refreshEventStatus(delivery.eventId)
+      await refreshEventStatus(delivery.eventId, delivery.userId)
       return 'processed'
     }
 
@@ -219,6 +228,7 @@ export async function attemptWebhookDelivery(deliveryId: string): Promise<'proce
     await prisma.webhookEndpoint.updateMany({
       where: {
         id: delivery.endpointId,
+        userId: delivery.userId,
         OR: [{ lastTriedAt: null }, { lastTriedAt: { lt: now } }],
       },
       data: { lastTriedAt: new Date() },
@@ -226,7 +236,7 @@ export async function attemptWebhookDelivery(deliveryId: string): Promise<'proce
 
     if (result.success) {
       const finalized = await prisma.webhookDelivery.updateMany({
-        where: { id: delivery.id, status: 'PROCESSING', leaseToken },
+        where: { id: delivery.id, userId: delivery.userId, status: 'PROCESSING', leaseToken },
         data: {
           status: 'SUCCESS',
           attemptNumber,
@@ -241,7 +251,7 @@ export async function attemptWebhookDelivery(deliveryId: string): Promise<'proce
       recordDeliveryActivity({ delivery, status: 'success', attemptNumber, result })
     } else if (attemptNumber < delivery.endpoint.maxRetries) {
       const finalized = await prisma.webhookDelivery.updateMany({
-        where: { id: delivery.id, status: 'PROCESSING', leaseToken },
+        where: { id: delivery.id, userId: delivery.userId, status: 'PROCESSING', leaseToken },
         data: {
           status: 'PENDING',
           attemptNumber,
@@ -256,7 +266,7 @@ export async function attemptWebhookDelivery(deliveryId: string): Promise<'proce
       recordDeliveryActivity({ delivery, status: 'pending', attemptNumber, result })
     } else {
       const finalized = await prisma.webhookDelivery.updateMany({
-        where: { id: delivery.id, status: 'PROCESSING', leaseToken },
+        where: { id: delivery.id, userId: delivery.userId, status: 'PROCESSING', leaseToken },
         data: {
           status: 'FAILED',
           attemptNumber,
@@ -270,11 +280,11 @@ export async function attemptWebhookDelivery(deliveryId: string): Promise<'proce
       recordDeliveryActivity({ delivery, status: 'failed', attemptNumber, result })
     }
 
-    await refreshEventStatus(delivery.eventId)
+    await refreshEventStatus(delivery.eventId, delivery.userId)
     return 'processed'
   } catch (error) {
     await prisma.webhookDelivery.updateMany({
-      where: { id: delivery.id, status: 'PROCESSING', leaseToken },
+      where: { id: delivery.id, userId: delivery.userId, status: 'PROCESSING', leaseToken },
       data: {
         status: 'PENDING',
         leaseUntil: null,
@@ -303,7 +313,7 @@ export async function processWebhookDeliveries(options?: { maxDeliveries?: numbe
     },
     orderBy: { nextRetryAt: 'asc' },
     take: options?.maxDeliveries ?? 100,
-    select: { id: true },
+    select: { id: true, userId: true },
   })
 
   const stats = { processed: 0, succeeded: 0, failed: 0, errors: [] as string[] }
@@ -312,8 +322,8 @@ export async function processWebhookDeliveries(options?: { maxDeliveries?: numbe
       const outcome = await attemptWebhookDelivery(delivery.id)
       if (outcome === 'processed') {
         stats.processed++
-        const current = await prisma.webhookDelivery.findUnique({
-          where: { id: delivery.id },
+        const current = await prisma.webhookDelivery.findFirst({
+          where: { id: delivery.id, userId: delivery.userId },
           select: { status: true },
         })
         if (current?.status === 'SUCCESS') stats.succeeded++

@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
       pending: ['PENDING', 'PROCESSING'],
     }
     const where = {
-      event: { userId: session.user.id },
+      userId: session.user.id,
       ...(endpointId ? { endpointId } : {}),
       ...(status && statusMap[status] ? { status: { in: statusMap[status] } } : {}),
     }
@@ -169,7 +169,7 @@ export async function DELETE(request: NextRequest) {
 
     const result = await prisma.webhookDelivery.deleteMany({
       where: {
-        event: { userId: session.user.id },
+        userId: session.user.id,
         ...(endpointId ? { endpointId } : {}),
         status: { in: ['SUCCESS', 'FAILED', 'CANCELLED'] },
       },

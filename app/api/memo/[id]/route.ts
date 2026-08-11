@@ -43,6 +43,14 @@ export async function PUT(
     if (!idCheck.valid) {
       return NextResponse.json({ error: idCheck.error }, { status: 400, headers: noStoreHeaders })
     }
+    const babyId = request.nextUrl.searchParams.get('babyId')
+    if (!babyId) {
+      return NextResponse.json({ error: '缺少babyId参数' }, { status: 400, headers: noStoreHeaders })
+    }
+    const babyIdCheck = validateId(babyId, 'babyId')
+    if (!babyIdCheck.valid) {
+      return NextResponse.json({ error: babyIdCheck.error }, { status: 400, headers: noStoreHeaders })
+    }
 
     const { data: body, error: parseError } = await safeParseBody(request)
     if (parseError || !body) {
@@ -52,6 +60,7 @@ export async function PUT(
     const existingMemo = await prisma.memo.findFirst({
       where: {
         id,
+        babyId,
         createdBy: session.user.id,
       },
     })
@@ -135,11 +144,14 @@ export async function PUT(
 
     const record = await prisma.$transaction(async tx => {
       const claimed = await tx.memo.updateMany({
-        where: { id, updatedAt: existingMemo.updatedAt },
+        where: { id, babyId, createdBy: session.user.id, updatedAt: existingMemo.updatedAt },
         data: updateData,
       })
       if (claimed.count !== 1) throw new Error('RECORD_UPDATE_CONFLICT')
-      const updated = await tx.memo.findUnique({ where: { id }, include: { baby: true } })
+      const updated = await tx.memo.findFirst({
+        where: { id, babyId, createdBy: session.user.id },
+        include: { baby: true },
+      })
       if (!updated) throw new Error('RECORD_UPDATE_CONFLICT')
       return updated
     })
@@ -194,10 +206,19 @@ export async function DELETE(
     if (!idCheck.valid) {
       return NextResponse.json({ error: idCheck.error }, { status: 400, headers: noStoreHeaders })
     }
+    const babyId = request.nextUrl.searchParams.get('babyId')
+    if (!babyId) {
+      return NextResponse.json({ error: '缺少babyId参数' }, { status: 400, headers: noStoreHeaders })
+    }
+    const babyIdCheck = validateId(babyId, 'babyId')
+    if (!babyIdCheck.valid) {
+      return NextResponse.json({ error: babyIdCheck.error }, { status: 400, headers: noStoreHeaders })
+    }
 
     const existingMemo = await prisma.memo.findFirst({
       where: {
         id,
+        babyId,
         createdBy: session.user.id,
       },
     })
@@ -207,7 +228,7 @@ export async function DELETE(
     }
 
     const deleted = await prisma.memo.deleteMany({
-      where: { id, updatedAt: existingMemo.updatedAt },
+      where: { id, babyId, createdBy: session.user.id, updatedAt: existingMemo.updatedAt },
     })
     if (deleted.count !== 1) throw new Error('RECORD_UPDATE_CONFLICT')
 

@@ -65,6 +65,7 @@ model Baby {
   memos          Memo[]
   reminderRules  ReminderRule[]
 
+  @@unique([id, createdBy])
   @@index([createdBy])
 }
 
@@ -85,7 +86,7 @@ model FeedingRecord {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
   createdBy           String
-  baby                Baby      @relation(fields: [babyId], references: [id], onDelete: Cascade)
+  baby                Baby      @relation(fields: [babyId, createdBy], references: [id, createdBy], onDelete: Cascade)
   user                User      @relation(fields: [createdBy], references: [id], onDelete: Cascade)
 
   @@index([createdBy, babyId, startTime])
@@ -118,10 +119,11 @@ model HealthRecord {
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
   createdBy           String
-  baby                Baby            @relation(fields: [babyId], references: [id], onDelete: Cascade)
+  baby                Baby            @relation(fields: [babyId, createdBy], references: [id, createdBy], onDelete: Cascade)
   user                User            @relation(fields: [createdBy], references: [id], onDelete: Cascade)
   toothEruptions      ToothEruption[]
 
+  @@unique([id, babyId])
   @@index([createdBy, babyId, recordedAt])
   @@index([babyId, type, recordedAt])
 }
@@ -131,7 +133,7 @@ model ToothEruption {
   healthRecordId String
   babyId         String
   toothCode      String
-  healthRecord   HealthRecord @relation(fields: [healthRecordId], references: [id], onDelete: Cascade)
+  healthRecord   HealthRecord @relation(fields: [healthRecordId, babyId], references: [id, babyId], onDelete: Cascade)
   baby           Baby         @relation(fields: [babyId], references: [id], onDelete: Cascade)
 
   @@unique([babyId, toothCode])
@@ -150,7 +152,7 @@ model Memo {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   createdBy   String
-  baby        Baby      @relation(fields: [babyId], references: [id], onDelete: Cascade)
+  baby        Baby      @relation(fields: [babyId, createdBy], references: [id, createdBy], onDelete: Cascade)
   user        User      @relation(fields: [createdBy], references: [id], onDelete: Cascade)
 
   @@index([createdBy, babyId, scheduledAt])
@@ -185,6 +187,7 @@ model WebhookEndpoint {
   user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   deliveries WebhookDelivery[]
 
+  @@unique([id, userId])
   @@index([userId])
   @@index([active])
 }
@@ -204,6 +207,7 @@ model WebhookEvent {
   user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   deliveries WebhookDelivery[]
 
+  @@unique([id, userId])
   @@index([userId, createdAt])
   @@index([status, createdAt])
   @@index([recordId])
@@ -211,6 +215,7 @@ model WebhookEvent {
 
 model WebhookDelivery {
   id            String    @id @default(cuid())
+  userId        String
   eventId       String
   endpointId    String
   status        String    @default("PENDING")
@@ -224,10 +229,11 @@ model WebhookDelivery {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  event    WebhookEvent    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  endpoint WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  event    WebhookEvent    @relation(fields: [eventId, userId], references: [id, userId], onDelete: Cascade)
+  endpoint WebhookEndpoint @relation(fields: [endpointId, userId], references: [id, userId], onDelete: Cascade)
 
   @@unique([eventId, endpointId])
+  @@index([userId, status, nextRetryAt])
   @@index([status, nextRetryAt])
   @@index([endpointId, createdAt])
 }
@@ -260,9 +266,10 @@ model ReminderRule {
   updatedAt DateTime @updatedAt
 
   user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  baby       Baby                @relation(fields: [babyId], references: [id], onDelete: Cascade)
+  baby       Baby                @relation(fields: [babyId, userId], references: [id, createdBy], onDelete: Cascade)
   executions ReminderExecution[]
 
+  @@unique([id, userId])
   @@unique([babyId, sourceKey])
   @@index([userId, enabled])
   @@index([babyId])
@@ -286,7 +293,7 @@ model ReminderExecution {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  rule ReminderRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  rule ReminderRule @relation(fields: [ruleId, userId], references: [id, userId], onDelete: Cascade)
   user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([ruleId, evaluatedAt])

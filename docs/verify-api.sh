@@ -203,7 +203,7 @@ test_api POST "/api/babies" "缺字段（应400）" '{"name":"bad"}' "400"
 
 # ══════════════════════════════════════════════════════════════
 section "[8/14] 喂养记录"
-test_api GET "/api/feeding" "获取列表" "" "200"
+test_api GET "/api/feeding" "缺少宝宝参数（应400）" "" "400"
 
 if [ -n "$BABY_ID" ]; then
     test_api GET "/api/feeding?babyId=${BABY_ID}" "按婴儿筛选" "" "200"
@@ -223,17 +223,17 @@ if [ -n "$BABY_ID" ]; then
     test_api POST "/api/feeding" "辅食 (SOLID_FOOD)" \
       "{\"babyId\":\"${BABY_ID}\",\"type\":\"SOLID_FOOD\",\"startTime\":\"2024-06-15T11:00:00.000Z\",\"solidFoodName\":\"米粉\",\"solidFoodAmount\":\"30g\"}" "201"
 
-    [ -n "$FEED_ID1" ] && test_api PUT "/api/feeding/${FEED_ID1}" "更新喂养记录" \
+    [ -n "$FEED_ID1" ] && test_api PUT "/api/feeding/${FEED_ID1}?babyId=${BABY_ID}" "更新喂养记录" \
       '{"notes":"更新备注","leftBreastDuration":20}' "200"
 
-    [ -n "$FEED_ID2" ] && test_api DELETE "/api/feeding/${FEED_ID2}" "删除喂养记录" "" "200"
+    [ -n "$FEED_ID2" ] && test_api DELETE "/api/feeding/${FEED_ID2}?babyId=${BABY_ID}" "删除喂养记录" "" "200"
 fi
 
 test_api POST "/api/feeding" "缺必填字段（应400）" '{"type":"FORMULA"}' "400"
 
 # ══════════════════════════════════════════════════════════════
 section "[9/14] 健康记录"
-test_api GET "/api/health" "获取列表" "" "200"
+test_api GET "/api/health" "缺少宝宝参数（应400）" "" "400"
 
 if [ -n "$BABY_ID" ]; then
     test_api GET "/api/health?babyId=${BABY_ID}" "按婴儿筛选" "" "200"
@@ -266,17 +266,17 @@ if [ -n "$BABY_ID" ]; then
     test_api POST "/api/health" "睡眠 (SLEEP)" \
       "{\"babyId\":\"${BABY_ID}\",\"type\":\"SLEEP\",\"recordedAt\":\"2024-06-15T14:00:00.000Z\",\"sleepStartTime\":\"2024-06-15T14:00:00.000Z\",\"sleepEndTime\":\"2024-06-15T22:00:00.000Z\",\"sleepQuality\":\"GOOD\"}" "201"
 
-    [ -n "$HEALTH_ID1" ] && test_api PUT "/api/health/${HEALTH_ID1}" "更新健康记录" \
+    [ -n "$HEALTH_ID1" ] && test_api PUT "/api/health/${HEALTH_ID1}?babyId=${BABY_ID}" "更新健康记录" \
       '{"weight":5.8,"notes":"增重了"}' "200"
 
-    [ -n "$HEALTH_ID2" ] && test_api DELETE "/api/health/${HEALTH_ID2}" "删除健康记录" "" "200"
+    [ -n "$HEALTH_ID2" ] && test_api DELETE "/api/health/${HEALTH_ID2}?babyId=${BABY_ID}" "删除健康记录" "" "200"
 fi
 
 test_api POST "/api/health" "缺必填字段（应400）" '{"type":"WEIGHT"}' "400"
 
 # ══════════════════════════════════════════════════════════════
 section "[10/14] 备忘录"
-test_api GET "/api/memo" "获取列表" "" "200"
+test_api GET "/api/memo" "缺少宝宝参数（应400）" "" "400"
 
 if [ -n "$BABY_ID" ]; then
     test_api GET "/api/memo?babyId=${BABY_ID}" "按婴儿筛选" "" "200"
@@ -287,15 +287,15 @@ if [ -n "$BABY_ID" ]; then
       "{\"babyId\":\"${BABY_ID}\",\"title\":\"接种疫苗\",\"content\":\"带接种本\",\"scheduledAt\":\"2024-07-15T09:00:00.000Z\"}" "201"
     MEMO_ID=$(extract_id)
 
-    [ -n "$MEMO_ID" ] && test_api PUT "/api/memo/${MEMO_ID}" "标记完成" \
+    [ -n "$MEMO_ID" ] && test_api PUT "/api/memo/${MEMO_ID}?babyId=${BABY_ID}" "标记完成" \
       '{"completed":true}' "200"
-    [ -n "$MEMO_ID" ] && test_api PUT "/api/memo/${MEMO_ID}" "取消完成" \
+    [ -n "$MEMO_ID" ] && test_api PUT "/api/memo/${MEMO_ID}?babyId=${BABY_ID}" "取消完成" \
       '{"completed":false}' "200"
 
     test_api POST "/api/memo" "创建待删备忘" \
       "{\"babyId\":\"${BABY_ID}\",\"title\":\"待删\",\"scheduledAt\":\"2024-07-20T09:00:00.000Z\"}" "201"
     MEMO_ID2=$(extract_id)
-    [ -n "$MEMO_ID2" ] && test_api DELETE "/api/memo/${MEMO_ID2}" "删除备忘" "" "200"
+    [ -n "$MEMO_ID2" ] && test_api DELETE "/api/memo/${MEMO_ID2}?babyId=${BABY_ID}" "删除备忘" "" "200"
 fi
 
 test_api POST "/api/memo" "缺必填字段（应400）" '{"title":"test"}' "400"

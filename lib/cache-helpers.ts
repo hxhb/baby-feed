@@ -10,4 +10,5 @@ export function invalidateRecordRelatedCaches(babyId: string) {
   invalidateRequestCache(`/api/health?babyId=${babyId}`)
   invalidateRequestCache(`stats:${babyId}:`)
   invalidateRequestCache(`timeline:${babyId}:`)
+  invalidateRequestCache(`timeline-dates:${babyId}`)
 }

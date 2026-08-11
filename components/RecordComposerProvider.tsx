@@ -28,6 +28,10 @@ import RecordComposerEditor from '@/components/record-composer/RecordComposerEdi
 import { getBeijingNow, toBeijingDatetimeLocal } from '@/lib/time'
 import { invalidateRecordRelatedCaches } from '@/lib/cache-helpers'
 import {
+  clearPrivateBrowserState,
+  getActiveTimerStorageKey,
+} from '@/lib/client-cache'
+import {
   createComposerDraft,
   getComposerTypeFromQuery,
   getRecordTypeMeta,
@@ -53,7 +57,6 @@ interface RecordComposerContextValue {
 }
 
 const RecordComposerContext = createContext<RecordComposerContextValue | null>(null)
-const ACTIVE_TIMER_KEY = 'baby-feed:record-composer-active-timer'
 const SAVED_RECORD_TOAST_DURATION_MS = 3000
 
 export function useRecordComposer() {
@@ -71,10 +74,28 @@ function formatTimer(totalSeconds: number) {
   return `${String(minutes).padStart(2, '0')}:${String(rest).padStart(2, '0')}`
 }
 
+function parseStoredActiveTimer(value: string): ActiveRecordTimer | null {
+  const parsed = JSON.parse(value) as Record<string, unknown>
+  if (
+    (parsed.kind !== 'breast' && parsed.kind !== 'sleep')
+    || typeof parsed.babyId !== 'string'
+    || typeof parsed.startedAt !== 'number'
+  ) return null
+  if (parsed.kind === 'breast') {
+    if (
+      (parsed.side !== 'left' && parsed.side !== 'right')
+      || typeof parsed.leftSeconds !== 'number'
+      || typeof parsed.rightSeconds !== 'number'
+    ) return null
+  }
+  return parsed as unknown as ActiveRecordTimer
+}
+
 export function RecordComposerProvider({ children }: { children: ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
-  const { status } = useSession()
+  const { data: session, status } = useSession()
+  const userId = session?.user?.id ?? null
   const [isOpen, setIsOpen] = useState(false)
   const [selectedType, setSelectedType] = useState<ComposerRecordType | null>(null)
   const [babies, setBabies] = useState<BabyOption[]>([])
@@ -87,7 +108,7 @@ export function RecordComposerProvider({ children }: { children: ReactNode }) {
   const [undoing, setUndoing] = useState(false)
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
   const [launcherScope, setLauncherScope] = useState<'feeding' | 'health' | null>(null)
-  const [activeTimer, setActiveTimer] = useState<ActiveRecordTimer | null>(null)
+  const [ownedActiveTimer, setOwnedActiveTimer] = useState<{ userId: string; timer: ActiveRecordTimer } | null>(null)
   const [timerNow, setTimerNow] = useState(() => Date.now())
   const panelRef = useRef<HTMLDivElement>(null)
   const discardDialogRef = useRef<HTMLDivElement>(null)
@@ -95,25 +116,74 @@ export function RecordComposerProvider({ children }: { children: ReactNode }) {
   const discardPreviousFocusRef = useRef<HTMLElement | null>(null)
   const routeOpenedRef = useRef(false)
   const babiesRequestInFlightRef = useRef(false)
+  const previousUserIdRef = useRef<string | null>(null)
+  const persistedTimerUserIdRef = useRef<string | null>(null)
+  const activeTimer = ownedActiveTimer?.userId === userId ? ownedActiveTimer.timer : null
+
+  const setActiveTimer = useCallback((
+    next: ActiveRecordTimer | null | ((current: ActiveRecordTimer | null) => ActiveRecordTimer | null),
+  ) => {
+    if (!userId) {
+      setOwnedActiveTimer(null)
+      return
+    }
+    setOwnedActiveTimer(current => {
+      const currentTimer = current?.userId === userId ? current.timer : null
+      const resolved = typeof next === 'function' ? next(currentTimer) : next
+      return resolved ? { userId, timer: resolved } : null
+    })
+  }, [userId])
 
   useEffect(() => {
+    const previousUserId = previousUserIdRef.current
+    if (
+      (previousUserId && previousUserId !== userId)
+      || (!userId && status === 'unauthenticated')
+    ) clearPrivateBrowserState()
+    previousUserIdRef.current = userId
+
+    setIsOpen(false)
+    setSelectedType(null)
+    setBabies([])
+    setDefaultBabyId('')
+    setDrafts({})
+    setSavedRecord(null)
+    setToastError('')
+    setShowDiscardConfirm(false)
+    setActiveTimer(null)
+    if (!userId) return
+
     try {
       window.localStorage.removeItem('baby-feed:record-composer-recents')
-      const storedTimer = window.localStorage.getItem(ACTIVE_TIMER_KEY)
-      if (storedTimer) setActiveTimer(JSON.parse(storedTimer) as ActiveRecordTimer)
+      window.localStorage.removeItem('baby-feed:record-composer-active-timer')
+      const storedTimer = window.localStorage.getItem(getActiveTimerStorageKey(userId))
+      if (storedTimer) {
+        const parsedTimer = parseStoredActiveTimer(storedTimer)
+        if (parsedTimer) setOwnedActiveTimer({ userId, timer: parsedTimer })
+        else window.localStorage.removeItem(getActiveTimerStorageKey(userId))
+      }
     } catch (error) {
       console.error('恢复记录面板状态失败:', error)
     }
-  }, [])
+  }, [setActiveTimer, status, userId])
 
   useEffect(() => {
+    const previousOwner = persistedTimerUserIdRef.current
     try {
-      if (activeTimer) window.localStorage.setItem(ACTIVE_TIMER_KEY, JSON.stringify(activeTimer))
-      else window.localStorage.removeItem(ACTIVE_TIMER_KEY)
+      if (previousOwner && previousOwner !== ownedActiveTimer?.userId) {
+        window.localStorage.removeItem(getActiveTimerStorageKey(previousOwner))
+      }
+      if (ownedActiveTimer) {
+        window.localStorage.setItem(
+          getActiveTimerStorageKey(ownedActiveTimer.userId),
+          JSON.stringify(ownedActiveTimer.timer),
+        )
+      }
+      persistedTimerUserIdRef.current = ownedActiveTimer?.userId ?? null
     } catch (error) {
       console.error('保存计时状态失败:', error)
     }
-  }, [activeTimer])
+  }, [ownedActiveTimer])
 
   useEffect(() => {
     if (!activeTimer) return
@@ -307,7 +377,7 @@ export function RecordComposerProvider({ children }: { children: ReactNode }) {
   const startBreastTimer = useCallback((side: 'left' | 'right', babyId: string) => {
     if (activeTimer && !window.confirm('当前有一项计时正在进行。要结束它并开始新的亲喂计时吗？')) return
     setActiveTimer({ kind: 'breast', babyId, side, startedAt: Date.now(), leftSeconds: 0, rightSeconds: 0 })
-  }, [activeTimer])
+  }, [activeTimer, setActiveTimer])
 
   const switchBreastSide = useCallback(() => {
     setActiveTimer(current => {
@@ -321,12 +391,12 @@ export function RecordComposerProvider({ children }: { children: ReactNode }) {
         rightSeconds: current.rightSeconds + (current.side === 'right' ? elapsed : 0),
       }
     })
-  }, [])
+  }, [setActiveTimer])
 
   const startSleepTimer = useCallback((babyId: string) => {
     if (activeTimer && !window.confirm('当前有一项计时正在进行。要结束它并开始睡眠计时吗？')) return
     setActiveTimer({ kind: 'sleep', babyId, startedAt: Date.now() })
-  }, [activeTimer])
+  }, [activeTimer, setActiveTimer])
 
   const finishTimer = useCallback(() => {
     if (!activeTimer) return
@@ -353,14 +423,18 @@ export function RecordComposerProvider({ children }: { children: ReactNode }) {
     }
     setActiveTimer(null)
     setIsOpen(true)
-  }, [activeTimer, updateDraft])
+  }, [activeTimer, setActiveTimer, updateDraft])
 
   const handleUndo = async () => {
     if (!savedRecord || undoing) return
     setUndoing(true)
     setToastError('')
     try {
-      const response = await fetch(`/api/${savedRecord.kind === 'memo' ? 'memo' : savedRecord.kind}/${savedRecord.id}`, { method: 'DELETE' })
+      const resource = savedRecord.kind === 'memo' ? 'memo' : savedRecord.kind
+      const response = await fetch(
+        `/api/${resource}/${savedRecord.id}?babyId=${encodeURIComponent(savedRecord.babyId)}`,
+        { method: 'DELETE' },
+      )
       if (!response.ok) {
         const result = await response.json().catch(() => null)
         throw new Error(result?.error || '撤销失败，请到时间轴中删除')

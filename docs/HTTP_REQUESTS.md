@@ -668,7 +668,7 @@
 
 更新喂养记录（支持部分更新）。未提供的字段保持不变；更改 `type` 时，非对应类型的字段会自动清空。
 
-- **URL**: `PUT /api/feeding/:id`
+- **URL**: `PUT /api/feeding/:id?babyId=ID`
 - **认证**: 需要
 - **限流**: 30 次/10分钟
 - **CSRF**: 需要 Origin 校验
@@ -703,7 +703,7 @@
 
 删除一条喂养记录。
 
-- **URL**: `DELETE /api/feeding/:id`
+- **URL**: `DELETE /api/feeding/:id?babyId=ID`
 - **认证**: 需要
 - **限流**: 20 次/15分钟
 - **CSRF**: 需要 Origin 校验
@@ -827,7 +827,7 @@
 
 更新健康记录（支持部分更新）。未提供的字段保持不变；更改 `type` 时，非对应类型的字段会自动清空。
 
-- **URL**: `PUT /api/health/:id`
+- **URL**: `PUT /api/health/:id?babyId=ID`
 - **认证**: 需要
 - **限流**: 30 次/10分钟
 - **CSRF**: 需要 Origin 校验
@@ -870,7 +870,7 @@
 
 删除一条健康记录。
 
-- **URL**: `DELETE /api/health/:id`
+- **URL**: `DELETE /api/health/:id?babyId=ID`
 - **认证**: 需要
 - **限流**: 20 次/15分钟
 - **CSRF**: 需要 Origin 校验
@@ -989,7 +989,7 @@ GET /api/memo?babyId=cxxx&date=2024-02-01&rangeDays=14
 
 更新备忘录（支持部分更新）。可用于修改标题、内容、时间，或标记完成/取消完成。
 
-- **URL**: `PUT /api/memo/:id`
+- **URL**: `PUT /api/memo/:id?babyId=ID`
 - **认证**: 需要
 - **限流**: 30 次/10分钟
 - **CSRF**: 需要 Origin 校验
@@ -1036,7 +1036,7 @@ GET /api/memo?babyId=cxxx&date=2024-02-01&rangeDays=14
 
 删除一条备忘录。
 
-- **URL**: `DELETE /api/memo/:id`
+- **URL**: `DELETE /api/memo/:id?babyId=ID`
 - **认证**: 需要
 - **限流**: 20 次/15分钟
 - **CSRF**: 需要 Origin 校验

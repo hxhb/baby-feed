@@ -36,11 +36,12 @@ export async function GET(request: NextRequest) {
     const date = searchParams.get('date')
     const rangeDays = searchParams.get('rangeDays')
 
-    if (babyId) {
-      const idCheck = validateId(babyId, 'babyId')
-      if (!idCheck.valid) {
-        return NextResponse.json({ error: idCheck.error }, { status: 400, headers: noStoreHeaders })
-      }
+    if (!babyId) {
+      return NextResponse.json({ error: '缺少babyId参数' }, { status: 400, headers: noStoreHeaders })
+    }
+    const idCheck = validateId(babyId, 'babyId')
+    if (!idCheck.valid) {
+      return NextResponse.json({ error: idCheck.error }, { status: 400, headers: noStoreHeaders })
     }
 
     if (completed !== null && completed !== 'true' && completed !== 'false') {
@@ -72,12 +73,17 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const whereClause: Record<string, unknown> = {
-      createdBy: session.user.id,
+    const baby = await prisma.baby.findFirst({
+      where: { id: babyId, createdBy: session.user.id },
+      select: { id: true },
+    })
+    if (!baby) {
+      return NextResponse.json({ error: '婴儿不存在' }, { status: 404, headers: noStoreHeaders })
     }
 
-    if (babyId) {
-      whereClause.babyId = babyId
+    const whereClause: Record<string, unknown> = {
+      createdBy: session.user.id,
+      babyId,
     }
 
     if (completed === 'true') {

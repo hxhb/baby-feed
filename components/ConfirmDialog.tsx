@@ -9,6 +9,9 @@ interface Props {
   confirmLabel?: string
   cancelLabel?: string
   variant?: 'danger' | 'primary'
+  loading?: boolean
+  loadingLabel?: string
+  errorMessage?: string
   onConfirm: () => void
   onCancel: () => void
 }
@@ -19,6 +22,9 @@ export default function ConfirmDialog({
   confirmLabel = '确认',
   cancelLabel = '取消',
   variant = 'primary',
+  loading = false,
+  loadingLabel = '处理中...',
+  errorMessage,
   onConfirm,
   onCancel,
 }: Props) {
@@ -36,8 +42,9 @@ export default function ConfirmDialog({
     : 'gradient-primary text-white shadow-elevated'
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 px-4" onClick={onCancel}>
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 px-4" onClick={() => !loading && onCancel()}>
       <div
+        aria-busy={loading}
         className="bg-white rounded-card p-5 sm:p-6 max-w-sm w-full shadow-elevated border border-blue-50"
         onClick={(e) => e.stopPropagation()}
       >
@@ -50,20 +57,27 @@ export default function ConfirmDialog({
             <p className="text-sm text-slate-600 mt-1">{message}</p>
           </div>
         </div>
+        {errorMessage ? (
+          <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+            {errorMessage}
+          </p>
+        ) : null}
         <div className="flex gap-3">
           <button
             type="button"
             onClick={onCancel}
-            className="flex-1 py-2.5 px-4 bg-slate-100 text-slate-700 font-medium rounded-button hover:bg-slate-200 transition active:scale-[0.98]"
+            disabled={loading}
+            className="flex-1 py-2.5 px-4 bg-slate-100 text-slate-700 font-medium rounded-button hover:bg-slate-200 transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {cancelLabel}
           </button>
           <button
             type="button"
             onClick={onConfirm}
-            className={`flex-1 py-2.5 px-4 font-medium rounded-button transition active:scale-[0.98] ${confirmClassName}`}
+            disabled={loading}
+            className={`flex-1 py-2.5 px-4 font-medium rounded-button transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 ${confirmClassName}`}
           >
-            {confirmLabel}
+            {loading ? loadingLabel : confirmLabel}
           </button>
         </div>
       </div>

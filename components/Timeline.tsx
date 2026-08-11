@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react'
 import TimelineEditRecordModal from '@/components/TimelineEditRecordModal'
+import RecordActionMenu from '@/components/RecordActionMenu'
 import { format, isToday, isYesterday } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
 import { formatBeijingTime, getBeijingHour } from '@/lib/time'
@@ -10,13 +11,7 @@ import { dedupeRequest, invalidateRequestCache } from '@/lib/client-request-cach
 import type { PreloadedTimelineRecord } from '@/lib/server-timeline'
 import type { PrimaryToothCode } from '@/lib/tooth-eruptions'
 import Link from 'next/link'
-import {
-  ChevronLeft,
-  ChevronRight,
-  Trash2,
-  Pencil,
-  MoreVertical,
-} from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { getRecordIcon, getRecordTitle } from '@/lib/record-display'
 import type { DisplayRecord } from '@/lib/record-display'
 
@@ -219,16 +214,6 @@ const TimelineRecordItem = memo(function TimelineRecordItem({
     ? record.startTime
     : getSleepRecordDisplayTime(record as HealthRecord, viewingDateStr)
   const isMenuOpen = menuOpenId === record.id
-  const menuBtnRef = useRef<HTMLButtonElement>(null)
-  const [openUpward, setOpenUpward] = useState(false)
-
-  useEffect(() => {
-    if (isMenuOpen && menuBtnRef.current) {
-      const rect = menuBtnRef.current.getBoundingClientRect()
-      // If less than 120px from viewport bottom (menu ~80px + navbar ~72px), open upward
-      setOpenUpward(window.innerHeight - rect.bottom < 120)
-    }
-  }, [isMenuOpen])
 
   return (
     <div className="flex items-center justify-between p-3 sm:p-4 bg-white rounded-element border border-slate-100/60 transition">
@@ -244,35 +229,14 @@ const TimelineRecordItem = memo(function TimelineRecordItem({
           </p>
         </div>
       </div>
-      <div className="relative flex-shrink-0 ml-2">
-        <button
-          ref={menuBtnRef}
-          type="button"
-          onClick={() => onMenuToggle(isMenuOpen ? null : record.id)}
-          className="mobile-touch-target p-2 text-gray-400 hover:text-slate-600 hover:bg-slate-100 rounded-element transition"
-        >
-          <MoreVertical size={16} />
-        </button>
-        {isMenuOpen && (
-          <div className={`absolute right-0 z-[60] bg-white rounded-element shadow-elevated border border-slate-100 py-1 min-w-[100px] ${openUpward ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
-            <button
-              type="button"
-              onClick={() => { onMenuToggle(null); onEdit(record) }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition"
-            >
-              <Pencil size={14} />
-              编辑
-            </button>
-            <button
-              type="button"
-              onClick={() => { onMenuToggle(null); onDelete(record.id, isFeeding ? 'feeding' : 'health') }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition"
-            >
-              <Trash2 size={14} />
-              删除
-            </button>
-          </div>
-        )}
+      <div className="ml-2 shrink-0">
+        <RecordActionMenu
+          open={isMenuOpen}
+          onOpenChange={(open) => onMenuToggle(open ? record.id : null)}
+          onEdit={() => onEdit(record)}
+          onDelete={() => onDelete(record.id, isFeeding ? 'feeding' : 'health')}
+          ariaLabel={`${getRecordTitle(record as DisplayRecord)}操作`}
+        />
       </div>
     </div>
   )
@@ -557,9 +521,10 @@ export default function TimelineComponent({
     if (!deleteTarget || !selectedBabyId) return
 
     try {
-      const endpoint = deleteTarget.type === 'feeding' 
-        ? `/api/feeding/${deleteTarget.id}` 
-        : `/api/health/${deleteTarget.id}`
+      const encodedBabyId = encodeURIComponent(selectedBabyId)
+      const endpoint = deleteTarget.type === 'feeding'
+        ? `/api/feeding/${deleteTarget.id}?babyId=${encodedBabyId}`
+        : `/api/health/${deleteTarget.id}?babyId=${encodedBabyId}`
       const response = await fetch(endpoint, { method: 'DELETE' })
       
       if (response.ok) {
@@ -589,9 +554,10 @@ export default function TimelineComponent({
     setSaving(true)
     try {
       const isFeeding = editingRecord.recordType === 'feeding'
-      const endpoint = isFeeding 
-        ? `/api/feeding/${editingRecord.id}` 
-        : `/api/health/${editingRecord.id}`
+      const encodedBabyId = encodeURIComponent(selectedBabyId)
+      const endpoint = isFeeding
+        ? `/api/feeding/${editingRecord.id}?babyId=${encodedBabyId}`
+        : `/api/health/${editingRecord.id}?babyId=${encodedBabyId}`
       
       const response = await fetch(endpoint, {
         method: 'PUT',

@@ -345,7 +345,7 @@ class ReminderScheduler {
           eventId: execution.eventId,
         })
         await prisma.reminderExecution.updateMany({
-          where: { id: execution.id, status: 'CLAIMED' },
+          where: { id: execution.id, ruleId: rule.id, userId: rule.userId, status: 'CLAIMED' },
           data: {
             status: 'DISPATCHED',
             title: dispatched.title,
@@ -356,7 +356,7 @@ class ReminderScheduler {
         })
       } catch (error) {
         await prisma.reminderExecution.updateMany({
-          where: { id: execution.id, status: 'CLAIMED' },
+          where: { id: execution.id, ruleId: rule.id, userId: rule.userId, status: 'CLAIMED' },
           data: {
             status: 'FAILED',
             errorMessage: error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500),
@@ -380,7 +380,7 @@ class ReminderScheduler {
     data: Prisma.ReminderRuleUpdateManyMutationInput,
   ): Promise<boolean> {
     const updated = await prisma.reminderRule.updateMany({
-      where: { id: rule.id, updatedAt: rule.updatedAt },
+      where: { id: rule.id, userId: rule.userId, babyId: rule.babyId, updatedAt: rule.updatedAt },
       data,
     })
     return updated.count === 1
@@ -403,7 +403,13 @@ class ReminderScheduler {
     try {
       return await prisma.$transaction(async tx => {
         const claimed = await tx.reminderRule.updateMany({
-          where: { id: rule.id, enabled: true, updatedAt: rule.updatedAt },
+          where: {
+            id: rule.id,
+            userId: rule.userId,
+            babyId: rule.babyId,
+            enabled: true,
+            updatedAt: rule.updatedAt,
+          },
           data: { lastFiredAt: now, nextCheckAt },
         })
         if (claimed.count !== 1) throw new StaleReminderRuleError()
@@ -445,6 +451,8 @@ class ReminderScheduler {
       const claimed = await prisma.reminderExecution.updateMany({
         where: {
           id: execution.id,
+          ruleId: execution.ruleId,
+          userId: execution.userId,
           status: execution.status,
           updatedAt: execution.updatedAt,
         },
@@ -455,7 +463,12 @@ class ReminderScheduler {
       try {
         if (!execution.rule.enabled) {
           await prisma.reminderExecution.updateMany({
-            where: { id: execution.id, status: 'RECOVERING' },
+            where: {
+              id: execution.id,
+              ruleId: execution.ruleId,
+              userId: execution.userId,
+              status: 'RECOVERING',
+            },
             data: { status: 'CANCELLED', errorMessage: 'Reminder rule is disabled' },
           })
           continue
@@ -470,7 +483,12 @@ class ReminderScheduler {
           eventId,
         })
         await prisma.reminderExecution.updateMany({
-          where: { id: execution.id, status: 'RECOVERING' },
+          where: {
+            id: execution.id,
+            ruleId: execution.ruleId,
+            userId: execution.userId,
+            status: 'RECOVERING',
+          },
           data: {
             status: 'DISPATCHED',
             title: dispatched.title,
@@ -482,7 +500,12 @@ class ReminderScheduler {
         })
       } catch (error) {
         await prisma.reminderExecution.updateMany({
-          where: { id: execution.id, status: 'RECOVERING' },
+          where: {
+            id: execution.id,
+            ruleId: execution.ruleId,
+            userId: execution.userId,
+            status: 'RECOVERING',
+          },
           data: {
             status: 'FAILED',
             errorMessage: error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500),
