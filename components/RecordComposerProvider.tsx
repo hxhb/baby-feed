@@ -54,6 +54,7 @@ interface RecordComposerContextValue {
 
 const RecordComposerContext = createContext<RecordComposerContextValue | null>(null)
 const ACTIVE_TIMER_KEY = 'baby-feed:record-composer-active-timer'
+const SAVED_RECORD_TOAST_DURATION_MS = 3000
 
 export function useRecordComposer() {
   const context = useContext(RecordComposerContext)
@@ -93,6 +94,7 @@ export function RecordComposerProvider({ children }: { children: ReactNode }) {
   const previousFocusRef = useRef<HTMLElement | null>(null)
   const discardPreviousFocusRef = useRef<HTMLElement | null>(null)
   const routeOpenedRef = useRef(false)
+  const babiesRequestInFlightRef = useRef(false)
 
   useEffect(() => {
     try {
@@ -121,7 +123,8 @@ export function RecordComposerProvider({ children }: { children: ReactNode }) {
   }, [activeTimer])
 
   const loadBabies = useCallback(async () => {
-    if (babiesLoading || babies.length > 0) return
+    if (babiesRequestInFlightRef.current) return
+    babiesRequestInFlightRef.current = true
     setBabiesLoading(true)
     setBabiesError('')
     try {
@@ -150,9 +153,10 @@ export function RecordComposerProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       setBabiesError(error instanceof Error ? error.message : '宝宝信息加载失败')
     } finally {
+      babiesRequestInFlightRef.current = false
       setBabiesLoading(false)
     }
-  }, [babies.length, babiesLoading])
+  }, [])
 
   useEffect(() => {
     if (isOpen && status === 'authenticated') void loadBabies()
@@ -199,6 +203,15 @@ export function RecordComposerProvider({ children }: { children: ReactNode }) {
     setShowDiscardConfirm(false)
     window.setTimeout(() => previousFocusRef.current?.focus(), 0)
     if (pathname === '/add') router.replace('/')
+  }, [pathname, router])
+
+  const openBabySettings = useCallback(() => {
+    setIsOpen(false)
+    setSelectedType(null)
+    setShowDiscardConfirm(false)
+    window.setTimeout(() => previousFocusRef.current?.focus(), 0)
+    if (pathname === '/add') router.replace('/settings')
+    else router.push('/settings')
   }, [pathname, router])
 
   const closeComposer = useCallback(() => {
@@ -264,10 +277,10 @@ export function RecordComposerProvider({ children }: { children: ReactNode }) {
   }, [cancelDiscard, closeComposer, isOpen, showDiscardConfirm])
 
   useEffect(() => {
-    if (!savedRecord) return
-    const timeout = window.setTimeout(() => setSavedRecord(null), 7000)
+    if (!savedRecord || undoing || toastError) return
+    const timeout = window.setTimeout(() => setSavedRecord(null), SAVED_RECORD_TOAST_DURATION_MS)
     return () => window.clearTimeout(timeout)
-  }, [savedRecord])
+  }, [savedRecord, toastError, undoing])
 
   const updateDraft = useCallback((type: ComposerRecordType, patch: DraftPatch, markDirty = true) => {
     setDrafts(current => {
@@ -479,7 +492,7 @@ export function RecordComposerProvider({ children }: { children: ReactNode }) {
                 <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-50 text-blue-600"><Plus size={22} /></div>
                 <p className="mt-4 font-semibold text-slate-950">先添加宝宝信息</p>
                 <p className="mt-1 text-sm text-slate-600">有宝宝资料后才能创建记录。</p>
-                <button type="button" onClick={() => { closeImmediately(); router.push('/settings') }} className="mt-5 min-h-11 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700">前往设置</button>
+                <button type="button" onClick={openBabySettings} className="mt-5 min-h-11 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700">前往设置</button>
               </div>
             ) : selectedType && selectedDraft ? (
               <RecordComposerEditor
@@ -525,14 +538,21 @@ export function RecordComposerProvider({ children }: { children: ReactNode }) {
 
       {savedRecord ? (
         <div className="fixed inset-x-3 top-4 z-[100] mx-auto max-w-xl rounded-xl bg-slate-950 px-4 py-3 text-white shadow-2xl" role="status" aria-live="polite">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-300"><Check size={19} /></div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold">已记录：{savedRecord.summary}</p>
-              {toastError ? <p className="mt-0.5 text-xs text-red-300">{toastError}</p> : <p className="mt-0.5 text-xs text-slate-300">数据已经保存</p>}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-300"><Check size={19} /></div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold">已记录：{savedRecord.summary}</p>
+                {toastError ? <p className="mt-0.5 text-xs text-red-300">{toastError}</p> : <p className="mt-0.5 text-xs text-slate-300">数据已经保存</p>}
+              </div>
             </div>
-            <button type="button" disabled={undoing} onClick={() => void handleUndo()} className="min-h-10 rounded-lg px-2 text-sm font-medium text-slate-200 hover:bg-white/10 hover:text-white disabled:opacity-50">{undoing ? '撤销中' : '撤销'}</button>
-            <button type="button" onClick={() => openComposer()} className="flex min-h-10 items-center gap-1 rounded-lg bg-white/10 px-2.5 text-sm font-medium text-white hover:bg-white/15">继续记录<ChevronRight size={15} /></button>
+            <div className="grid grid-cols-2 gap-2 sm:ml-auto sm:flex sm:shrink-0">
+              <button type="button" disabled={undoing} onClick={() => void handleUndo()} className="flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-white px-3 text-sm font-semibold text-slate-950 shadow-sm hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:cursor-wait disabled:opacity-70">
+                <RotateCcw size={15} />
+                {undoing ? '撤销中' : '撤销记录'}
+              </button>
+              <button type="button" onClick={() => openComposer()} className="flex min-h-10 items-center justify-center gap-1 rounded-lg border border-white/20 bg-white/10 px-3 text-sm font-medium text-white hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">继续记录<ChevronRight size={15} /></button>
+            </div>
           </div>
         </div>
       ) : null}

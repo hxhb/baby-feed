@@ -26,25 +26,14 @@ interface Props {
 
 interface ToothPlacement {
   code: PrimaryToothCode
-  x: number | string
+  x: number
   y: number
   layerClass: string
 }
 
 const UPPER_CODES: readonly PrimaryToothCode[] = ['55', '54', '53', '52', '51', '61', '62', '63', '64', '65']
 const LOWER_CODES: readonly PrimaryToothCode[] = ['85', '84', '83', '82', '81', '71', '72', '73', '74', '75']
-const ARCH_X = [
-  14,
-  19.5,
-  27,
-  35,
-  'calc(50% - clamp(16.5px, 4.5vw, 18px) - 2px)',
-  'calc(50% + clamp(16.5px, 4.5vw, 18px) + 2px)',
-  65,
-  73,
-  80.5,
-  86,
-] as const
+const ARCH_X = [14, 19.5, 27, 35, 45, 55, 65, 73, 80.5, 86] as const
 const UPPER_Y = [40, 31, 23.5, 18, 14, 14, 18, 23.5, 31, 40] as const
 const LOWER_Y = [60, 69, 76.5, 82, 86, 86, 82, 76.5, 69, 60] as const
 const UPPER_LAYERS = ['z-[20]', 'z-[18]', 'z-[16]', 'z-[14]', 'z-[12]', 'z-[12]', 'z-[14]', 'z-[16]', 'z-[18]', 'z-[20]'] as const
@@ -267,7 +256,7 @@ export default function ToothChart({
               className={`absolute flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 touch-manipulation items-center justify-center rounded-full !bg-transparent transition-[filter,opacity] duration-200 motion-reduce:transition-none focus-visible:z-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 focus-visible:ring-offset-orange-100 ${layerClass} ${
                 canInteract ? 'cursor-pointer hover:brightness-105 active:opacity-80' : 'cursor-default'
               }`}
-              style={{ left: typeof x === 'number' ? `${x}%` : x, top: `${y}%` }}
+              style={{ left: `${x}%`, top: `${y}%` }}
             >
               <span className="relative flex items-center justify-center">
                 <ToothGlyph

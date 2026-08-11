@@ -237,7 +237,7 @@ const TimelineRecordItem = memo(function TimelineRecordItem({
           {getRecordIcon(record.type)}
         </div>
         <div className="min-w-0 flex-1">
-        <p className="font-medium text-gray-900 text-sm truncate">{getRecordTitle(record as DisplayRecord)}</p>
+          <p className="break-words text-sm font-medium leading-5 text-gray-900">{getRecordTitle(record as DisplayRecord)}</p>
           <p className="text-xs text-gray-500">
             {formatBeijingTime(time)}
             {record.notes && <span className="ml-1 text-gray-400">· {record.notes}</span>}

@@ -549,7 +549,7 @@ export default function Dashboard({
                         {getRecordIcon(record.type)}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium text-gray-900 text-sm truncate">
+                        <p className="break-words text-sm font-medium leading-5 text-gray-900">
                           {getRecordTitle(record as DisplayRecord)}
                         </p>
                         <p className="text-xs text-gray-500">
