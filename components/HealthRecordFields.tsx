@@ -1,6 +1,14 @@
 'use client'
 
+import { useEffect, useMemo, useState } from 'react'
+import { Pill } from 'lucide-react'
 import type { HealthFieldValues, HealthType, DiaperType, VaccineSuggestion } from '@/lib/health-records'
+import {
+  buildRecentMedicationSuggestions,
+  findPreviousMeasurementRecord,
+  type MedicationSuggestion,
+} from '@/lib/health-record-history'
+import { formatBeijingDateTimeLabel, toBeijingISO } from '@/lib/time'
 import ToothEruptionFields from '@/components/ToothEruptionFields'
 import type { PrimaryToothCode } from '@/lib/tooth-eruptions'
 
@@ -38,6 +46,14 @@ interface Props {
   babyId?: string
   recordedAt?: string
   currentRecordId?: string
+}
+
+interface HealthHistoryRecord {
+  recordedAt?: string | null
+  weight?: number | null
+  height?: number | null
+  medicationName?: string | null
+  medicationDose?: string | null
 }
 
 export function getHealthFieldValidationMessage(type: HealthType, values: HealthFieldValues) {
@@ -134,6 +150,79 @@ export default function HealthRecordFields({
   const showVaccineNameError = type === 'VACCINE' && !!validationMessage
   const showVaccineSuggestions = (vaccineSuggestionsLoading || vaccineSuggestions.length > 0) && !!onApplyVaccineSuggestion
   const cardClassName = mode === 'create' ? 'rounded-2xl bg-gray-50/70 p-3' : 'space-y-3'
+  const [historyRecords, setHistoryRecords] = useState<HealthHistoryRecord[]>([])
+  const [historyRecordsKey, setHistoryRecordsKey] = useState('')
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const historyType = type === 'WEIGHT' || type === 'HEIGHT' || type === 'MEDICATION' ? type : null
+  const historyEnabled = !currentRecordId && !!babyId && !!historyType
+  const historyRequestKey = historyEnabled ? `${babyId}:${historyType}` : ''
+  const visibleHistoryRecords = useMemo(() => {
+    return historyRecordsKey === historyRequestKey ? historyRecords : []
+  }, [historyRecords, historyRecordsKey, historyRequestKey])
+  const referenceAt = useMemo(() => {
+    return recordedAt ? toBeijingISO(recordedAt) : new Date().toISOString()
+  }, [recordedAt])
+  const previousMeasurement = useMemo(() => {
+    if (type !== 'WEIGHT' && type !== 'HEIGHT') {
+      return null
+    }
+
+    return findPreviousMeasurementRecord(visibleHistoryRecords, type, referenceAt)
+  }, [referenceAt, type, visibleHistoryRecords])
+  const medicationSuggestions = useMemo(() => {
+    return type === 'MEDICATION'
+      ? buildRecentMedicationSuggestions(visibleHistoryRecords, referenceAt)
+      : []
+  }, [referenceAt, type, visibleHistoryRecords])
+
+  useEffect(() => {
+    if (!historyEnabled || !historyType) {
+      setHistoryRecords([])
+      setHistoryRecordsKey('')
+      setHistoryLoading(false)
+      return
+    }
+
+    const controller = new AbortController()
+    setHistoryRecords([])
+    setHistoryLoading(true)
+
+    fetch(`/api/health?babyId=${encodeURIComponent(babyId)}&type=${historyType}`, {
+      signal: controller.signal,
+    })
+      .then(async response => {
+        if (!response.ok) {
+          throw new Error('获取历史健康记录失败')
+        }
+        return response.json()
+      })
+      .then(records => {
+        if (Array.isArray(records)) {
+          setHistoryRecords(records)
+          setHistoryRecordsKey(historyRequestKey)
+        }
+      })
+      .catch(error => {
+        if (error instanceof Error && error.name === 'AbortError') {
+          return
+        }
+        console.error('获取健康记录历史提示失败:', error)
+        setHistoryRecords([])
+        setHistoryRecordsKey('')
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setHistoryLoading(false)
+        }
+      })
+
+    return () => controller.abort()
+  }, [babyId, historyEnabled, historyRequestKey, historyType])
+
+  const applyMedicationSuggestion = (suggestion: MedicationSuggestion) => {
+    setters.setMedicationName(suggestion.medicationName)
+    setters.setMedicationDose(suggestion.medicationDose)
+  }
 
   if (type === 'TOOTH_ERUPTION') {
     return (
@@ -151,6 +240,16 @@ export default function HealthRecordFields({
   if (type === 'WEIGHT') {
     return (
       <div className={cardClassName}>
+        {historyEnabled && (historyLoading || previousMeasurement) ? (
+          <p className="mb-2 border-b border-gray-200 pb-2 text-xs text-gray-500">
+            {historyLoading ? '正在获取上次记录...' : (
+              <>
+                上次记录：<span className="font-semibold text-gray-800">{previousMeasurement?.value} 千克</span>
+                <span className="ml-1.5">{previousMeasurement ? formatBeijingDateTimeLabel(previousMeasurement.recordedAt) : ''}</span>
+              </>
+            )}
+          </p>
+        ) : null}
         <label className="mb-1.5 block text-sm font-medium text-gray-700">
           体重（千克）
         </label>
@@ -178,6 +277,16 @@ export default function HealthRecordFields({
   if (type === 'HEIGHT') {
     return (
       <div className={cardClassName}>
+        {historyEnabled && (historyLoading || previousMeasurement) ? (
+          <p className="mb-2 border-b border-gray-200 pb-2 text-xs text-gray-500">
+            {historyLoading ? '正在获取上次记录...' : (
+              <>
+                上次记录：<span className="font-semibold text-gray-800">{previousMeasurement?.value} 厘米</span>
+                <span className="ml-1.5">{previousMeasurement ? formatBeijingDateTimeLabel(previousMeasurement.recordedAt) : ''}</span>
+              </>
+            )}
+          </p>
+        ) : null}
         <label className="mb-1.5 block text-sm font-medium text-gray-700">
           身高（厘米）
         </label>
@@ -232,37 +341,83 @@ export default function HealthRecordFields({
 
   if (type === 'MEDICATION') {
     return (
-      <div className={mode === 'create' ? 'grid gap-2.5 sm:grid-cols-2' : 'space-y-3'}>
-        <div className={mode === 'create' ? 'rounded-2xl bg-gray-50/70 p-3' : ''}>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700">
-            药物名称
-          </label>
-          <input
-            type="text"
-            value={values.medicationName}
-            onChange={(e) => setters.setMedicationName(e.target.value)}
-            aria-invalid={showMedicationNameError}
-            aria-describedby={showMedicationNameError ? 'health-medication-name-error' : undefined}
-            className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-transparent focus:ring-2 focus:ring-blue-500"
-            placeholder="例如：布洛芬"
-          />
-          {showMedicationNameError ? (
-            <p id="health-medication-name-error" className="mt-1.5 text-sm text-red-600">
-              请填写药物名称
-            </p>
-          ) : null}
-        </div>
-        <div className={mode === 'create' ? 'rounded-2xl bg-gray-50/70 p-3' : ''}>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700">
-            剂量（可选）
-          </label>
-          <input
-            type="text"
-            value={values.medicationDose}
-            onChange={(e) => setters.setMedicationDose(e.target.value)}
-            className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-transparent focus:ring-2 focus:ring-blue-500"
-            placeholder="例如：2ml"
-          />
+      <div className="space-y-3">
+        {historyEnabled && (historyLoading || medicationSuggestions.length > 0) ? (
+          <div>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="text-xs font-medium text-gray-500">近 3 天用药</p>
+              {!historyLoading ? (
+                <span className="text-[11px] text-gray-400">{medicationSuggestions.length} 个快捷项</span>
+              ) : null}
+            </div>
+            {historyLoading ? (
+              <p className="text-xs text-gray-500">正在整理近期用药记录...</p>
+            ) : (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {medicationSuggestions.map(suggestion => {
+                  const isSelected = values.medicationName.trim().toLowerCase() === suggestion.medicationName.toLowerCase()
+                    && values.medicationDose.trim().toLowerCase() === suggestion.medicationDose.toLowerCase()
+                  return (
+                    <button
+                      key={suggestion.key}
+                      type="button"
+                      aria-pressed={isSelected}
+                      onClick={() => applyMedicationSuggestion(suggestion)}
+                      className={`flex min-h-14 items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                        isSelected
+                          ? 'border-blue-400 bg-blue-50'
+                          : 'border-gray-200 bg-white hover:border-blue-200 hover:bg-blue-50/50'
+                      }`}
+                    >
+                      <Pill size={17} className={isSelected ? 'shrink-0 text-blue-600' : 'shrink-0 text-gray-400'} aria-hidden="true" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block break-words text-sm font-semibold text-gray-900">
+                          {suggestion.medicationName}
+                          {suggestion.medicationDose ? ` · ${suggestion.medicationDose}` : ''}
+                        </span>
+                        <span className="mt-0.5 block text-xs text-gray-500">
+                          {formatBeijingDateTimeLabel(suggestion.latestRecordedAt)}
+                        </span>
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        ) : null}
+        <div className={mode === 'create' ? 'grid gap-2.5 sm:grid-cols-2' : 'space-y-3'}>
+          <div className={mode === 'create' ? 'rounded-2xl bg-gray-50/70 p-3' : ''}>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+              药物名称
+            </label>
+            <input
+              type="text"
+              value={values.medicationName}
+              onChange={(e) => setters.setMedicationName(e.target.value)}
+              aria-invalid={showMedicationNameError}
+              aria-describedby={showMedicationNameError ? 'health-medication-name-error' : undefined}
+              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              placeholder="例如：布洛芬"
+            />
+            {showMedicationNameError ? (
+              <p id="health-medication-name-error" className="mt-1.5 text-sm text-red-600">
+                请填写药物名称
+              </p>
+            ) : null}
+          </div>
+          <div className={mode === 'create' ? 'rounded-2xl bg-gray-50/70 p-3' : ''}>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+              剂量（可选）
+            </label>
+            <input
+              type="text"
+              value={values.medicationDose}
+              onChange={(e) => setters.setMedicationDose(e.target.value)}
+              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              placeholder="例如：2ml"
+            />
+          </div>
         </div>
       </div>
     )
@@ -321,9 +476,12 @@ export default function HealthRecordFields({
                       <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium ${
                         isSelected ? 'bg-white text-teal-700' : 'bg-teal-50 text-teal-700'
                       }`}>
-                        下一针：第{suggestion.nextDoseNumber}/{suggestion.totalDoses}针
+                        已打 {suggestion.currentDoseNumber} 针 / 共 {suggestion.totalDoses} 针
                       </span>
                     </div>
+                    <p className="mt-2 text-xs font-medium text-teal-700">
+                      下一针：第 {suggestion.nextDoseNumber} 针
+                    </p>
                   </button>
                 )
               })}

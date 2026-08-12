@@ -1,6 +1,13 @@
 import { toBeijingISO } from '@/lib/time'
 import type { PrimaryToothCode } from '@/lib/tooth-eruptions'
 
+export {
+  buildVaccineSuggestionKey,
+  buildVaccineSuggestions,
+  findSelectedVaccineSuggestion,
+} from '@/lib/vaccine-suggestions'
+export type { VaccineSuggestion } from '@/lib/vaccine-suggestions'
+
 export const HEALTH_TYPES = ['WEIGHT', 'HEIGHT', 'TEMPERATURE', 'MEDICATION', 'VACCINE', 'DIAPER', 'AD_VITAMIN', 'SLEEP', 'TOOTH_ERUPTION', 'CUSTOM'] as const
 export type HealthType = typeof HEALTH_TYPES[number]
 export type DiaperType = 'PEE' | 'POOP' | 'BOTH'
@@ -26,35 +33,9 @@ export interface HealthFieldValues {
   toothCodes: PrimaryToothCode[]
 }
 
-export interface VaccineSuggestion {
-  key: string
-  vaccineName: string
-  vaccineManufacturer: string
-  nextDoseNumber: number
-  totalDoses: number
-  latestRecordedAt: string
-}
-
-interface VaccineRecordLike {
-  id?: string | null
-  vaccineName?: string | null
-  vaccineManufacturer?: string | null
-  vaccineDoseNumber?: number | null
-  vaccineTotalDoses?: number | null
-  recordedAt?: string | Date | null
-}
-
 function normalizeOptionalText(value: string) {
   const trimmed = value.trim()
   return trimmed ? trimmed : null
-}
-
-function getRecordedAtValue(value: string | Date | null | undefined) {
-  if (!value) {
-    return 0
-  }
-
-  return new Date(value).getTime()
 }
 
 export function buildHealthRecordPayload(type: HealthType, values: HealthFieldValues): Record<string, unknown> {
@@ -155,75 +136,4 @@ export function buildHealthRecordPayload(type: HealthType, values: HealthFieldVa
     sleepEndTime: values.sleepEndTime ? toBeijingISO(values.sleepEndTime) : null,
     sleepQuality: values.sleepQuality.trim() || null,
   }
-}
-
-export function buildVaccineSuggestionKey(vaccineName: string, vaccineManufacturer: string) {
-  return `${vaccineName.trim().toLowerCase()}::${vaccineManufacturer.trim().toLowerCase()}`
-}
-
-export function buildVaccineSuggestions(
-  records: VaccineRecordLike[],
-  options?: { excludeRecordId?: string }
-): VaccineSuggestion[] {
-  const suggestionsMap = records.reduce<Map<string, VaccineSuggestion>>((acc, record) => {
-    if (options?.excludeRecordId && record.id === options.excludeRecordId) {
-      return acc
-    }
-
-    if (
-      typeof record?.vaccineName !== 'string' ||
-      record.recordedAt == null ||
-      typeof record?.vaccineDoseNumber !== 'number' ||
-      typeof record?.vaccineTotalDoses !== 'number'
-    ) {
-      return acc
-    }
-
-    const normalizedName = record.vaccineName.trim()
-    const normalizedManufacturer = typeof record.vaccineManufacturer === 'string' ? record.vaccineManufacturer.trim() : ''
-    const doseNumber = record.vaccineDoseNumber
-    const totalDoses = record.vaccineTotalDoses
-
-    if (!normalizedName || totalDoses <= 1 || doseNumber < 1 || doseNumber >= totalDoses) {
-      return acc
-    }
-
-    const key = buildVaccineSuggestionKey(normalizedName, normalizedManufacturer)
-    const nextSuggestion: VaccineSuggestion = {
-      key,
-      vaccineName: normalizedName,
-      vaccineManufacturer: normalizedManufacturer,
-      nextDoseNumber: doseNumber + 1,
-      totalDoses,
-      latestRecordedAt: new Date(record.recordedAt).toISOString(),
-    }
-
-    const existingSuggestion = acc.get(key)
-    if (!existingSuggestion || getRecordedAtValue(nextSuggestion.latestRecordedAt) > getRecordedAtValue(existingSuggestion.latestRecordedAt)) {
-      acc.set(key, nextSuggestion)
-    }
-
-    return acc
-  }, new Map())
-
-  return Array.from(suggestionsMap.values()).sort((a, b) => {
-    return getRecordedAtValue(b.latestRecordedAt) - getRecordedAtValue(a.latestRecordedAt)
-  })
-}
-
-export function findSelectedVaccineSuggestion(
-  suggestions: VaccineSuggestion[],
-  values: Pick<HealthFieldValues, 'vaccineName' | 'vaccineManufacturer' | 'vaccineDoseNumber' | 'vaccineTotalDoses'>
-) {
-  const normalizedName = values.vaccineName.trim().toLowerCase()
-  const normalizedManufacturer = values.vaccineManufacturer.trim().toLowerCase()
-
-  return suggestions.find((suggestion) => {
-    return (
-      suggestion.vaccineName.trim().toLowerCase() === normalizedName &&
-      suggestion.vaccineManufacturer.trim().toLowerCase() === normalizedManufacturer &&
-      String(suggestion.nextDoseNumber) === values.vaccineDoseNumber &&
-      String(suggestion.totalDoses) === values.vaccineTotalDoses
-    )
-  })
 }
