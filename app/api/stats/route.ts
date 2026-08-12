@@ -288,6 +288,7 @@ export async function GET(request: NextRequest) {
         select: {
           id: true,
           vaccineName: true,
+          vaccineManufacturer: true,
           recordedAt: true,
           notes: true,
           vaccineDoseNumber: true,
@@ -385,6 +386,7 @@ export async function GET(request: NextRequest) {
         return {
           id: record.id,
           vaccineName: record.vaccineName,
+          vaccineManufacturer: record.vaccineManufacturer,
           date: getBeijingDateStr(new Date(record.recordedAt)),
           recordedAt: record.recordedAt,
           notes: record.notes,

@@ -53,6 +53,7 @@ export interface PreloadedStatsData {
   vaccineRecords: {
     id: string
     vaccineName: string
+    vaccineManufacturer: string | null
     date: string
     recordedAt: string
     notes: string | null
@@ -195,6 +196,7 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
       select: {
         id: true,
         vaccineName: true,
+        vaccineManufacturer: true,
         recordedAt: true,
         notes: true,
         vaccineDoseNumber: true,
@@ -395,6 +397,7 @@ async function getPreloadedStatsForBaby(userId: string, babyId: string, days = 7
       return {
         id: record.id,
         vaccineName: record.vaccineName,
+        vaccineManufacturer: record.vaccineManufacturer,
         date: getBeijingDateStr(new Date(record.recordedAt)),
         recordedAt: record.recordedAt.toISOString(),
         notes: record.notes,

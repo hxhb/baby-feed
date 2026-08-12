@@ -41,7 +41,7 @@ test('vaccine suggestions include only vaccines whose latest dose is incomplete'
 
   assert.deepEqual(suggestions, [
     {
-      key: '五联疫苗::厂家 b',
+      key: '五联疫苗',
       vaccineName: '五联疫苗',
       vaccineManufacturer: '厂家 B',
       currentDoseNumber: 2,
@@ -90,6 +90,37 @@ test('a latest single-dose completion suppresses an older incomplete suggestion'
       vaccineDoseNumber: 1,
       vaccineTotalDoses: 1,
       recordedAt: '2026-08-01T08:00:00.000Z',
+    },
+  ])
+
+  assert.deepEqual(suggestions, [])
+})
+
+test('manufacturer changes do not split one vaccine course into incomplete suggestions', () => {
+  const suggestions = buildVaccineSuggestions([
+    {
+      id: 'hepatitis-b-1',
+      vaccineName: '乙肝(酿酒酵母)',
+      vaccineManufacturer: null,
+      vaccineDoseNumber: 1,
+      vaccineTotalDoses: 3,
+      recordedAt: '2026-01-02T07:02:00.000Z',
+    },
+    {
+      id: 'hepatitis-b-2',
+      vaccineName: '乙肝(酿酒酵母)',
+      vaccineManufacturer: '',
+      vaccineDoseNumber: 2,
+      vaccineTotalDoses: 3,
+      recordedAt: '2026-02-10T01:20:00.000Z',
+    },
+    {
+      id: 'hepatitis-b-3',
+      vaccineName: '乙肝(酿酒酵母)',
+      vaccineManufacturer: '深圳康泰',
+      vaccineDoseNumber: 3,
+      vaccineTotalDoses: 3,
+      recordedAt: '2026-07-04T01:35:00.000Z',
     },
   ])
 

@@ -24,6 +24,7 @@ import MemoSection from '@/components/MemoSection'
 import ToothGrowthStats from '@/components/ToothGrowthStats'
 import { generateWHOCurve } from '@/lib/who-growth-standards'
 import { getBeijingToday } from '@/lib/time'
+import { buildVaccineProgressGroups } from '@/lib/vaccine-progress'
 
 interface Baby {
   id: string
@@ -975,61 +976,13 @@ export default function StatsComponent({
     }
     window.history.pushState({}, '', `${url.pathname}${url.search}${url.hash}`)
   }
-  const vaccineProgressSummary = Object.values(
-    (stats?.vaccineRecords || []).reduce<Record<string, {
-      vaccineName: string
-      latestDoseNumber: number | null
-      totalDoses: number | null
-      latestRecordedAt: string
-      latestDate: string
-      doseEntries: {
-        id: string
-        recordedAt: string
-        doseNumber: number | null
-        totalDoses: number | null
-        note: string | null
-      }[]
-      isCompleted: boolean
-      remainingDoses: number | null
-    }>>((acc, record) => {
-      const key = record.vaccineName.trim().toLowerCase()
-      const existing = acc[key]
-      const doseNumber = record.vaccineDoseNumber ?? null
-      const totalDoses = record.vaccineTotalDoses ?? null
-      const isCompleted = !!doseNumber && !!totalDoses && doseNumber >= totalDoses
-      const remainingDoses = !!doseNumber && !!totalDoses && doseNumber < totalDoses
-        ? totalDoses - doseNumber
-        : 0
-      const doseEntry = {
-        id: record.id,
-        recordedAt: record.recordedAt,
-        doseNumber,
-        totalDoses,
-        note: record.notes?.trim() || null,
-      }
-
-      if (!existing) {
-        acc[key] = {
-          vaccineName: record.vaccineName,
-          latestDoseNumber: doseNumber,
-          totalDoses,
-          latestRecordedAt: record.recordedAt,
-          latestDate: record.date,
-          doseEntries: [doseEntry],
-          isCompleted,
-          remainingDoses,
-        }
-        return acc
-      }
-
-      existing.doseEntries.push(doseEntry)
-      return acc
-    }, {})
-  ).map(item => ({
-    ...item,
-    doseEntries: [...item.doseEntries].sort((a, b) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime()),
-  })).sort((a, b) => Number(a.isCompleted) - Number(b.isCompleted))
-  const pendingVaccines = vaccineProgressSummary.filter(item => item.remainingDoses && item.remainingDoses > 0)
+  const vaccineProgressSummary = buildVaccineProgressGroups(stats?.vaccineRecords || [])
+    .map(item => ({
+      ...item,
+      latestDoseNumber: item.currentDoseNumber,
+    }))
+    .sort((a, b) => Number(a.isCompleted) - Number(b.isCompleted))
+  const pendingVaccines = vaccineProgressSummary.filter(item => !item.isCompleted)
   const totalVaccineTypes = vaccineProgressSummary.length
   const completedVaccineTypes = vaccineProgressSummary.filter(v => v.isCompleted).length
   const recentVaccineCard = (
@@ -1053,11 +1006,13 @@ export default function StatsComponent({
         <div className="mt-2 space-y-1">
           {/* Pending vaccines - highlighted */}
           {pendingVaccines.map(item => (
-            <div key={item.vaccineName} className="flex items-center gap-2 rounded-lg border border-amber-100 bg-amber-50/60 px-2.5 py-2">
+            <div key={item.key} className="flex items-center gap-2 rounded-lg border border-amber-100 bg-amber-50/60 px-2.5 py-2">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
                   <p className="text-sm font-bold text-slate-900 truncate">{item.vaccineName}</p>
-                  <span className="shrink-0 rounded-full bg-amber-200 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">差{item.remainingDoses}针</span>
+                  <span className="shrink-0 rounded-full bg-amber-200 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
+                    {item.remainingDoses == null ? '待完善' : `差${item.remainingDoses}针`}
+                  </span>
                 </div>
                 <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-500">
                   <span className="font-medium text-teal-600">{formatVaccineProgress(item.latestDoseNumber, item.totalDoses) || '未标注'}</span>
@@ -1081,7 +1036,7 @@ export default function StatsComponent({
             <div className="rounded-lg bg-emerald-50/60 px-2.5 py-2">
               <div className="flex flex-wrap gap-x-2.5 gap-y-1">
                 {vaccineProgressSummary.filter(v => v.isCompleted).map(item => (
-                  <span key={item.vaccineName} className="text-[11px] text-emerald-700">
+                  <span key={item.key} className="text-[11px] text-emerald-700">
                     ✓ <span className="font-medium">{item.vaccineName}</span>
                     {item.totalDoses && <span className="text-emerald-500">({item.totalDoses}针)</span>}
                   </span>
@@ -1513,14 +1468,14 @@ export default function StatsComponent({
                     {pendingVaccines.length > 0 && (
                       <div className="grid gap-2 sm:grid-cols-2">
                         {vaccineProgressSummary.filter(v => !v.isCompleted).map(item => (
-                          <div key={item.vaccineName} className="rounded-xl border p-3 border-amber-100 bg-amber-50/20">
+                          <div key={item.key} className="rounded-xl border p-3 border-amber-100 bg-amber-50/20">
                             {/* Header row: name + status + progress bar */}
                             <div className="flex items-center gap-2">
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-1.5">
                                   <p className="text-sm font-bold text-slate-900 truncate">{item.vaccineName}</p>
                                   <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold bg-amber-200 text-amber-800">
-                                    差{item.remainingDoses}针
+                                    {item.remainingDoses == null ? '待完善' : `差${item.remainingDoses}针`}
                                   </span>
                                 </div>
                                 <div className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-500">
@@ -1543,7 +1498,7 @@ export default function StatsComponent({
                             <div className="mt-2 rounded-lg bg-white/70 px-2.5 py-2">
                               <div className="space-y-1 text-xs leading-4 text-slate-600">
                                 {item.doseEntries.map(doseEntry => (
-                                  <div key={doseEntry.id} className="flex items-start gap-1">
+                                  <div key={doseEntry.key} className="flex items-start gap-1">
                                     <span className="shrink-0 text-slate-300 leading-4">•</span>
                                     <p className="min-w-0 break-words">
                                       <span className="font-semibold text-slate-700">
@@ -1578,7 +1533,7 @@ export default function StatsComponent({
                         {showCompletedVaccines && (
                           <div className="mt-1 grid gap-2 sm:grid-cols-2">
                             {vaccineProgressSummary.filter(v => v.isCompleted).map(item => (
-                              <div key={item.vaccineName} className="rounded-xl border p-3 border-emerald-100 bg-emerald-50/30">
+                              <div key={item.key} className="rounded-xl border p-3 border-emerald-100 bg-emerald-50/30">
                                 {/* Header row: name + status + progress bar */}
                                 <div className="flex items-center gap-2">
                                   <div className="min-w-0 flex-1">
@@ -1608,7 +1563,7 @@ export default function StatsComponent({
                                 <div className="mt-2 rounded-lg bg-white/70 px-2.5 py-2">
                                   <div className="space-y-1 text-xs leading-4 text-slate-600">
                                     {item.doseEntries.map(doseEntry => (
-                                      <div key={doseEntry.id} className="flex items-start gap-1">
+                                      <div key={doseEntry.key} className="flex items-start gap-1">
                                         <span className="shrink-0 text-slate-300 leading-4">•</span>
                                         <p className="min-w-0 break-words">
                                           <span className="font-semibold text-slate-700">
